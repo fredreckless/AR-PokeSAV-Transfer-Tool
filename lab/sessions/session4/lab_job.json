@@ -1,0 +1,18 @@
+{
+ "id": "session4 cartridge baseline",
+ "jobs": [
+  {
+   "id": "start-up shortcut (switch the GBA on)",
+   "special": "boot_hello",
+   "wait_s": 180
+  },
+  {
+   "id": "cartridge baseline",
+   "args": [
+    "--lab",
+    "script",
+    "s4_cart_baseline.json"
+   ]
+  }
+ ]
+}

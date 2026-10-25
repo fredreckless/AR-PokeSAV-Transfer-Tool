@@ -1,0 +1,27 @@
+Reckless v4.1 - test results (24 Oct 2026)
+- 59 of 59 tests pass, each run in its own simulator process
+  (the emulator library occasionally crashes when many simulated DUOs share
+   one process; that is a test-harness limit, not a firmware or tool fault)
+- 12 of 12 planted bugs caught, including v4's restart race and the 32-bit
+  save checksum that real hardware exposed
+- v4.1 firmware CRC A5303402
+
+=== Real-hardware confirmation, 25 Oct 2026 (v4.1 firmware, LeafGreen) ===
+Boot shortcut: hello answered 12 s after switch-on.
+Restarts: 13/13 back in USB SERVER MODE in 0.5 s; every following lab run worked first time.
+Fast save: 5 runs, all CRC 59F4A131 (save #33); ~50 s (about 24 s per 64 KB bank -
+  this save compresses ~3x less than the near-empty Ruby save the 20 s estimate assumed).
+Cartridge report: DAFFECEC, unchanged.
+New finding: twice, the first run after a start-up returned the first 3-5 bytes of its output
+  garbled (title read "ON LEAF"); not reproduced in 13 later attempts. Tool now reads a 32-byte
+  guard first (save and cart report), reports any garbling, and re-reads a header whose
+  checksum fails. Simulator: 60/60 tests pass, each in its own process (new test added).
+
+=== Session 9, 25 Oct 2026: cold start, speed model, soak ===
+Cold start: hello -> server mode; first save after it read cleanly (no garbling; guard silent).
+Soak: 21 saves in a row, all CRC 59F4A131, 47.4-47.9 s each; no re-reads, re-sends or errors.
+Speed: time = ~2.6 s fixed + ~18 ms per 8-byte packet actually sent (one GBA packet + one PC
+  reply, ~9.2 ms each) - confirmed from 1% to 100% compressible data (FF padding 64 KB: 5 s;
+  ROM code 64 KB: 151 s; this save's bank: 24 s, RLE 14%).
+Ceiling: zlib packs this save's banks to ~3.9 KB vs RLE's ~9 KB; a GBA-side LZ compressor
+  could bring a full save to roughly 25 s. Packet timing itself is fixed by the USB link.

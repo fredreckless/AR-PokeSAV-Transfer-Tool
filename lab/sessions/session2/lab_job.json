@@ -1,0 +1,13 @@
+{
+ "id": "session2a",
+ "jobs": [
+  {
+   "id": "F1 flash windows, 4 KB checksums",
+   "args": [
+    "--lab",
+    "script",
+    "s2_flash_windows.json"
+   ]
+  }
+ ]
+}

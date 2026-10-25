@@ -1,0 +1,1 @@
+{"id": "rehearsal", "jobs": [{"id": "F1", "args": ["--lab", "script", "s2_flash_windows.json"]}, {"id": "B1 boot hello", "special": "boot_hello", "wait_s": 20}, {"id": "B2 list", "args": ["--list"]}]}

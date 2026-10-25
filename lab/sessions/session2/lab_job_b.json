@@ -1,0 +1,16 @@
+{
+ "id": "session2b",
+ "jobs": [
+  {
+   "id": "B1 boot hello (GBA off at start)",
+   "special": "boot_hello",
+   "wait_s": 120
+  },
+  {
+   "id": "B2 confirm normal state",
+   "args": [
+    "--list"
+   ]
+  }
+ ]
+}

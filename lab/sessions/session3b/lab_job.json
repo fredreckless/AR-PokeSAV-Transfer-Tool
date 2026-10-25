@@ -1,0 +1,13 @@
+{
+ "id": "session3b",
+ "jobs": [
+  {
+   "id": "H1 header under mappings 0x0007/0x0001, and 32/16-bit reads",
+   "args": [
+    "--lab",
+    "script",
+    "s3b_header_maps.json"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1981 @@
+=== job probe-1 at 2026-10-22 00:19:57 ===
+args: ['--lab', 'probe']
+Connected to Action Replay MAX DUO (firmware 1.04)
+Running lab probe (reads only; save-chip ID commands; DUO restored afterwards)...
+  registers: 0x09FE0160=0000  0x09FFE140=a0f0
+  DUO mapped:  header title area: '            ....'   save area: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  map 0x0101: title 'POKEMON RUBYAXVE'
+      save area [16 bytes of save data: trainer name and ID, redacted]
+      flash ID 62 13 -> Sanyo LE26FV10N1TS (128 KB Flash);  after exit: 62 13 00 00
+  map 0x0007: title 'POKEMON RUBYAXVE'
+      save area 62 13 00 00 62 13 00 00 62 13 00 00 62 13 00 00
+      flash ID 62 13 -> Sanyo LE26FV10N1TS (128 KB Flash);  after exit: 62 13 00 00
+  map 0x0001: title 'POKEMON RUBYAXVE'
+      save area 62 13 00 00 62 13 00 00 62 13 00 00 62 13 00 00
+      flash ID 62 13 -> Sanyo LE26FV10N1TS (128 KB Flash);  after exit: 62 13 00 00
+
+Results saved to lab_results\lab 2026-10-22 002003.json
+
+exit code 0
+
+=== job sanyo-exit-1 at 2026-10-22 00:21:06 ===
+args: ['--lab', 'script', 'exit_test.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 234881024, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 234881024, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 234881024, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 234881024, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+
+Results saved to lab_results\lab 2026-10-22 002109.json
+
+exit code 0
+
+=== job readonly-diag-1 at 2026-10-22 00:23:02 ===
+args: ['--lab', 'script', 'readonly_diag.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 134217888, 16): 50 4f 4b 45 4d 4f 4e 20 52 55 42 59 41 58 56 45
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 134217888, 16): 50 4f 4b 45 4d 4f 4e 20 52 55 42 59 41 58 56 45
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 134217888, 16): 50 4f 4b 45 4d 4f 4e 20 52 55 42 59 41 58 56 45
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+
+Results saved to lab_results\lab 2026-10-22 002307.json
+
+exit code 0
+
+=== job read-bank0 at 2026-10-22 00:24:00 ===
+args: ['--lab', 'script', 'read_bank0.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-22 002626 #0.bin  (crc DEAB7E4E)
+
+Results saved to lab_results\lab 2026-10-22 002626.json
+
+exit code 0
+
+=== job read-bank0 at 2026-10-22 00:30:16 ===
+args: ['--lab', 'script', 'read_bank0.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-22 003241 #0.bin  (crc DEAB7E4E)
+
+Results saved to lab_results\lab 2026-10-22 003241.json
+
+exit code 0
+
+=== job read-bank0 at 2026-10-22 00:34:19 ===
+args: ['--lab', 'script', 'read_bank0.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-22 003651 #0.bin  (crc DEAB7E4E)
+
+Results saved to lab_results\lab 2026-10-22 003651.json
+
+exit code 0
+
+=== job bank0-v2 at 2026-10-22 00:38:30 ===
+args: ['--lab', 'script', 'bank0_v2.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 134217888, 16): 50 4f 4b 45 4d 4f 4e 20 52 55 42 59 41 58 56 45
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-22 004057 #1.bin  (crc 65F35C59)
+
+Results saved to lab_results\lab 2026-10-22 004057.json
+
+exit code 0
+
+=== job bank1-v3 at 2026-10-22 00:44:39 ===
+args: ['--lab', 'script', 'bank1_v3.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 134217888, 16): 50 4f 4b 45 4d 4f 4e 20 52 55 42 59 41 58 56 45
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-22 004705 #2.bin  (crc 69717592)
+
+Results saved to lab_results\lab 2026-10-22 004705.json
+
+exit code 0
+
+=== job tests-1-and-2 at 2026-10-22 11:27:32 ===
+args: ['--lab', 'batch', 'tests12.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+
+--- t1a cold save read, header, save, re-map ---
+  ('r8', 234881024, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 134217888, 16): 50 4f 4b 45 4d 4f 4e 20 52 55 42 59 41 58 56 45
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234881024, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+
+--- t1b next run: persists? far ROM read ---
+  ('r8', 234881024, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 135266304, 4): 00 9b 98 7c
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+
+--- t1c next run: 16-bit read at 0x08000000 ---
+  ('r8', 234881024, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r16', 134217728, 2): 32 00
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+
+--- t2 bank 0 ---
+  ('r8', 134217888, 16): 50 4f 4b 45 4d 4f 4e 20 52 55 42 59 41 58 56 45
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\t2 bank 0 2026-10-22 113003 #1.bin  (crc 65F35C59)
+
+--- t2 bank 1 ---
+  ('r8', 134217888, 16): 50 4f 4b 45 4d 4f 4e 20 52 55 42 59 41 58 56 45
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\t2 bank 1 2026-10-22 113226 #2.bin  (crc 69717592)
+
+Joined ['b0', 'b1'] -> lab_results/t2_full_save.sav: 131,072 bytes, crc 612DDAF0
+
+Batch finished.
+
+exit code 0
+
+=== job tests-1-and-3 at 2026-10-22 11:52:54 ===
+args: ['--lab', 'batch', 'tests13.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+
+--- test 3: mappings with wake-up read (no chip commands) ---
+  ('r16', 134217728, 2): 32 00
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234942464, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r16', 134217728, 2): 32 00
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234942464, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r16', 134217728, 2): 32 00
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234942464, 16): [16 bytes of save data: trainer name and ID, redacted]
+
+--- test 1: Sanyo ID mode exit (ID, then E1 F0@0, E2 F0@5555, E3 AA55F0 long wait, E4 AA55F0+F0@0) ---
+  ('r16', 134217728, 2): 32 00
+  ('r8', 234881024, 4): [4 bytes of save data: start of trainer name, redacted]
+  ('r8', 234881024, 4): 62 13 00 00
+  ('r8', 234881024, 4): [4 bytes of save data: start of trainer name, redacted]
+  ('r8', 234881024, 4): [4 bytes of save data: start of trainer name, redacted]
+  ('r8', 234881024, 4): [4 bytes of save data: start of trainer name, redacted]
+  ('r8', 234881024, 4): [4 bytes of save data: start of trainer name, redacted]
+
+--- test 1: fresh run - back in normal read mode? ---
+  ('r16', 134217728, 2): 32 00
+  ('r8', 234881024, 16): [16 bytes of save data: trainer name and ID, redacted]
+  ('r8', 234942464, 16): [16 bytes of save data: trainer name and ID, redacted]
+
+Batch finished.
+
+exit code 0
+
+##### session1: 8 job(s) #####
+
+=== job T1 empty program at 2026-10-24 20:32:47 ===
+args: ['--lab', 'script', 's1_empty.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+
+Results saved to lab_results\lab 2026-10-24 203249.json
+
+exit code 0, took 1.99 s
+
+=== job T2 save-tag search, whole area at 2026-10-24 20:32:49 ===
+args: ['--lab', 'script', 's1_search_full.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('search', 134217728, 33423360, [1396788294, 1296126547, 1380992325]): ac 07 6b 08 46 4c 41 53 48 31 4d 5f 56 31 30 33 ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+
+Results saved to lab_results\lab 2026-10-24 203322.json
+
+exit code 0, took 33.15 s
+
+=== job T3 save-tag search, first 16 MB at 2026-10-24 20:33:22 ===
+args: ['--lab', 'script', 's1_search_16mb.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('search', 134217728, 16777216, [1396788294, 1296126547, 1380992325]): ac 07 6b 08 46 4c 41 53 48 31 4d 5f 56 31 30 33 ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+
+Results saved to lab_results\lab 2026-10-24 203340.json
+
+exit code 0, took 17.61 s
+
+=== job T4 read 64 KB bank 0 at 2026-10-24 20:33:40 ===
+args: ['--lab', 'script', 's1_bank0.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-24 203350 #1.bin  (crc D658F135)
+
+Results saved to lab_results\lab 2026-10-24 203350.json
+
+exit code 0, took 10.28 s
+
+=== job T5 GBA checksum of 64 KB at 2026-10-24 20:33:50 ===
+args: ['--lab', 'script', 's1_crc64k.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('crc', 234881024, 65536): 35 f1 58 d6
+
+Results saved to lab_results\lab 2026-10-24 203352.json
+
+exit code 0, took 2.54 s
+
+=== job D1 DUO flash size at 2026-10-24 20:33:52 ===
+args: ['--lab', 'script', 's1_duo_flash.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('crc', 134217728, 524288): 2b 06 63 dd
+  ('crc', 134742016, 524288): ac 48 ab 90
+  ('crc', 135266304, 524288): 92 d5 4e dc
+  ('crc', 135790592, 524288): 92 d5 4e dc
+  ('crc', 134463488, 278528): 7c 60 31 cf
+  ('r8', 134217728, 16): 2e 00 00 ea 00 00 00 00 00 00 00 00 00 00 00 00
+  ('r8', 134742016, 16): 2e 00 00 ea 00 00 00 00 00 00 00 00 00 00 00 00
+  ('r8', 135266304, 16): 00 00 01 00 02 00 03 00 04 00 05 00 06 00 07 00
+  ('r8', 134463488, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 134737920, 16): 20 20 20 20 73 74 01 0d e8 59 d3 23 02 00 00 00
+
+Results saved to lab_results\lab 2026-10-24 203424.json
+
+exit code 0, took 31.36 s
+
+=== job D2 DUO stored files at 2026-10-24 20:34:24 ===
+args: ['--list', '--verbose']
+Connected to Action Replay MAX DUO (firmware 1.04)
+Reading the list of stored items...
+Found 2 item(s).
+
+  [  0] 1                        flags 0x1F  1, User 2, User 3, User 4   raw 4250524531000000000000000000000000000000000000000000001f00020100
+  [  1] q                        flags 0x1F  1, User 2, User 3, User 4   raw ffffffff71000000000000000000000000000000000000000000001f01020100
+
+exit code 0, took 0.56 s
+
+=== job W1 wake-read variants at 2026-10-24 20:34:24 ===
+args: ['--lab', 'script', 's1_wake.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 234881024, 8): ff ff ff ff ff ff ff ff
+  ('r8', 134217728, 1): 32
+  ('r8', 234881024, 8): 00 00 00 00 00 00 00 00
+  ('r16', 150994942, 2): ff ff
+  ('r8', 234881024, 8): 00 00 00 00 00 00 00 00
+  ('r16', 150994944, 2): 00 00
+  ('r8', 234881024, 8): 00 00 00 00 00 00 00 00
+  ('r16', 134217728, 2): 32 00
+  ('r8', 234881024, 8): 00 00 00 00 00 00 00 00
+  ('r32', 134217888, 4): 50 4f 4b 45
+  ('r8', 234881024, 8): 00 00 00 00 00 00 00 00
+  ('r8', 234881024, 8): ff ff ff ff ff ff ff ff
+  ('r16', 134217728, 2): 32 00
+  ('r8', 234881024, 8): 00 00 00 00 00 00 00 00
+  ('r8', 234881024, 8): ff ff ff ff ff ff ff ff
+  ('r16', 134217728, 2): 32 00
+  ('r8', 234881024, 8): 00 00 00 00 00 00 00 00
+  ('r8', 234881024, 8): ff ff ff ff ff ff ff ff
+  ('r16', 134217728, 2): 32 00
+  ('r8', 234881024, 8): 00 00 00 00 00 00 00 00
+
+Results saved to lab_results\lab 2026-10-24 203440.json
+
+exit code 0, took 15.54 s
+
+##### session2a: 1 job(s) #####
+
+=== job F1 flash windows, 4 KB checksums at 2026-10-24 20:40:42 ===
+args: ['--lab', 'script', 's2_flash_windows.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('crc', 134217728, 4096): 32 f8 79 05
+  ('crc', 134221824, 4096): 73 09 4a 22
+  ('crc', 134225920, 4096): 1c 4a f7 f7
+  ('crc', 134230016, 4096): 10 79 bf bb
+  ('crc', 134234112, 4096): ab 28 85 6d
+  ('crc', 134238208, 4096): 37 ac 06 31
+  ('crc', 134242304, 4096): 89 3f 5a 97
+  ('crc', 134246400, 4096): 20 d3 1a 16
+  ('crc', 134250496, 4096): e5 fb 54 5d
+  ('crc', 134254592, 4096): 7c e2 1a 97
+  ('crc', 134258688, 4096): 37 13 85 ef
+  ('crc', 134262784, 4096): a4 1b cc 6b
+  ('crc', 134266880, 4096): 56 ba 12 c4
+  ('crc', 134270976, 4096): 28 0e c4 e8
+  ('crc', 134275072, 4096): ce 65 3c 0d
+  ('crc', 134279168, 4096): fb 8b 87 ad
+  ('crc', 134283264, 4096): b4 df 65 26
+  ('crc', 134287360, 4096): 90 29 9c 16
+  ('crc', 134291456, 4096): 8f a1 0a d8
+  ('crc', 134295552, 4096): e9 b5 b0 3e
+  ('crc', 134299648, 4096): d1 40 d8 2f
+  ('crc', 134303744, 4096): af 7d d0 e1
+  ('crc', 134307840, 4096): fd 34 9a 28
+  ('crc', 134311936, 4096): 71 e7 9c d3
+  ('crc', 134316032, 4096): d5 f1 d5 53
+  ('crc', 134320128, 4096): f2 73 a8 cc
+  ('crc', 134324224, 4096): b8 d7 e0 80
+  ('crc', 134328320, 4096): 56 4b 48 8f
+  ('crc', 134332416, 4096): 02 0b 91 04
+  ('crc', 134336512, 4096): 1e 2c 84 87
+  ('crc', 134340608, 4096): 37 94 6d 6f
+  ('crc', 134344704, 4096): 1e 06 f6 de
+  ('crc', 134348800, 4096): 11 00 1c c7
+  ('crc', 134352896, 4096): 11 00 1c c7
+  ('crc', 134356992, 4096): 36 3d 49 63
+  ('crc', 134361088, 4096): cc 56 ee 7c
+  ('crc', 134365184, 4096): 08 e2 84 aa
+  ('crc', 134369280, 4096): d8 fb 76 89
+  ('crc', 134373376, 4096): e8 0f 01 61
+  ('crc', 134377472, 4096): 8b a9 60 d1
+  ('crc', 134381568, 4096): 06 7c 2f 5a
+  ('crc', 134385664, 4096): 51 e9 86 3e
+  ('crc', 134389760, 4096): ef 26 8a 39
+  ('crc', 134393856, 4096): 33 92 8a f7
+  ('crc', 134397952, 4096): 8d a1 87 80
+  ('crc', 134402048, 4096): 3e f0 de 60
+  ('crc', 134406144, 4096): 39 8d f0 54
+  ('crc', 134410240, 4096): 11 00 1c c7
+  ('crc', 134414336, 4096): 12 99 24 6d
+  ('crc', 134418432, 4096): 43 f1 7f 1d
+  ('crc', 134422528, 4096): 05 b4 81 02
+  ('crc', 134426624, 4096): 43 f1 7f 1d
+  ('crc', 134430720, 4096): 13 33 84 01
+  ('crc', 134434816, 4096): 0a 67 54 f1
+  ('crc', 134438912, 4096): 0a 67 54 f1
+  ('crc', 134443008, 4096): 0a 67 54 f1
+  ('crc', 134447104, 4096): 0a 67 54 f1
+  ('crc', 134451200, 4096): 31 e8 a0 54
+  ('crc', 134455296, 4096): 72 45 e7 2e
+  ('crc', 134459392, 4096): 0a 67 54 f1
+  ('crc', 134463488, 4096): 0a 67 54 f1
+  ('crc', 134467584, 4096): 0a 67 54 f1
+  ('crc', 134471680, 4096): 0a 67 54 f1
+  ('crc', 134475776, 4096): 37 48 22 45
+  ('crc', 134479872, 4096): 4f f3 93 88
+  ('crc', 134483968, 4096): 2c df 91 c0
+  ('crc', 134488064, 4096): 43 5e fa 44
+  ('crc', 134492160, 4096): 57 5f 57 0d
+  ('crc', 134496256, 4096): e5 8d 0d 92
+  ('crc', 134500352, 4096): 83 03 da 0b
+  ('crc', 134504448, 4096): 93 c4 4d 79
+  ('crc', 134508544, 4096): 47 2c 0a c1
+  ('crc', 134512640, 4096): 68 f8 43 82
+  ('crc', 134516736, 4096): 30 7d 65 78
+  ('crc', 134520832, 4096): 80 03 45 86
+  ('crc', 134524928, 4096): e0 9d 10 20
+  ('crc', 134529024, 4096): 7c 86 e9 b0
+  ('crc', 134533120, 4096): cd 95 29 4a
+  ('crc', 134537216, 4096): 1b a9 dc f0
+  ('crc', 134541312, 4096): f9 32 d8 06
+  ('crc', 134545408, 4096): 12 2d 8d 2c
+  ('crc', 134549504, 4096): 7d d9 d7 d7
+  ('crc', 134553600, 4096): 2f 7f f8 97
+  ('crc', 134557696, 4096): f8 cb 37 69
+  ('crc', 134561792, 4096): 39 c3 d8 59
+  ('crc', 134565888, 4096): a6 88 9a 41
+  ('crc', 134569984, 4096): 0c 6f 40 1b
+  ('crc', 134574080, 4096): d0 46 75 27
+  ('crc', 134578176, 4096): 01 75 04 d9
+  ('crc', 134582272, 4096): c6 fd c0 3a
+  ('crc', 134586368, 4096): 46 94 f6 14
+  ('crc', 134590464, 4096): 6b 61 17 29
+  ('crc', 134594560, 4096): 58 fd 2e 36
+  ('crc', 134598656, 4096): 7c 53 94 5f
+  ('crc', 134602752, 4096): 33 b0 23 26
+  ('crc', 134606848, 4096): bd c9 2a 5f
+  ('crc', 134610944, 4096): b0 c2 42 84
+  ('crc', 134615040, 4096): 71 51 de 08
+  ('crc', 134619136, 4096): ab bb 65 1d
+  ('crc', 134623232, 4096): d5 04 db 74
+  ('crc', 134627328, 4096): 08 f5 2c 25
+  ('crc', 134631424, 4096): 88 e4 4a 08
+  ('crc', 134635520, 4096): 5d d3 75 23
+  ('crc', 134639616, 4096): ce d4 28 be
+  ('crc', 134643712, 4096): e2 02 95 37
+  ('crc', 134647808, 4096): 1a ba a8 b8
+  ('crc', 134651904, 4096): 9c 74 b4 c7
+  ('crc', 134656000, 4096): f5 3a bb c4
+  ('crc', 134660096, 4096): 72 2d 04 5c
+  ('crc', 134664192, 4096): 1b ed 06 73
+  ('crc', 134668288, 4096): ed c2 66 c9
+  ('crc', 134672384, 4096): c7 48 75 94
+  ('crc', 134676480, 4096): d4 f6 53 00
+  ('crc', 134680576, 4096): ef 87 38 ce
+  ('crc', 134684672, 4096): 6c 97 f9 d2
+  ('crc', 134688768, 4096): bb 3e 92 3d
+  ('crc', 134692864, 4096): aa b9 b4 04
+  ('crc', 134696960, 4096): ab 4e b1 68
+  ('crc', 134701056, 4096): ea 7d 9c 1f
+  ('crc', 134705152, 4096): 30 c2 bd 95
+  ('crc', 134709248, 4096): b8 54 bd 8c
+  ('crc', 134713344, 4096): c5 a4 5f a3
+  ('crc', 134717440, 4096): 58 24 ea c5
+  ('crc', 134721536, 4096): bd 50 f8 e3
+  ('crc', 134725632, 4096): 9c 32 54 f6
+  ('crc', 134729728, 4096): 0e 3d 8f 71
+  ('crc', 134733824, 4096): 75 dd 78 20
+  ('crc', 134737920, 4096): 63 da cc 0d
+  ('crc', 134742016, 4096): d8 30 6c 24
+  ('crc', 134746112, 4096): 73 09 4a 22
+  ('crc', 134750208, 4096): 1c 4a f7 f7
+  ('crc', 134754304, 4096): 10 79 bf bb
+  ('crc', 134758400, 4096): ab 28 85 6d
+  ('crc', 134762496, 4096): 37 ac 06 31
+  ('crc', 134766592, 4096): 89 3f 5a 97
+  ('crc', 134770688, 4096): 20 d3 1a 16
+  ('crc', 134774784, 4096): e5 fb 54 5d
+  ('crc', 134778880, 4096): 7c e2 1a 97
+  ('crc', 134782976, 4096): 37 13 85 ef
+  ('crc', 134787072, 4096): a4 1b cc 6b
+  ('crc', 134791168, 4096): 56 ba 12 c4
+  ('crc', 134795264, 4096): 28 0e c4 e8
+  ('crc', 134799360, 4096): ce 65 3c 0d
+  ('crc', 134803456, 4096): fb 8b 87 ad
+  ('crc', 134807552, 4096): b4 df 65 26
+  ('crc', 134811648, 4096): 90 29 9c 16
+  ('crc', 134815744, 4096): 8f a1 0a d8
+  ('crc', 134819840, 4096): e9 b5 b0 3e
+  ('crc', 134823936, 4096): d1 40 d8 2f
+  ('crc', 134828032, 4096): af 7d d0 e1
+  ('crc', 134832128, 4096): fd 34 9a 28
+  ('crc', 134836224, 4096): 71 e7 9c d3
+  ('crc', 134840320, 4096): d5 f1 d5 53
+  ('crc', 134844416, 4096): f2 73 a8 cc
+  ('crc', 134848512, 4096): b8 d7 e0 80
+  ('crc', 134852608, 4096): 56 4b 48 8f
+  ('crc', 134856704, 4096): 02 0b 91 04
+  ('crc', 134860800, 4096): 1e 2c 84 87
+  ('crc', 134864896, 4096): 37 94 6d 6f
+  ('crc', 134868992, 4096): 1e 06 f6 de
+  ('crc', 134873088, 4096): 11 00 1c c7
+  ('crc', 134877184, 4096): 11 00 1c c7
+  ('crc', 134881280, 4096): 36 3d 49 63
+  ('crc', 134885376, 4096): cc 56 ee 7c
+  ('crc', 134889472, 4096): 08 e2 84 aa
+  ('crc', 134893568, 4096): d8 fb 76 89
+  ('crc', 134897664, 4096): e8 0f 01 61
+  ('crc', 134901760, 4096): 8b a9 60 d1
+  ('crc', 134905856, 4096): 06 7c 2f 5a
+  ('crc', 134909952, 4096): 51 e9 86 3e
+  ('crc', 134914048, 4096): ef 26 8a 39
+  ('crc', 134918144, 4096): 33 92 8a f7
+  ('crc', 134922240, 4096): 8d a1 87 80
+  ('crc', 134926336, 4096): 3e f0 de 60
+  ('crc', 134930432, 4096): 39 8d f0 54
+  ('crc', 134934528, 4096): 11 00 1c c7
+  ('crc', 134938624, 4096): 12 99 24 6d
+  ('crc', 134942720, 4096): 43 f1 7f 1d
+  ('crc', 134946816, 4096): 05 b4 81 02
+  ('crc', 134950912, 4096): 43 f1 7f 1d
+  ('crc', 134955008, 4096): 13 33 84 01
+  ('crc', 134959104, 4096): 0a 67 54 f1
+  ('crc', 134963200, 4096): 0a 67 54 f1
+  ('crc', 134967296, 4096): 0a 67 54 f1
+  ('crc', 134971392, 4096): 0a 67 54 f1
+  ('crc', 134975488, 4096): 31 e8 a0 54
+  ('crc', 134979584, 4096): 72 45 e7 2e
+  ('crc', 134983680, 4096): 0a 67 54 f1
+  ('crc', 134987776, 4096): 0a 67 54 f1
+  ('crc', 134991872, 4096): 0a 67 54 f1
+  ('crc', 134995968, 4096): 0a 67 54 f1
+  ('crc', 135000064, 4096): 37 48 22 45
+  ('crc', 135004160, 4096): 4f f3 93 88
+  ('crc', 135008256, 4096): 2c df 91 c0
+  ('crc', 135012352, 4096): 43 5e fa 44
+  ('crc', 135016448, 4096): 57 5f 57 0d
+  ('crc', 135020544, 4096): e5 8d 0d 92
+  ('crc', 135024640, 4096): 83 03 da 0b
+  ('crc', 135028736, 4096): 93 c4 4d 79
+  ('crc', 135032832, 4096): 47 2c 0a c1
+  ('crc', 135036928, 4096): 68 f8 43 82
+  ('crc', 135041024, 4096): 30 7d 65 78
+  ('crc', 135045120, 4096): 80 03 45 86
+  ('crc', 135049216, 4096): e0 9d 10 20
+  ('crc', 135053312, 4096): 7c 86 e9 b0
+  ('crc', 135057408, 4096): cd 95 29 4a
+  ('crc', 135061504, 4096): 1b a9 dc f0
+  ('crc', 135065600, 4096): f9 32 d8 06
+  ('crc', 135069696, 4096): 12 2d 8d 2c
+  ('crc', 135073792, 4096): 7d d9 d7 d7
+  ('crc', 135077888, 4096): 2f 7f f8 97
+  ('crc', 135081984, 4096): f8 cb 37 69
+  ('crc', 135086080, 4096): 39 c3 d8 59
+  ('crc', 135090176, 4096): a6 88 9a 41
+  ('crc', 135094272, 4096): 0c 6f 40 1b
+  ('crc', 135098368, 4096): d0 46 75 27
+  ('crc', 135102464, 4096): 01 75 04 d9
+  ('crc', 135106560, 4096): c6 fd c0 3a
+  ('crc', 135110656, 4096): 46 94 f6 14
+  ('crc', 135114752, 4096): 6b 61 17 29
+  ('crc', 135118848, 4096): 58 fd 2e 36
+  ('crc', 135122944, 4096): 7c 53 94 5f
+  ('crc', 135127040, 4096): 33 b0 23 26
+  ('crc', 135131136, 4096): bd c9 2a 5f
+  ('crc', 135135232, 4096): b0 c2 42 84
+  ('crc', 135139328, 4096): 71 51 de 08
+  ('crc', 135143424, 4096): ab bb 65 1d
+  ('crc', 135147520, 4096): d5 04 db 74
+  ('crc', 135151616, 4096): 08 f5 2c 25
+  ('crc', 135155712, 4096): 88 e4 4a 08
+  ('crc', 135159808, 4096): 5d d3 75 23
+  ('crc', 135163904, 4096): ce d4 28 be
+  ('crc', 135168000, 4096): e2 02 95 37
+  ('crc', 135172096, 4096): 1a ba a8 b8
+  ('crc', 135176192, 4096): 9c 74 b4 c7
+  ('crc', 135180288, 4096): f5 3a bb c4
+  ('crc', 135184384, 4096): 72 2d 04 5c
+  ('crc', 135188480, 4096): 1b ed 06 73
+  ('crc', 135192576, 4096): ed c2 66 c9
+  ('crc', 135196672, 4096): c7 48 75 94
+  ('crc', 135200768, 4096): d4 f6 53 00
+  ('crc', 135204864, 4096): ef 87 38 ce
+  ('crc', 135208960, 4096): 6c 97 f9 d2
+  ('crc', 135213056, 4096): bb 3e 92 3d
+  ('crc', 135217152, 4096): aa b9 b4 04
+  ('crc', 135221248, 4096): ab 4e b1 68
+  ('crc', 135225344, 4096): ea 7d 9c 1f
+  ('crc', 135229440, 4096): 30 c2 bd 95
+  ('crc', 135233536, 4096): b8 54 bd 8c
+  ('crc', 135237632, 4096): c5 a4 5f a3
+  ('crc', 135241728, 4096): 58 24 ea c5
+  ('crc', 135245824, 4096): bd 50 f8 e3
+  ('crc', 135249920, 4096): 9c 32 54 f6
+  ('crc', 135254016, 4096): 0e 3d 8f 71
+  ('crc', 135258112, 4096): 75 dd 78 20
+  ('crc', 135262208, 4096): 63 da cc 0d
+  ('r8', 134217856, 64): [Datel's stored data, omitted]
+  ('r8', 134742144, 64): 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 20 20 20 20 20 20 20 20 20 20 20 20 00 00 00 00 30 31 96 00 00 00 00 00 00 00 00 00 00 f0 00 00
+
+Results saved to lab_results\lab 2026-10-24 204106.json
+
+exit code 0, took 24.44 s
+
+##### session2b: 2 job(s) #####
+
+=== job B1 boot hello (GBA off at start) (boot_hello) at 2026-10-24 20:43:32 ===
+[   0.40 s] the DUO is present on USB
+[   0.72 s] hello sent - switch the GBA on now if it is off
+[  14.78 s] answer: code 0x03, value 0x104  (hello reply)
+exit code 0
+
+=== job B2 confirm normal state at 2026-10-24 20:43:47 ===
+args: ['--list']
+Connected to Action Replay MAX DUO (firmware 1.04)
+Reading the list of stored items...
+Found 2 item(s).
+
+  [  0] 1                        flags 0x1F  1, User 2, User 3, User 4
+  [  1] q                        flags 0x1F  1, User 2, User 3, User 4
+
+exit code 0, took 0.63 s
+
+##### session3: 14 job(s) #####
+
+=== job T1 search 4 MB, WAITCNT 0x0003 default (4/2) at 2026-10-24 20:58:44 ===
+args: ['--lab', 'script', 's3_search_0003.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('search', 134217728, 4194304, [1396788294, 1296126547, 1380992325]): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+
+Results saved to lab_results\lab 2026-10-24 205850.json
+
+exit code 0, took 6.01 s
+
+=== job T1 checksums, WAITCNT 0x0003 default (4/2) at 2026-10-24 20:58:50 ===
+args: ['--lab', 'script', 's3_crc_0003.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('crc', 134217728, 524288): c8 ad fa 43
+  ('crc', 142606336, 524288): 49 f8 4b 50
+
+Results saved to lab_results\lab 2026-10-24 205905.json
+
+exit code 0, took 14.85 s
+
+=== job T1 search 4 MB, WAITCNT 0x0017 3/1 at 2026-10-24 20:59:05 ===
+args: ['--lab', 'script', 's3_search_0017.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('search', 134217728, 4194304, [1396788294, 1296126547, 1380992325]): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+
+Results saved to lab_results\lab 2026-10-24 205911.json
+
+exit code 0, took 5.91 s
+
+=== job T1 checksums, WAITCNT 0x0017 3/1 at 2026-10-24 20:59:11 ===
+args: ['--lab', 'script', 's3_crc_0017.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('crc', 134217728, 524288): c8 ad fa 43
+  ('crc', 142606336, 524288): 49 f8 4b 50
+
+Results saved to lab_results\lab 2026-10-24 205926.json
+
+exit code 0, took 14.78 s
+
+=== job T1 search 4 MB, WAITCNT 0x4003 4/2 + prefetch at 2026-10-24 20:59:26 ===
+args: ['--lab', 'script', 's3_search_4003.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('search', 134217728, 4194304, [1396788294, 1296126547, 1380992325]): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+
+Results saved to lab_results\lab 2026-10-24 205932.json
+
+exit code 0, took 5.72 s
+
+=== job T1 checksums, WAITCNT 0x4003 4/2 + prefetch at 2026-10-24 20:59:32 ===
+args: ['--lab', 'script', 's3_crc_4003.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('crc', 134217728, 524288): c8 ad fa 43
+  ('crc', 142606336, 524288): 49 f8 4b 50
+
+Results saved to lab_results\lab 2026-10-24 205946.json
+
+exit code 0, took 14.69 s
+
+=== job T1 search 4 MB, WAITCNT 0x4317 3/1 + prefetch (typical game) at 2026-10-24 20:59:46 ===
+args: ['--lab', 'script', 's3_search_4317.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('search', 134217728, 4194304, [1396788294, 1296126547, 1380992325]): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+
+Results saved to lab_results\lab 2026-10-24 205952.json
+
+exit code 0, took 5.61 s
+
+=== job T1 checksums, WAITCNT 0x4317 3/1 + prefetch (typical game) at 2026-10-24 20:59:52 ===
+args: ['--lab', 'script', 's3_crc_4317.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('crc', 134217728, 524288): c8 ad fa 43
+  ('crc', 142606336, 524288): 49 f8 4b 50
+
+Results saved to lab_results\lab 2026-10-24 210007.json
+
+exit code 0, took 14.62 s
+
+=== job T1 search 4 MB, WAITCNT 0x401B 2/1 + prefetch (aggressive) at 2026-10-24 21:00:07 ===
+args: ['--lab', 'script', 's3_search_401B.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('search', 134217728, 4194304, [1396788294, 1296126547, 1380992325]): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+
+Results saved to lab_results\lab 2026-10-24 210012.json
+
+exit code 0, took 5.53 s
+
+=== job T1 checksums, WAITCNT 0x401B 2/1 + prefetch (aggressive) at 2026-10-24 21:00:12 ===
+args: ['--lab', 'script', 's3_crc_401B.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('crc', 134217728, 524288): 56 de 17 85
+  ('crc', 142606336, 524288): 49 f8 4b 50
+
+Results saved to lab_results\lab 2026-10-24 210027.json
+
+exit code 0, took 14.58 s
+
+=== job T2 ROM end at 2026-10-24 21:00:27 ===
+args: ['--lab', 'script', 's3_rom_end.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('r8', 134217728, 16): 32 00 00 ea 24 ff ae 51 69 9a a2 21 3d 84 82 0a
+  ('r8', 138412032, 16): d8 00 fd 1d ab ff fc 10 11 00 fd 1d 00 da e0 d9
+  ('r8', 142606336, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 150994928, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 150994944, 16): 00 00 01 00 02 00 03 00 04 00 05 00 06 00 07 00
+  ('r8', 150995200, 16): 80 00 81 00 82 00 83 00 84 00 85 00 86 00 87 00
+  ('r8', 155189232, 16): f8 ff f9 ff fa ff fb ff fc ff fd ff fe ff ff ff
+  ('r8', 159383536, 16): f8 ff f9 ff fa ff fb ff fc ff fd ff fe ff ff ff
+  ('r8', 167641072, 16): f8 ff f9 ff fa ff fb ff fc ff fd ff fe ff ff ff
+
+Results saved to lab_results\lab 2026-10-24 210029.json
+
+exit code 0, took 2.29 s
+
+=== job T3 header, DUO then game at 2026-10-24 21:00:29 ===
+args: ['--lab', 'script', 's3_header.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 134217728, 192): 192 bytes -> lab_results\read 2026-10-24 210032 #0.bin  (crc 01023D42)
+  ('r16', 134217728, 2): 32 00
+  ('r8', 134217728, 192): 192 bytes -> lab_results\read 2026-10-24 210032 #2.bin  (crc D9BFB7ED)
+  ('r16', 134217884, 2): f0 0f
+
+Results saved to lab_results\lab 2026-10-24 210032.json
+
+exit code 0, took 2.67 s
+
+=== job T4 Datel fixed reply (0x22) (datel_0x22) at 2026-10-24 21:00:32 ===
+reply 53 42 57 23 00 00 04 00  ->  code 0x23, value 0x40000
+exit code 0
+
+=== job T5 flash data regions (74 pieces) at 2026-10-24 21:00:32 ===
+args: ['--lab', 'script', 's3_flash_top.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 134406144, 64): all 00
+  ('r8', 134410240, 64): all 00
+  ('r8', 134414336, 64): [Datel's stored data, omitted]
+  ('r8', 134418432, 64): all 00
+  ('r8', 134422528, 64): [Datel's stored data, omitted]
+  ('r8', 134426624, 64): all 00
+  ('r8', 134430720, 64): [Datel's stored data, omitted]
+  ('r8', 134451200, 64): all FF
+  ('r8', 134455296, 64): [Datel's stored data, omitted]
+  ('r8', 134475776, 64): all FF
+  ('r8', 134479872, 64): all 00
+  ('r8', 134483968, 64): [Datel's stored data, omitted]
+  ('r8', 134488064, 64): [Datel's stored data, omitted]
+  ('r8', 134492160, 64): [Datel's stored data, omitted]
+  ('r8', 134496256, 64): [Datel's stored data, omitted]
+  ('r8', 134500352, 64): [Datel's stored data, omitted]
+  ('r8', 134504448, 64): [Datel's stored data, omitted]
+  ('r8', 134508544, 64): [Datel's stored data, omitted]
+  ('r8', 134512640, 64): [Datel's stored data, omitted]
+  ('r8', 134516736, 64): [Datel's stored data, omitted]
+  ('r8', 134520832, 64): [Datel's stored data, omitted]
+  ('r8', 134524928, 64): [Datel's stored data, omitted]
+  ('r8', 134529024, 64): all FF
+  ('r8', 134533120, 64): [Datel's stored data, omitted]
+  ('r8', 134537216, 64): [Datel's stored data, omitted]
+  ('r8', 134541312, 64): [Datel's stored data, omitted]
+  ('r8', 134545408, 64): [Datel's stored data, omitted]
+  ('r8', 134549504, 64): all FF
+  ('r8', 134553600, 64): all FF
+  ('r8', 134557696, 64): [Datel's stored data, omitted]
+  ('r8', 134561792, 64): [Datel's stored data, omitted]
+  ('r8', 134565888, 64): [Datel's stored data, omitted]
+  ('r8', 134569984, 64): [Datel's stored data, omitted]
+  ('r8', 134574080, 64): [Datel's stored data, omitted]
+  ('r8', 134578176, 64): [Datel's stored data, omitted]
+  ('r8', 134582272, 64): [Datel's stored data, omitted]
+  ('r8', 134586368, 64): [Datel's stored data, omitted]
+  ('r8', 134590464, 64): all 00
+  ('r8', 134594560, 64): all 00
+  ('r8', 134598656, 64): [Datel's stored data, omitted]
+  ('r8', 134602752, 64): [Datel's stored data, omitted]
+  ('r8', 134606848, 64): [Datel's stored data, omitted]
+  ('r8', 134610944, 64): [Datel's stored data, omitted]
+  ('r8', 134615040, 64): [Datel's stored data, omitted]
+  ('r8', 134619136, 64): [Datel's stored data, omitted]
+  ('r8', 134623232, 64): [Datel's stored data, omitted]
+  ('r8', 134627328, 64): all FF
+  ('r8', 134631424, 64): all FF
+  ('r8', 134635520, 64): [Datel's stored data, omitted]
+  ('r8', 134639616, 64): [Datel's stored data, omitted]
+  ('r8', 134643712, 64): [Datel's stored data, omitted]
+  ('r8', 134647808, 64): [Datel's stored data, omitted]
+  ('r8', 134651904, 64): [Datel's stored data, omitted]
+  ('r8', 134656000, 64): [Datel's stored data, omitted]
+  ('r8', 134660096, 64): [Datel's stored data, omitted]
+  ('r8', 134664192, 64): [Datel's stored data, omitted]
+  ('r8', 134668288, 64): [Datel's stored data, omitted]
+  ('r8', 134672384, 64): [Datel's stored data, omitted]
+  ('r8', 134676480, 64): [Datel's stored data, omitted]
+  ('r8', 134680576, 64): [Datel's stored data, omitted]
+  ('r8', 134684672, 64): [Datel's stored data, omitted]
+  ('r8', 134688768, 64): [Datel's stored data, omitted]
+  ('r8', 134692864, 64): [Datel's stored data, omitted]
+  ('r8', 134696960, 64): [Datel's stored data, omitted]
+  ('r8', 134701056, 64): [Datel's stored data, omitted]
+  ('r8', 134705152, 64): [Datel's stored data, omitted]
+  ('r8', 134709248, 64): [Datel's stored data, omitted]
+  ('r8', 134713344, 64): [Datel's stored data, omitted]
+  ('r8', 134717440, 64): [Datel's stored data, omitted]
+  ('r8', 134721536, 64): [Datel's stored data, omitted]
+  ('r8', 134725632, 64): [Datel's stored data, omitted]
+  ('r8', 134729728, 64): [Datel's stored data, omitted]
+  ('r8', 134733824, 64): [Datel's stored data, omitted]
+  ('r8', 134737920, 64): [Datel's stored data, omitted]
+
+Results saved to lab_results\lab 2026-10-24 210042.json
+
+exit code 0, took 10.00 s
+
+##### session3b: 1 job(s) #####
+
+=== job H1 header under mappings 0x0007/0x0001, and 32/16-bit reads at 2026-10-24 21:08:19 ===
+args: ['--lab', 'script', 's3b_header_maps.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r16', 134217728, 2): 32 00
+  ('r8', 134217728, 192): 192 bytes -> lab_results\read 2026-10-24 210824 #1.bin  (crc D9BFB7ED)
+  ('r16', 134217728, 2): 32 00
+  ('r8', 134217728, 192): 192 bytes -> lab_results\read 2026-10-24 210824 #3.bin  (crc D9BFB7ED)
+  ('r16', 134217728, 2): 32 00
+  ('r32', 134217728, 192): 192 bytes -> lab_results\read 2026-10-24 210824 #5.bin  (crc D9BFB7ED)
+  ('r16', 134217728, 192): 192 bytes -> lab_results\read 2026-10-24 210824 #6.bin  (crc D9BFB7ED)
+
+Results saved to lab_results\lab 2026-10-24 210824.json
+
+exit code 0, took 4.81 s
+
+##### session4 cartridge baseline: 2 job(s) #####
+
+=== job start-up shortcut (switch the GBA on) (boot_hello) at 2026-10-24 21:20:17 ===
+[   0.46 s] the DUO is present on USB
+[   0.78 s] hello sent - switch the GBA on now if it is off
+[  20.73 s] answer: code 0x03, value 0x104  (hello reply)
+exit code 0
+
+=== job cartridge baseline at 2026-10-24 21:20:38 ===
+args: ['--lab', 'script', 's4_cart_baseline.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 234881024, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r16', 134217728, 2): 32 00
+  ('r8', 234881024, 16): 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  ('r8', 134217728, 192): 192 bytes -> lab_results\read 2026-10-24 212113 #3.bin  (crc 3C70CB96)
+  ('r8', 138412016, 16): fe d5 e2 d8 00 fd 1d ab ff ca e0 d5 ed d9 e6 00
+  ('r8', 138412032, 16): e0 e3 e7 e8 00 d5 db d5 dd e2 e7 e8 fe fd 1d ab
+  ('r8', 142606320, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 142606336, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 150994928, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 150994944, 16): 00 00 01 00 02 00 03 00 04 00 05 00 06 00 07 00
+  ('r8', 159383536, 16): f8 ff f9 ff fa ff fb ff fc ff fd ff fe ff ff ff
+  ('r8', 167641072, 16): f8 ff f9 ff fa ff fb ff fc ff fd ff fe ff ff ff
+  ('crc', 234881024, 32768): 3a 34 a5 e3
+  ('crc', 234913792, 32768): 4a 86 d3 7b
+  ('search', 134217728, 33423360, [1396788294, 1296126547, 1380992325]): 0c 08 6b 08 46 4c 41 53 48 31 4d 5f 56 31 30 33 ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+
+Results saved to lab_results\lab 2026-10-24 212113.json
+
+exit code 0, took 34.81 s
+
+##### session4 cartridge baseline: 2 job(s) #####
+
+=== job start-up shortcut (switch the GBA on) (boot_hello) at 2026-10-24 21:22:55 ===
+[   0.43 s] the DUO is present on USB
+[   0.74 s] hello sent - switch the GBA on now if it is off
+[  55.43 s] answer: code 0x03, value 0x104  (hello reply)
+exit code 0
+
+=== job cartridge baseline at 2026-10-24 21:23:51 ===
+args: ['--lab', 'script', 's4_cart_baseline.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 234881024, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 234881024, 16): 00 00 00 00 00 00 00 00 00 00 00 0e c0 3f 70 03
+  ('r8', 134217728, 192): 192 bytes -> lab_results\read 2026-10-24 212425 #3.bin  (crc B053CE29)
+  ('r8', 138412016, 16): 03 08 00 00 71 01 19 05 f1 00 4c 00 eb 00 4b 00
+  ('r8', 138412032, 16): 14 06 00 00 63 01 24 43 4e 01 bc 00 f2 00 46 00
+  ('r8', 142606320, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 142606336, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 150994928, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 150994944, 16): 00 00 01 00 02 00 03 00 04 00 05 00 06 00 07 00
+  ('r8', 159383536, 16): f8 ff f9 ff fa ff fb ff fc ff fd ff fe ff ff ff
+  ('r8', 167641072, 16): f8 ff f9 ff fa ff fb ff fc ff fd ff fe ff ff ff
+  ('crc', 234881024, 32768): 8b 86 5f 5d
+  ('crc', 234913792, 32768): d0 b4 1e d8
+  ('search', 134217728, 33423360, [1396788294, 1296126547, 1380992325]): 74 bf 6f 08 46 4c 41 53 48 31 4d 5f 56 31 30 33 ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+
+Results saved to lab_results\lab 2026-10-24 212425.json
+
+exit code 0, took 34.75 s
+
+##### session4 cartridge baseline: 2 job(s) #####
+
+=== job start-up shortcut (switch the GBA on) (boot_hello) at 2026-10-24 21:25:51 ===
+[   0.51 s] the DUO is present on USB
+[   0.83 s] hello sent - switch the GBA on now if it is off
+[   7.36 s] answer: code 0x03, value 0x104  (hello reply)
+exit code 0
+
+=== job cartridge baseline at 2026-10-24 21:25:58 ===
+args: ['--lab', 'script', 's4_cart_baseline.json']
+Connected to Action Replay MAX DUO (firmware 1.04)
+  ('r8', 234881024, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r16', 134217728, 2): 00 00
+  ('r8', 234881024, 16): 10 10 10 10 10 10 10 10 10 10 10 10 10 10 10 10
+  ('r8', 134217728, 192): 192 bytes -> lab_results\read 2026-10-24 212633 #3.bin  (crc 36E54215)
+  ('r8', 138412016, 16): 67 01 2b 43 51 01 5d 01 5c 00 68 00 03 06 00 00
+  ('r8', 138412032, 16): 11 00 f0 f2 1f 1c d2 01 f0 00 08 01 03 0b 00 00
+  ('r8', 142606320, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 142606336, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 150994928, 16): ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  ('r8', 150994944, 16): 00 00 01 00 02 00 03 00 04 00 05 00 06 00 07 00
+  ('r8', 159383536, 16): f8 ff f9 ff fa ff fb ff fc ff fd ff fe ff ff ff
+  ('r8', 167641072, 16): f8 ff f9 ff fa ff fb ff fc ff fd ff fe ff ff ff
+  ('crc', 234881024, 32768): db 95 3e c7
+  ('crc', 234913792, 32768): ee 2b bf 7a
+  ('search', 134217728, 33423360, [1396788294, 1296126547, 1380992325]): 60 b8 6f 08 46 4c 41 53 48 31 4d 5f 56 31 30 33 ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+
+Results saved to lab_results\lab 2026-10-24 212633.json
+
+exit code 0, took 34.81 s
+
+##### session5 v4 verification: 8 job(s) #####
+
+=== job V1 restart at 2026-10-24 22:45:29 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 1.24 s
+
+=== job V2 fast GBA save at 2026-10-24 22:45:30 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.1 s)
+  Game: EMON LEAF (BPGE, revision 1)   (header checksum does NOT match)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+    The GBA's own checksum of bank 0 disagreed; reading again...
+
+    [progress bar]
+    The GBA's own checksum disagreed (54327A47); reading again...
+
+    [progress bar]
+    The GBA's own checksum disagreed (54327A47); reading again...
+
+
+Stopped: bank 0 gave different data twice - not saving it
+
+exit code 1, took 68.62 s
+Stopping: a job failed.
+
+##### session6 v4.1 verification: 24 job(s) #####
+
+=== job A boot shortcut on v4.1 (switch the GBA on when asked) (boot_hello) at 2026-10-25 06:33:17 ===
+[   0.63 s] the DUO is present on USB
+[   0.94 s] hello sent - switch the GBA on now if it is off
+[  12.52 s] answer: code 0x03, value 0x104  (hello reply)
+exit code 0
+
+=== job B listing at 2026-10-25 06:33:30 ===
+args: ['--list']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the list of stored items...
+Found 2 item(s).
+
+  [  0] 1                        flags 0x1F  1, User 2, User 3, User 4
+  [  1] q                        flags 0x1F  1, User 2, User 3, User 4
+
+exit code 0, took 0.79 s
+
+=== job C fixed fast GBA save at 2026-10-25 06:33:30 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.8 s)
+  Game: ON LEAF (BPGE, revision 1)   (header checksum does NOT match)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 23.6 s)
+
+Saved: saves\BPGE ON LEAF\2026-10-25 063419 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 49 s
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 49.15 s
+
+=== job R1 restart at 2026-10-25 06:34:20 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 0.83 s
+
+=== job R1 lab run straight after at 2026-10-25 06:34:20 ===
+args: ['--lab', 'script', 's6_after_restart.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('crc', 234881024, 65536): 2c 92 ca e2
+
+Results saved to lab_results\lab 2026-10-25 063423.json
+
+exit code 0, took 3.11 s
+
+=== job R2 restart at 2026-10-25 06:34:23 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 0.84 s
+
+=== job R2 lab run straight after at 2026-10-25 06:34:24 ===
+args: ['--lab', 'script', 's6_after_restart.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('crc', 234881024, 65536): 2c 92 ca e2
+
+Results saved to lab_results\lab 2026-10-25 063427.json
+
+exit code 0, took 3.05 s
+
+=== job R3 restart at 2026-10-25 06:34:27 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 0.81 s
+
+=== job R3 lab run straight after at 2026-10-25 06:34:28 ===
+args: ['--lab', 'script', 's6_after_restart.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('crc', 234881024, 65536): 2c 92 ca e2
+
+Results saved to lab_results\lab 2026-10-25 063431.json
+
+exit code 0, took 3.07 s
+
+=== job R4 restart at 2026-10-25 06:34:31 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 0.87 s
+
+=== job R4 lab run straight after at 2026-10-25 06:34:32 ===
+args: ['--lab', 'script', 's6_after_restart.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('crc', 234881024, 65536): 2c 92 ca e2
+
+Results saved to lab_results\lab 2026-10-25 063435.json
+
+exit code 0, took 3.12 s
+
+=== job R5 restart at 2026-10-25 06:34:35 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 0.83 s
+
+=== job R5 lab run straight after at 2026-10-25 06:34:36 ===
+args: ['--lab', 'script', 's6_after_restart.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('crc', 234881024, 65536): 2c 92 ca e2
+
+Results saved to lab_results\lab 2026-10-25 063439.json
+
+exit code 0, took 3.03 s
+
+=== job R6 restart at 2026-10-25 06:34:39 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 0.83 s
+
+=== job R6 lab run straight after at 2026-10-25 06:34:40 ===
+args: ['--lab', 'script', 's6_after_restart.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('crc', 234881024, 65536): 2c 92 ca e2
+
+Results saved to lab_results\lab 2026-10-25 063443.json
+
+exit code 0, took 3.01 s
+
+=== job R7 restart at 2026-10-25 06:34:43 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 0.83 s
+
+=== job R7 lab run straight after at 2026-10-25 06:34:44 ===
+args: ['--lab', 'script', 's6_after_restart.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('crc', 234881024, 65536): 2c 92 ca e2
+
+Results saved to lab_results\lab 2026-10-25 063447.json
+
+exit code 0, took 3.16 s
+
+=== job R8 restart at 2026-10-25 06:34:47 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 0.83 s
+
+=== job R8 lab run straight after at 2026-10-25 06:34:48 ===
+args: ['--lab', 'script', 's6_after_restart.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('crc', 234881024, 65536): 2c 92 ca e2
+
+Results saved to lab_results\lab 2026-10-25 063451.json
+
+exit code 0, took 3.03 s
+
+=== job R9 restart at 2026-10-25 06:34:51 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 0.83 s
+
+=== job R9 lab run straight after at 2026-10-25 06:34:52 ===
+args: ['--lab', 'script', 's6_after_restart.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('crc', 234881024, 65536): 2c 92 ca e2
+
+Results saved to lab_results\lab 2026-10-25 063455.json
+
+exit code 0, took 3.05 s
+
+=== job R10 restart at 2026-10-25 06:34:55 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 0.85 s
+
+=== job R10 lab run straight after at 2026-10-25 06:34:56 ===
+args: ['--lab', 'script', 's6_after_restart.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('crc', 234881024, 65536): 2c 92 ca e2
+
+Results saved to lab_results\lab 2026-10-25 063459.json
+
+exit code 0, took 3.08 s
+
+=== job D cartridge report at 2026-10-25 06:34:59 ===
+args: ['--cart-report']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Cartridge report (reads only)...
+    (header and size: 3.3 s)
+  Checksumming the whole 16 MB ROM on the GBA (about 59 s)...
+    (checksums: 59.9 s)
+
+  POKEMON LEAF (BPGE, maker 01, revision 1)
+    Header checksum valid:      yes
+    Visible logo bytes correct: yes   (0x20-0x9F are masked by the DUO)
+    ROM size:                   16 MB
+    Whole-ROM CRC-32:           DAFFECEC   (as read through the DUO: B84A272D)
+    Repeated reads identical:   yes
+    Reads OK at games' timing:  yes;  at 2-cycle timing: yes
+    Save library:               flash128 (known game)
+    Verdict: consistent with a genuine cartridge (no reference checksum on file yet)
+
+exit code 0, took 63.61 s
+
+##### session7 header experiment: 11 job(s) #####
+
+=== job e1 run 1 at 2026-10-25 06:40:01 ===
+args: ['--lab', 'script', 's7_e1.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+
+Results saved to lab_results\lab 2026-10-25 064003.json
+
+exit code 0, took 2.67 s
+
+=== job e2 run 1 at 2026-10-25 06:40:03 ===
+args: ['--lab', 'script', 's7_e2.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-25 064028 #2.bin  (crc E2CA922C)
+
+Results saved to lab_results\lab 2026-10-25 064028.json
+
+exit code 0, took 24.32 s
+
+=== job e3 run 1 at 2026-10-25 06:40:28 ===
+args: ['--lab', 'script', 's7_e3.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-25 064052 #2.bin  (crc E2CA922C)
+
+Results saved to lab_results\lab 2026-10-25 064052.json
+
+exit code 0, took 23.83 s
+
+=== job e4 run 1 at 2026-10-25 06:40:52 ===
+args: ['--lab', 'script', 's7_e4.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-25 064116 #4.bin  (crc E2CA922C)
+
+Results saved to lab_results\lab 2026-10-25 064116.json
+
+exit code 0, took 24.14 s
+
+=== job e5 run 1 at 2026-10-25 06:41:16 ===
+args: ['--lab', 'script', 's7_e5.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-25 064141 #1.bin  (crc E2CA922C)
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+
+Results saved to lab_results\lab 2026-10-25 064141.json
+
+exit code 0, took 25.54 s
+
+=== job e1 run 2 at 2026-10-25 06:41:41 ===
+args: ['--lab', 'script', 's7_e1.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+
+Results saved to lab_results\lab 2026-10-25 064144.json
+
+exit code 0, took 2.27 s
+
+=== job e2 run 2 at 2026-10-25 06:41:44 ===
+args: ['--lab', 'script', 's7_e2.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-25 064207 #2.bin  (crc E2CA922C)
+
+Results saved to lab_results\lab 2026-10-25 064207.json
+
+exit code 0, took 23.89 s
+
+=== job e3 run 2 at 2026-10-25 06:42:07 ===
+args: ['--lab', 'script', 's7_e3.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-25 064232 #2.bin  (crc E2CA922C)
+
+Results saved to lab_results\lab 2026-10-25 064232.json
+
+exit code 0, took 24.93 s
+
+=== job e4 run 2 at 2026-10-25 06:42:32 ===
+args: ['--lab', 'script', 's7_e4.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-25 064256 #4.bin  (crc E2CA922C)
+
+Results saved to lab_results\lab 2026-10-25 064256.json
+
+exit code 0, took 24.07 s
+
+=== job e5 run 2 at 2026-10-25 06:42:56 ===
+args: ['--lab', 'script', 's7_e5.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-25 064320 #1.bin  (crc E2CA922C)
+  ('r8', 134217888, 32): [Datel's stored data, omitted]
+
+Results saved to lab_results\lab 2026-10-25 064320.json
+
+exit code 0, took 23.68 s
+
+=== job save again at 2026-10-25 06:43:20 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 26.5 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 24.7 s)
+
+Saved: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 52 s
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 52.04 s
+
+##### session8 garbled-start check: 7 job(s) #####
+
+=== job restart 1 at 2026-10-25 06:47:10 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 1.47 s
+
+=== job save 1 straight after the restart at 2026-10-25 06:47:11 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 26.5 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 23.2 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 50 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 50.57 s
+
+=== job restart 2 at 2026-10-25 06:48:02 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 0.86 s
+
+=== job save 2 straight after the restart at 2026-10-25 06:48:03 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 25.6 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 23.3 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 49 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 49.74 s
+
+=== job restart 3 at 2026-10-25 06:48:52 ===
+args: ['--restart']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Restarted - back in USB SERVER MODE after 0.5 s.
+
+exit code 0, took 1.00 s
+
+=== job save 3 straight after the restart at 2026-10-25 06:48:53 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 25.3 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 23.5 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 49 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 49.59 s
+
+=== job cartridge report at 2026-10-25 06:49:43 ===
+args: ['--cart-report']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Cartridge report (reads only)...
+    (header and size: 3.4 s)
+  Checksumming the whole 16 MB ROM on the GBA (about 59 s)...
+    (checksums: 60.0 s)
+
+  POKEMON LEAF (BPGE, maker 01, revision 1)
+    Header checksum valid:      yes
+    Visible logo bytes correct: yes   (0x20-0x9F are masked by the DUO)
+    ROM size:                   16 MB
+    Whole-ROM CRC-32:           DAFFECEC   (as read through the DUO: B84A272D)
+    Repeated reads identical:   yes
+    Reads OK at games' timing:  yes;  at 2-cycle timing: yes
+    Save library:               flash128 (known game)
+    Verdict: consistent with a genuine cartridge (no reference checksum on file yet)
+
+exit code 0, took 63.67 s
+
+##### session9 cold start, speed and soak: 34 job(s) #####
+
+=== job A start-up shortcut (switch the GBA on when asked) (boot_hello) at 2026-10-25 09:20:51 ===
+[   0.56 s] the DUO is present on USB
+[   0.88 s] hello sent - switch the GBA on now if it is off
+[   8.67 s] answer: code 0x03, value 0x104  (hello reply)
+exit code 0
+
+=== job B first save after a cold start at 2026-10-25 09:21:00 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 25.8 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 23.5 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 50 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 50.26 s
+
+=== job speed sp_ff64 run 1 at 2026-10-25 09:21:50 ===
+args: ['--lab', 'script', 'sp_ff64.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 149946368, 65536): 65,536 bytes -> lab_results\read 2026-10-25 092155 #1.bin  (crc DEAB7E4E)
+
+Results saved to lab_results\lab 2026-10-25 092155.json
+
+exit code 0, took 5.24 s
+
+=== job speed sp_ff16 run 1 at 2026-10-25 09:21:55 ===
+args: ['--lab', 'script', 'sp_ff16.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 149946368, 16384): 16,384 bytes -> lab_results\read 2026-10-25 092158 #1.bin  (crc 690B37D3)
+
+Results saved to lab_results\lab 2026-10-25 092158.json
+
+exit code 0, took 3.05 s
+
+=== job speed sp_rom64 run 1 at 2026-10-25 09:21:58 ===
+args: ['--lab', 'script', 'sp_rom64.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 135266304, 65536): 65,536 bytes -> lab_results\read 2026-10-25 092430 #1.bin  (crc 4CBBC3D7)
+
+Results saved to lab_results\lab 2026-10-25 092430.json
+
+exit code 0, took 151.83 s
+
+=== job speed sp_rom32 run 1 at 2026-10-25 09:24:30 ===
+args: ['--lab', 'script', 'sp_rom32.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 135266304, 32768): 32,768 bytes -> lab_results\read 2026-10-25 092546 #1.bin  (crc 278EB761)
+
+Results saved to lab_results\lab 2026-10-25 092546.json
+
+exit code 0, took 75.74 s
+
+=== job speed sp_rom16 run 1 at 2026-10-25 09:25:46 ===
+args: ['--lab', 'script', 'sp_rom16.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 135266304, 16384): 16,384 bytes -> lab_results\read 2026-10-25 092625 #1.bin  (crc 8A6F7D0A)
+
+Results saved to lab_results\lab 2026-10-25 092625.json
+
+exit code 0, took 39.16 s
+
+=== job speed sp_save64 run 1 at 2026-10-25 09:26:25 ===
+args: ['--lab', 'script', 'sp_save64.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-25 092651 #1.bin  (crc E2CA922C)
+
+Results saved to lab_results\lab 2026-10-25 092651.json
+
+exit code 0, took 25.77 s
+
+=== job speed sp_ff64 run 2 at 2026-10-25 09:26:51 ===
+args: ['--lab', 'script', 'sp_ff64.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 149946368, 65536): 65,536 bytes -> lab_results\read 2026-10-25 092656 #1.bin  (crc DEAB7E4E)
+
+Results saved to lab_results\lab 2026-10-25 092656.json
+
+exit code 0, took 5.17 s
+
+=== job speed sp_ff16 run 2 at 2026-10-25 09:26:56 ===
+args: ['--lab', 'script', 'sp_ff16.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 149946368, 16384): 16,384 bytes -> lab_results\read 2026-10-25 092659 #1.bin  (crc 690B37D3)
+
+Results saved to lab_results\lab 2026-10-25 092659.json
+
+exit code 0, took 3.05 s
+
+=== job speed sp_rom64 run 2 at 2026-10-25 09:26:59 ===
+args: ['--lab', 'script', 'sp_rom64.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 135266304, 65536): 65,536 bytes -> lab_results\read 2026-10-25 092930 #1.bin  (crc 4CBBC3D7)
+
+Results saved to lab_results\lab 2026-10-25 092930.json
+
+exit code 0, took 150.78 s
+
+=== job speed sp_rom32 run 2 at 2026-10-25 09:29:30 ===
+args: ['--lab', 'script', 'sp_rom32.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 135266304, 32768): 32,768 bytes -> lab_results\read 2026-10-25 093045 #1.bin  (crc 278EB761)
+
+Results saved to lab_results\lab 2026-10-25 093045.json
+
+exit code 0, took 75.89 s
+
+=== job speed sp_rom16 run 2 at 2026-10-25 09:30:45 ===
+args: ['--lab', 'script', 'sp_rom16.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 135266304, 16384): 16,384 bytes -> lab_results\read 2026-10-25 093123 #1.bin  (crc 8A6F7D0A)
+
+Results saved to lab_results\lab 2026-10-25 093123.json
+
+exit code 0, took 37.26 s
+
+=== job speed sp_save64 run 2 at 2026-10-25 09:31:23 ===
+args: ['--lab', 'script', 'sp_save64.json']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+  ('r16', 134217728, 2): 7f 00
+  ('r8', 234881024, 65536): 65,536 bytes -> lab_results\read 2026-10-25 093145 #1.bin  (crc E2CA922C)
+
+Results saved to lab_results\lab 2026-10-25 093145.json
+
+exit code 0, took 22.64 s
+
+=== job soak save 1/20 at 2026-10-25 09:31:45 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.4 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.6 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.70 s
+
+=== job soak save 2/20 at 2026-10-25 09:32:33 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.3 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.4 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.45 s
+
+=== job soak save 3/20 at 2026-10-25 09:33:21 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.3 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.6 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.75 s
+
+=== job soak save 4/20 at 2026-10-25 09:34:08 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.4 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.6 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.69 s
+
+=== job soak save 5/20 at 2026-10-25 09:34:56 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.2 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.5 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.42 s
+
+=== job soak save 6/20 at 2026-10-25 09:35:43 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.5 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.6 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 48 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.88 s
+
+=== job soak save 7/20 at 2026-10-25 09:36:31 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.6 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.6 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 48 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.90 s
+
+=== job soak save 8/20 at 2026-10-25 09:37:19 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.4 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.5 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.67 s
+
+=== job soak save 9/20 at 2026-10-25 09:38:07 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.3 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.7 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.68 s
+
+=== job soak save 10/20 at 2026-10-25 09:38:55 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.4 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.6 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.68 s
+
+=== job soak save 11/20 at 2026-10-25 09:39:42 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.3 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.7 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.66 s
+
+=== job soak save 12/20 at 2026-10-25 09:40:30 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.5 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.6 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 48 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.85 s
+
+=== job soak save 13/20 at 2026-10-25 09:41:18 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.3 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.7 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.71 s
+
+=== job soak save 14/20 at 2026-10-25 09:42:05 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.4 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.6 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 48 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.80 s
+
+=== job soak save 15/20 at 2026-10-25 09:42:53 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.4 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.7 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 48 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.83 s
+
+=== job soak save 16/20 at 2026-10-25 09:43:41 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.4 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.7 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 48 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.82 s
+
+=== job soak save 17/20 at 2026-10-25 09:44:29 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.5 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.5 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.68 s
+
+=== job soak save 18/20 at 2026-10-25 09:45:17 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.2 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.6 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.55 s
+
+=== job soak save 19/20 at 2026-10-25 09:46:04 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.4 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.6 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 47 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.71 s
+
+=== job soak save 20/20 at 2026-10-25 09:46:52 ===
+args: ['--gba-save']
+Connected to Action Replay MAX DUO (Datel protocol 1.04, Reckless v4)
+Reading the game's header and the first 64 KB of its save...
+
+    [progress bar]
+    (header + bank 0: 24.4 s)
+  Game: POKEMON LEAF (BPGE, revision 1)
+  Save library: known game (Pokemon LeafGreen)
+  Plan: flash128, 128 KB in 2 bank(s)
+
+    [progress bar]
+    (bank 1: 22.7 s)
+
+Already backed up: saves\BPGE POKEMON LEAF\2026-10-25 064412 [trainer] #33.sav
+  (131,072 bytes, CRC 59F4A131) in 48 s - identical to an earlier backup - not stored again
+  Trainer [name] (ID [redacted]), play time 9h 10m 42s, save #33, 14/14 sections valid
+  Found 28 valid Pokemon Gen 3 save sections - this looks like a real save.
+
+exit code 0, took 47.80 s
+

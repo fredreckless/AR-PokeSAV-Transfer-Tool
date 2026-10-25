@@ -1,0 +1,47 @@
+{
+ "id": "session8 garbled-start check",
+ "jobs": [
+  {
+   "id": "restart 1",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "save 1 straight after the restart",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "restart 2",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "save 2 straight after the restart",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "restart 3",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "save 3 straight after the restart",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "cartridge report",
+   "args": [
+    "--cart-report"
+   ]
+  }
+ ]
+}

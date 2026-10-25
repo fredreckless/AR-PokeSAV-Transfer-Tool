@@ -1,0 +1,32 @@
+{
+ "steps": [
+  {
+   "name": "t1a cold save read, header, save, re-map",
+   "script": "t1a.json"
+  },
+  {
+   "name": "t1b next run: persists? far ROM read",
+   "script": "t1b.json"
+  },
+  {
+   "name": "t1c next run: 16-bit read at 0x08000000",
+   "script": "t1c.json"
+  },
+  {
+   "name": "t2 bank 0",
+   "script": "t2_bank0.json",
+   "keep": "b0"
+  },
+  {
+   "name": "t2 bank 1",
+   "script": "t2_bank1.json",
+   "keep": "b1"
+  }
+ ],
+ "join": {
+  "t2_full_save.sav": [
+   "b0",
+   "b1"
+  ]
+ }
+}

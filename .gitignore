@@ -1,0 +1,14 @@
+# Built firmware contains Datel's code: never commit it
+firmware/build/
+*.bin
+# Personal data the tools create when you use them (in the folder you run them from)
+*.sav
+saves/
+lab_results/
+/lab_job.json
+/lab_runner_log.txt
+cart_reports.jsonl
+cart_references.json
+# Python
+__pycache__/
+*.pyc

@@ -1,0 +1,68 @@
+{
+ "id": "session1",
+ "jobs": [
+  {
+   "id": "T1 empty program",
+   "args": [
+    "--lab",
+    "script",
+    "s1_empty.json"
+   ]
+  },
+  {
+   "id": "T2 save-tag search, whole area",
+   "args": [
+    "--lab",
+    "script",
+    "s1_search_full.json"
+   ]
+  },
+  {
+   "id": "T3 save-tag search, first 16 MB",
+   "args": [
+    "--lab",
+    "script",
+    "s1_search_16mb.json"
+   ]
+  },
+  {
+   "id": "T4 read 64 KB bank 0",
+   "args": [
+    "--lab",
+    "script",
+    "s1_bank0.json"
+   ]
+  },
+  {
+   "id": "T5 GBA checksum of 64 KB",
+   "args": [
+    "--lab",
+    "script",
+    "s1_crc64k.json"
+   ]
+  },
+  {
+   "id": "D1 DUO flash size",
+   "args": [
+    "--lab",
+    "script",
+    "s1_duo_flash.json"
+   ]
+  },
+  {
+   "id": "D2 DUO stored files",
+   "args": [
+    "--list",
+    "--verbose"
+   ]
+  },
+  {
+   "id": "W1 wake-read variants",
+   "args": [
+    "--lab",
+    "script",
+    "s1_wake.json"
+   ]
+  }
+ ]
+}

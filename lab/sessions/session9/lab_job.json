@@ -1,0 +1,232 @@
+{
+ "id": "session9 cold start, speed and soak",
+ "jobs": [
+  {
+   "id": "A start-up shortcut (switch the GBA on when asked)",
+   "special": "boot_hello",
+   "wait_s": 300
+  },
+  {
+   "id": "B first save after a cold start",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "speed sp_ff64 run 1",
+   "args": [
+    "--lab",
+    "script",
+    "sp_ff64.json"
+   ]
+  },
+  {
+   "id": "speed sp_ff16 run 1",
+   "args": [
+    "--lab",
+    "script",
+    "sp_ff16.json"
+   ]
+  },
+  {
+   "id": "speed sp_rom64 run 1",
+   "args": [
+    "--lab",
+    "script",
+    "sp_rom64.json"
+   ]
+  },
+  {
+   "id": "speed sp_rom32 run 1",
+   "args": [
+    "--lab",
+    "script",
+    "sp_rom32.json"
+   ]
+  },
+  {
+   "id": "speed sp_rom16 run 1",
+   "args": [
+    "--lab",
+    "script",
+    "sp_rom16.json"
+   ]
+  },
+  {
+   "id": "speed sp_save64 run 1",
+   "args": [
+    "--lab",
+    "script",
+    "sp_save64.json"
+   ]
+  },
+  {
+   "id": "speed sp_ff64 run 2",
+   "args": [
+    "--lab",
+    "script",
+    "sp_ff64.json"
+   ]
+  },
+  {
+   "id": "speed sp_ff16 run 2",
+   "args": [
+    "--lab",
+    "script",
+    "sp_ff16.json"
+   ]
+  },
+  {
+   "id": "speed sp_rom64 run 2",
+   "args": [
+    "--lab",
+    "script",
+    "sp_rom64.json"
+   ]
+  },
+  {
+   "id": "speed sp_rom32 run 2",
+   "args": [
+    "--lab",
+    "script",
+    "sp_rom32.json"
+   ]
+  },
+  {
+   "id": "speed sp_rom16 run 2",
+   "args": [
+    "--lab",
+    "script",
+    "sp_rom16.json"
+   ]
+  },
+  {
+   "id": "speed sp_save64 run 2",
+   "args": [
+    "--lab",
+    "script",
+    "sp_save64.json"
+   ]
+  },
+  {
+   "id": "soak save 1/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 2/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 3/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 4/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 5/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 6/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 7/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 8/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 9/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 10/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 11/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 12/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 13/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 14/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 15/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 16/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 17/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 18/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 19/20",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "soak save 20/20",
+   "args": [
+    "--gba-save"
+   ]
+  }
+ ]
+}

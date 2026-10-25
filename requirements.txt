@@ -1,0 +1,8 @@
+# The PC tool
+pyusb
+libusb-package
+# Building the firmware
+keystone-engine
+capstone
+# The simulator and tests
+unicorn>=2.0

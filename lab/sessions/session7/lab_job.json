@@ -1,0 +1,91 @@
+{
+ "id": "session7 header experiment",
+ "jobs": [
+  {
+   "id": "e1 run 1",
+   "args": [
+    "--lab",
+    "script",
+    "s7_e1.json"
+   ]
+  },
+  {
+   "id": "e2 run 1",
+   "args": [
+    "--lab",
+    "script",
+    "s7_e2.json"
+   ]
+  },
+  {
+   "id": "e3 run 1",
+   "args": [
+    "--lab",
+    "script",
+    "s7_e3.json"
+   ]
+  },
+  {
+   "id": "e4 run 1",
+   "args": [
+    "--lab",
+    "script",
+    "s7_e4.json"
+   ]
+  },
+  {
+   "id": "e5 run 1",
+   "args": [
+    "--lab",
+    "script",
+    "s7_e5.json"
+   ]
+  },
+  {
+   "id": "e1 run 2",
+   "args": [
+    "--lab",
+    "script",
+    "s7_e1.json"
+   ]
+  },
+  {
+   "id": "e2 run 2",
+   "args": [
+    "--lab",
+    "script",
+    "s7_e2.json"
+   ]
+  },
+  {
+   "id": "e3 run 2",
+   "args": [
+    "--lab",
+    "script",
+    "s7_e3.json"
+   ]
+  },
+  {
+   "id": "e4 run 2",
+   "args": [
+    "--lab",
+    "script",
+    "s7_e4.json"
+   ]
+  },
+  {
+   "id": "e5 run 2",
+   "args": [
+    "--lab",
+    "script",
+    "s7_e5.json"
+   ]
+  },
+  {
+   "id": "save again",
+   "args": [
+    "--gba-save"
+   ]
+  }
+ ]
+}

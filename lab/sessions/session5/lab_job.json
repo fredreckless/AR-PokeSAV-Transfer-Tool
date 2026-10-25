@@ -1,0 +1,55 @@
+{
+ "id": "session5 v4 verification",
+ "jobs": [
+  {
+   "id": "V1 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "V2 fast GBA save",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "V3 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "V4 lab run straight after the restart",
+   "args": [
+    "--lab",
+    "script",
+    "s5_after_restart.json"
+   ]
+  },
+  {
+   "id": "V5 cartridge report",
+   "args": [
+    "--cart-report"
+   ]
+  },
+  {
+   "id": "V6 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "V7 restart again",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "V8 normal listing",
+   "args": [
+    "--list"
+   ]
+  }
+ ]
+}

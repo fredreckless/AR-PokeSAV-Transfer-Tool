@@ -1,0 +1,168 @@
+{
+ "id": "session6 v4.1 verification",
+ "jobs": [
+  {
+   "id": "A boot shortcut on v4.1 (switch the GBA on when asked)",
+   "special": "boot_hello",
+   "wait_s": 120
+  },
+  {
+   "id": "B listing",
+   "args": [
+    "--list"
+   ]
+  },
+  {
+   "id": "C fixed fast GBA save",
+   "args": [
+    "--gba-save"
+   ]
+  },
+  {
+   "id": "R1 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "R1 lab run straight after",
+   "args": [
+    "--lab",
+    "script",
+    "s6_after_restart.json"
+   ]
+  },
+  {
+   "id": "R2 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "R2 lab run straight after",
+   "args": [
+    "--lab",
+    "script",
+    "s6_after_restart.json"
+   ]
+  },
+  {
+   "id": "R3 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "R3 lab run straight after",
+   "args": [
+    "--lab",
+    "script",
+    "s6_after_restart.json"
+   ]
+  },
+  {
+   "id": "R4 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "R4 lab run straight after",
+   "args": [
+    "--lab",
+    "script",
+    "s6_after_restart.json"
+   ]
+  },
+  {
+   "id": "R5 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "R5 lab run straight after",
+   "args": [
+    "--lab",
+    "script",
+    "s6_after_restart.json"
+   ]
+  },
+  {
+   "id": "R6 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "R6 lab run straight after",
+   "args": [
+    "--lab",
+    "script",
+    "s6_after_restart.json"
+   ]
+  },
+  {
+   "id": "R7 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "R7 lab run straight after",
+   "args": [
+    "--lab",
+    "script",
+    "s6_after_restart.json"
+   ]
+  },
+  {
+   "id": "R8 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "R8 lab run straight after",
+   "args": [
+    "--lab",
+    "script",
+    "s6_after_restart.json"
+   ]
+  },
+  {
+   "id": "R9 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "R9 lab run straight after",
+   "args": [
+    "--lab",
+    "script",
+    "s6_after_restart.json"
+   ]
+  },
+  {
+   "id": "R10 restart",
+   "args": [
+    "--restart"
+   ]
+  },
+  {
+   "id": "R10 lab run straight after",
+   "args": [
+    "--lab",
+    "script",
+    "s6_after_restart.json"
+   ]
+  },
+  {
+   "id": "D cartridge report",
+   "args": [
+    "--cart-report"
+   ]
+  }
+ ]
+}

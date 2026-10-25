@@ -1,0 +1,113 @@
+{
+ "id": "session3",
+ "jobs": [
+  {
+   "id": "T1 search 4 MB, WAITCNT 0x0003 default (4/2)",
+   "args": [
+    "--lab",
+    "script",
+    "s3_search_0003.json"
+   ]
+  },
+  {
+   "id": "T1 checksums, WAITCNT 0x0003 default (4/2)",
+   "args": [
+    "--lab",
+    "script",
+    "s3_crc_0003.json"
+   ]
+  },
+  {
+   "id": "T1 search 4 MB, WAITCNT 0x0017 3/1",
+   "args": [
+    "--lab",
+    "script",
+    "s3_search_0017.json"
+   ]
+  },
+  {
+   "id": "T1 checksums, WAITCNT 0x0017 3/1",
+   "args": [
+    "--lab",
+    "script",
+    "s3_crc_0017.json"
+   ]
+  },
+  {
+   "id": "T1 search 4 MB, WAITCNT 0x4003 4/2 + prefetch",
+   "args": [
+    "--lab",
+    "script",
+    "s3_search_4003.json"
+   ]
+  },
+  {
+   "id": "T1 checksums, WAITCNT 0x4003 4/2 + prefetch",
+   "args": [
+    "--lab",
+    "script",
+    "s3_crc_4003.json"
+   ]
+  },
+  {
+   "id": "T1 search 4 MB, WAITCNT 0x4317 3/1 + prefetch (typical game)",
+   "args": [
+    "--lab",
+    "script",
+    "s3_search_4317.json"
+   ]
+  },
+  {
+   "id": "T1 checksums, WAITCNT 0x4317 3/1 + prefetch (typical game)",
+   "args": [
+    "--lab",
+    "script",
+    "s3_crc_4317.json"
+   ]
+  },
+  {
+   "id": "T1 search 4 MB, WAITCNT 0x401B 2/1 + prefetch (aggressive)",
+   "args": [
+    "--lab",
+    "script",
+    "s3_search_401B.json"
+   ]
+  },
+  {
+   "id": "T1 checksums, WAITCNT 0x401B 2/1 + prefetch (aggressive)",
+   "args": [
+    "--lab",
+    "script",
+    "s3_crc_401B.json"
+   ]
+  },
+  {
+   "id": "T2 ROM end",
+   "args": [
+    "--lab",
+    "script",
+    "s3_rom_end.json"
+   ]
+  },
+  {
+   "id": "T3 header, DUO then game",
+   "args": [
+    "--lab",
+    "script",
+    "s3_header.json"
+   ]
+  },
+  {
+   "id": "T4 Datel fixed reply (0x22)",
+   "special": "datel_0x22"
+  },
+  {
+   "id": "T5 flash data regions (74 pieces)",
+   "args": [
+    "--lab",
+    "script",
+    "s3_flash_top.json"
+   ]
+  }
+ ]
+}
