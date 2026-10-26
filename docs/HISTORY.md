@@ -75,18 +75,6 @@ v4.1 was confirmed on the real DUO:
 
 One question remains open: twice, the first save after a start-up showed a garbled title. It hasn't been seen since, and the tool now guards against it ([FINDINGS.md](FINDINGS.md#open-questions)).
 
-## v4.2 and the Wireless Adapter (26 October)
-
-The next goal was genuine Mystery Gift events, starting with the Japanese Old Sea Map for Emerald. Those
-games deliver Wonder Cards only through the Wireless Adapter. v4.2 lets the DUO's GBA run small programs
-from RAM: they are CRC-checked, and the PC tool runs only the ones built from this repository. The first
-program answers the adapter detection a Pokémon game runs at its title screen.
-
-- To test it, the simulator gained a link-port partner: a bit-exact model of the game's side of
-  Nintendo's detection exchange.
-- The words exchanged match a published capture of a real adapter, word for word.
-- It hasn't been tried on real hardware yet. See [WIRELESS.md](WIRELESS.md).
-
 ## Lessons worth passing on
 
 - **Measure, model, test, correct the model.** The simulator only knows what has been observed. When the hardware disagrees, reproduce the failure in the simulator before fixing it.

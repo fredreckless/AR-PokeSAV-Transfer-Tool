@@ -43,9 +43,8 @@ All new code lives in empty padding inside Datel's image. These commands occupy 
 | 0x1E | v3 | Upload n bytes to the staging area. Each packet is answered with 0x1F; the last is answered with the CRC-32 of everything received |
 | 0x07 | v3 | Run the staged program (log the PC's messages, run, stream the output; see below) |
 | 0x08 / 0x1D | v3 | Stream support: resend and pacing (in the firmware; the current tool doesn't need them) |
-| 0x09 | v3 | Version: replies `RK31` (v3.1), `RK40` (v4/v4.1) or `RK42` (v4.2) |
+| 0x09 | v3 | Version: replies `RK31` (v3.1) or `RK40` (v4/v4.1) |
 | 0x21 | v4 | Restart: reply first, then a BIOS soft reset; in v4.1 it first waits for the PC's hello to arrive |
-| 0x23 | v4.2 | Run a program from RAM (see below) |
 
 ### Staged programs
 
@@ -71,24 +70,6 @@ The firmware refuses to run it unless all three checks match. The code is always
 Any other write stops the script with `ERR!`. The PC tool checks the same rules before uploading anything. After a run, the firmware always switches the DUO's program back into view and checks it's there. If it isn't, it waits safely in RAM rather than running whatever is mapped.
 
 In v4 the interpreter stays in the GBA's RAM between runs, so the PC only re-sends the header and the operations. The firmware's CRC check then rejects the run if the resident copy has gone, and the tool sends it again in full.
-
-### Programs (v4.2)
-
-The PC uploads an image to the staging area with 0x04 and 0x1E. The image is made up of:
-1. the `RKR1` magic;
-2. the code length;
-3. the CRC-32 of the code;
-4. the entry offset (bit 0 = Thumb);
-5. the code, linked at 0x02038010.
-
-Command 0x23 checks all of it, replies `0x23 'RUN!'` (or 0x3F if anything is wrong), and calls the code. In
-r0 it passes a table of Datel's routines: USB send, receive and available; idle; screen log; packet reply;
-CRC. While a program runs, it answers PC packets one at a time:
-- `0x2A` poll gets an answer `0x2A value`;
-- `0x2B` stop gets an answer `0x2B value`, and then the program returns.
-
-The DUO then shows "Program finished" and is back in USB server mode. The tool only runs the programs
-built from `firmware/programs.py`; the tests check that its embedded copies match a fresh build.
 
 ### Streams
 

@@ -198,14 +198,8 @@ class MaxDuo:
         """'v3.1', 'v3' (fast mode broken on real hardware) or None."""
         if not hasattr(self, "_reckless"):
             code, val = self.ask(CMD_INFO)
-            self._reckless = {RK40: "v4", RK42: "v4", RK31: "v3.1", RKL3: "v3"}.get(val) if code == CMD_INFO else None
-            self._can_run = code == CMD_INFO and val == RK42
+            self._reckless = {RK40: "v4", RK31: "v3.1", RKL3: "v3"}.get(val) if code == CMD_INFO else None
         return self._reckless
-
-    def can_run(self):
-        """True on Reckless v4.2, which can run this repository's programs from RAM."""
-        self.reckless()
-        return getattr(self, "_can_run", False)
 
     def is_v3(self):
         """True when the fast (compressed, CRC-checked) transfers are available."""
@@ -705,8 +699,6 @@ def bar(done, total):
 def run(duo, args):
     version = duo.connect(wait_s=getattr(args, "wait", 120))
     edition = {"v4": "Reckless v4", "v3.1": "Reckless v3.1", "v3": "Reckless v3"}.get(duo.reckless(), "")
-    if edition and duo.can_run():
-        edition = "Reckless v4.2"
     print(f"Connected to Action Replay MAX DUO (Datel protocol {version >> 8}.{version & 0xFF:02d}"
           + (f", {edition})" if edition else ")"))
 
@@ -717,9 +709,6 @@ def run(duo, args):
 
     if getattr(args, "cart_report", False):
         return cart_report(duo, args)
-
-    if getattr(args, "adapter_test", None):
-        return adapter_test(duo, args)
 
     if getattr(args, "lab", None):
         return do_lab(duo, args)
@@ -824,7 +813,6 @@ KNOWN_FIRMWARE = {
     0x99C72FF9: "Reckless v3.1 (fast, strictly alternating transfers, save-type detection, verbose log, lab)",
     0xD1003397: "Reckless v4 (restart can occasionally land in the menu - use v4.1)",
     0xA5303402: "Reckless v4.1 (v3.1 + reliable restart from the PC, Datel's original look)",
-    0xDD59ED8A: "Reckless v4.2 (v4.1 + runs this project's programs from RAM, e.g. --adapter-test)",
 }
 
 
@@ -1059,8 +1047,7 @@ import json
 #   * the Actel masks 0x20-0x9F of every header -> whole-ROM checksums are
 #     corrected with one published-logo-derived constant per ROM size.
 
-RK40 = 0x30344B52              # Reckless v4 / v4.1
-RK42 = 0x32344B52              # Reckless v4.2: v4.1 + run a program from RAM
+RK40 = 0x30344B52              # Reckless v4
 BUSY_WAIT_S = 16               # the DUO gives up on a stalled transfer after ~15 s
 CMD_RESTART, RESTART_ACK = 0x21, 0x54534552
 SAFE_COMMANDS |= {CMD_RESTART}
@@ -1425,91 +1412,6 @@ def print_cart_table():
               f"{(r['rom_crc32'] or '-'):9} {'yes' if r['stable'] else 'NO':6} {r['verdict'][:40]}")
 
 
-
-# ===================================================================== v4.2
-# Reckless v4.2 can run a program from the GBA's RAM (command 0x23). The tool
-# only runs the programs built from this repository (firmware/programs.py),
-# embedded here and checked by the tests against a fresh build.
-CMD_RUN, RUN_ACK = 0x23, 0x214E5552
-PROG_POLL, PROG_STOP = 0x2A, 0x2B
-SAFE_COMMANDS |= {CMD_RUN, PROG_POLL, PROG_STOP}
-PROGRAMS = {
-    "adapter_detect": bytes.fromhex(
-        "524b52319c0100000bb29eac01000000f0b5071c4b4e00200021705004312029fbd34c4c4c4908804c4820810020206020898021084320812089000601d400f045f8f068002808d0b069002805d10120b0613f483b6900f074f8bb6800f071f80028e9d038487b6800f06bf83648c1782b290bd04268012a02d000f014f800e071692a20bb6900f05cf8d5e700f00bf80d1c2b20bb6900f054f800202081281cf0bc02bc084731690904090c326812041143f268002a08d001231b051943284b9a4202d101235b051943704720b520687061316901313161010c0204120cf368002b17d1b368994212d13568042d0dd27168c9430904090c8b420bd1d9430904090c8a4206d10135356003e0f26001e0002131603568042d03d20c496b00c95a00e00f497160d3431b041b0cb360090419432160208980210843208120bc02bc084718478c81030284810302648103026c810302200100043401000400100000018000004e494e54454e444f4164617074657220636865636b20616e737765726564000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
-}
-
-
-def run_program(duo, name):
-    """Upload one of this repository's programs and start it. Afterwards the PC
-    talks to it with program_poll() and must finish with program_stop()."""
-    if not duo.can_run():
-        raise DuoError("running programs needs the Reckless v4.2 firmware")
-    image = PROGRAMS[name]
-    Lab(duo)._upload_fast(LAB_STAGE, image)
-    duo.lab_resident = False                       # the staging area now holds the program
-    code, val = duo.ask(CMD_RUN)
-    if (code, val) != (CMD_RUN, RUN_ACK):
-        raise DuoError(f"the DUO refused the program ({code:#x} {val:#x})")
-
-
-def program_poll(duo, arg=0):
-    code, val = duo.ask(PROG_POLL, arg)
-    if code != PROG_POLL:
-        raise DuoError(f"the program didn't answer ({code:#x} {val:#x})")
-    return val
-
-
-def program_stop(duo):
-    code, val = duo.ask(PROG_STOP)
-    if code != PROG_STOP:
-        raise DuoError(f"the program didn't stop cleanly ({code:#x} {val:#x})")
-    return val
-
-
-def describe_adapter_status(st):
-    pairs, done, good = (st >> 16) & 0xF, st >> 20 & 1, st >> 21 & 1
-    if good:
-        return "the game accepted the adapter ID (0x8001) - it believes a Wireless Adapter is connected"
-    if done:
-        return "the exchange finished, but with an unexpected ID"
-    if pairs:
-        return f"exchanging the NINTENDO handshake ({pairs}/4 matched)"
-    if st & 0xFFFF:
-        return "the game is clocking the link, waiting for the handshake to line up"
-    return "nothing from the game yet"
-
-
-def adapter_test(duo, args, poll_s=0.5, after_s=5.0):
-    """Detection test: the DUO's GBA answers the Wireless Adapter check of a Pokemon
-    game on a second GBA. Only the detection exchange - nothing is written anywhere."""
-    seconds = args.adapter_test
-    print("Wireless Adapter detection test (reads and writes nothing on either cartridge)")
-    print("  Connect the two GBAs with a link cable whose data lines are crossed (a GBC link")
-    print("  cable, CGB-003). Then switch the second GBA on with your Pokemon game.")
-    run_program(duo, "adapter_detect")
-    print("  Program running on the DUO's GBA. Waiting for the game's check...")
-    last_text, t0, done_at, st = None, time.time(), None, 0
-    try:
-        while time.time() - t0 < seconds:
-            st = program_poll(duo)
-            text = describe_adapter_status(st)
-            if text != last_text:
-                print(f"  [{time.time() - t0:5.1f} s] {text}")
-                last_text = text
-            if st >> 21 & 1 and done_at is None:
-                done_at = time.time()
-            if done_at and time.time() - done_at > after_s:
-                break
-            time.sleep(poll_s)
-    finally:
-        word = program_poll(duo, 1)
-        st = program_stop(duo)
-    print(f"  Transfers: {st & 0xFFFF}, last word from the game: {word:08X}")
-    print("  Result: " + ("PASS - the game saw a Wireless Adapter." if st >> 21 & 1 else
-                         "not detected - see the notes in docs for what to check."))
-    return st
-
-
 def main():
     ap = argparse.ArgumentParser(description="Export DS saves from an Action Replay MAX DUO (read-only)")
     ap.add_argument("--list", action="store_true", help="only list what's stored")
@@ -1523,7 +1425,7 @@ def main():
                     help="cartridge mapping for --gba-save: 0x7 (default), 0x1 or 0x101 "
                          "(needs patch version 2)")
     ap.add_argument("--lab", nargs="+", metavar="ARG",
-                    help="lab firmware: probe | peek ADDR LEN | scope ADDR SECONDS | script FILE.json | batch FILE.json")
+                    help="lab firmware: probe | peek ADDR LEN | scope ADDR SECONDS | script FILE.json")
     ap.add_argument("--width", type=int, default=1, choices=(1, 2, 4), help="access width for --lab peek/scope")
     ap.add_argument("--map-lab", type=lambda v: int(v, 0), default=0, help="mapping for --lab peek/scope")
     ap.add_argument("--save-type", choices=sorted(SAVE_KINDS),
@@ -1538,9 +1440,6 @@ def main():
                     help="seconds to wait for the GBA to be switched on (default 120)")
     ap.add_argument("--update", metavar="FILE",
                     help="install a DUO firmware update file (asks for confirmation)")
-    ap.add_argument("--adapter-test", type=int, nargs="?", const=180, metavar="SECONDS",
-                    help="Reckless v4.2: answer a Pokemon game's Wireless Adapter check on a second GBA "
-                         "(detection only; default 180 s)")
     ap.add_argument("--cart", action="store_true",
                     help="read the save straight from the cartridge in the slot")
     args = ap.parse_args()

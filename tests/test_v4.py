@@ -17,7 +17,6 @@ OFFICIAL = paths.read_build("fw.bin")
 LABFW = paths.read_build("fw_lab.bin")
 OLD_V3 = paths.read_build("fw_v3_original.bin", required=False)   # the first v3, whose transfers stalled
 V31 = paths.read_build("fw_v3.bin")                                  # v3.1
-FW42 = open(os.environ.get("V42_FW") or paths.build_file("fw_v42.bin"), "rb").read()    # v4.2
 import fixtures
 RUBY = fixtures.make_gen3_save("May", 12345, save_no=337)          # synthetic Ruby save
 GAME = hwsim.make_game_rom()
@@ -921,119 +920,6 @@ def _():
         assert "POKEMON RUBY" in path
         assert ("garbled" in text) != garble_header and ("reading it again" in text) == garble_header, text[-600:]
 
-
-
-# ====================================================================== v4.2
-import sio32id_model
-
-
-def run42(**kw):
-    hw = hwsim.Hw(FW42, kw.get("game") or GAME, "sanyo", RUBY).start(); LIVE.append(hw)
-    duo = M.MaxDuo(hwsim.Transport(hw)); duo.hello()
-    return hw, duo
-
-
-@test("v4.2 build: only command slot 0x23, the INFO reply and Datel's padding differ from v4.1; reproducible")
-def _():
-    diff = [i for i in range(len(FW)) if FW42[i] != FW[i]]
-    outside = sorted({0x08000000 + (i & ~3) for i in diff if not 0x1E7C2 <= i < 0x1FD90})
-    assert outside == [0x080074A8 + 4 * (0x23 - 2)], [hex(x) for x in outside]
-    assert struct.pack("<I", M.RK42) in FW42 and struct.pack("<I", M.RK40) not in FW42[0x1F400:0x1F500]
-    work = tempfile.mkdtemp()
-    open(os.path.join(work, "fw.bin"), "wb").write(OFFICIAL)
-    out = subprocess.run([sys.executable, "-c", "import build_v42; build_v42.build()"], cwd=work, capture_output=True,
-                         text=True, env=dict(os.environ, PYTHONPATH=paths.FIRMWARE))
-    assert out.returncode == 0, out.stderr[-800:]
-    assert open(os.path.join(work, "fw_v42.bin"), "rb").read() == FW42
-
-
-@test("v4.2 programs: the tool's embedded programs are exactly this repository's build, Thumb-1 only")
-def _():
-    out = subprocess.run([sys.executable, "-c", "import programs, sys; sys.stdout.write(programs.build('adapter_detect').hex())"],
-                         cwd=paths.FIRMWARE, capture_output=True, text=True, env=dict(os.environ, PYTHONPATH=paths.FIRMWARE))
-    assert out.returncode == 0, out.stderr[-800:]
-    assert bytes.fromhex(out.stdout) == M.PROGRAMS["adapter_detect"]
-
-
-@test("v4.2 run: a staged program with a bad magic, length, entry or CRC is refused and never runs")
-def _():
-    good = bytearray(M.PROGRAMS["adapter_detect"])
-    bad_images = []
-    b = bytearray(good); b[0] ^= 1; bad_images.append(b)                         # magic
-    b = bytearray(good); struct.pack_into("<I", b, 4, 0x4000); bad_images.append(b)  # length too big
-    b = bytearray(good); struct.pack_into("<I", b, 12, 0x1000); bad_images.append(b) # entry outside the code
-    b = bytearray(good); b[40] ^= 0x10; bad_images.append(b)                        # code damaged (CRC)
-    for img in bad_images:
-        hw, duo = run42()
-        M.Lab(duo)._upload_fast(M.LAB_STAGE, bytes(img))
-        code, val = duo.ask(M.CMD_RUN)
-        assert code == 0x3F, hex(code)
-        assert duo.hello() == 0x104
-        hw.stop(); clean(hw)
-        assert "Program rejected" in hw.log and "Running program" not in hw.log
-
-
-@test("v4.2 adapter test: answers the game's NINTENDO / 0x8001 exchange; the game accepts the adapter; DUO back in USB mode")
-def _():
-    hw, duo = run42()
-    game = sio32id_model.Side(1)                      # the game's half: librfu's own code, clock master
-    hw.attach_link_partner(game)
-    st = quiet(M.adapter_test, duo, types.SimpleNamespace(adapter_test=30), poll_s=0.1, after_s=0.5)[0]
-    assert game.last == 0x8001 and st >> 21 & 1, (hex(game.last), hex(st))
-    words = hw.link_words
-    assert words[1] == (0x494EFFFF, 0xFFFF494E) and (0x8001B0BB, 0xB0BB8001) in words   # matches the real adapter
-    assert duo.hello() == 0x104 and duo.reckless() == "v4"
-    hw.stop(); clean(hw)
-    assert "Adapter check answered" in hw.log and any(l.startswith("Program finished") for l in hw.log)
-
-
-@test("v4.2 adapter test: with nothing on the cable it reports 'nothing from the game' and stops cleanly")
-def _():
-    hw, duo = run42()
-    st, text = quiet(M.adapter_test, duo, types.SimpleNamespace(adapter_test=1), poll_s=0.2, after_s=0.5)
-    assert st & 0xFFFF == 0 and "nothing from the game yet" in text and "not detected" in text
-    assert duo.hello() == 0x104
-    hw.stop(); clean(hw)
-
-
-@test("v4.2 adapter test: the game starts mid-way (junk words first) and still accepts the adapter")
-def _():
-    hw, duo = run42()
-    game = sio32id_model.Side(1); game.out = 0x12345678; game.count = 2; game.recv_id = 0xBEEF
-    hw.attach_link_partner(game)
-    st = quiet(M.adapter_test, duo, types.SimpleNamespace(adapter_test=30), poll_s=0.1, after_s=0.5)[0]
-    hw.stop(); clean(hw)
-    assert game.last == 0x8001 and st >> 21 & 1
-
-
-@test("v4.2: everything else still works - fast save, cartridge report, restart; older firmware refuses programs")
-def _():
-    hw, duo = run42()
-    path, data, info, text, _ = gba_save(duo)
-    duo.restart(wait_s=20)
-    hw.stop(); clean(hw)
-    assert data == RUBY and hw.restarts == 1
-    hw, duo = device()                                 # v4.1
-    try:
-        M.run_program(duo, "adapter_detect"); raise AssertionError("v4.1 ran a program")
-    except M.DuoError as e:
-        assert "v4.2" in str(e)
-    hw.stop(); clean(hw)
-
-
-@test("v4.2 update: installing v4.2 over the official firmware and over v4.1, flash simulated")
-def _():
-    saved, sys.argv = sys.argv, sys.argv[:1]
-    try:
-        import emu_update_test as U
-    finally:
-        sys.argv = saved
-    for current in (OFFICIAL, FW):
-        U.OFFICIAL = current
-        ok, text = quiet(U.main, paths.build_file("duo_1.06_reckless_v4.2.bin"))
-        assert ok, text
-    crc, payload = M.check_update_file(paths.build_file("duo_1.06_reckless_v4.2.bin"))
-    assert payload == FW42 and "v4.2" in M.KNOWN_FIRMWARE.get(crc, "")
 
 if __name__ == "__main__":
     pick = sys.argv[1] if len(sys.argv) > 1 else ""
