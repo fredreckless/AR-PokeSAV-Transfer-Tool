@@ -185,6 +185,40 @@ class Hw:
         mu.mem_write(MENU_LOOP, b"\xfe\xe7")
         self.flip_at = set(self.faults.get("flip_save_read", ()))
         self.restore = None
+        self.link_partner = None             # a second GBA on the link port (see attach_link_partner)
+        self.link_words = []                 # (word sent by the DUO's GBA, word sent by the partner)
+
+    # ------------------------------------------------------------ link port
+    def attach_link_partner(self, partner, delay_blocks=40):
+        """A second GBA on the link port, as the clock master in Normal 32-bit mode
+        (as a Pokemon game is when it looks for a Wireless Adapter). partner.out is
+        the word it sends next; partner.intr(word) receives ours. A transfer happens
+        only once our side has armed SIOCNT (start bit) with an external clock."""
+        self.link_partner = partner
+        self.sio_armed = None
+        self.blocks = 0
+        self.sio_delay = delay_blocks
+        self.mu.hook_add(UC_HOOK_MEM_WRITE, self.on_siocnt, begin=0x04000128, end=0x04000129)
+        self.mu.hook_add(UC_HOOK_BLOCK, self.on_block)
+
+    def on_siocnt(self, mu, access, addr, size, value, _):
+        v = value & 0xFFFF if addr == 0x04000128 else (value << 8) & 0xFF00
+        if v & 0x80 and not v & 0x1 and v & 0x1000 and not v & 0x2000:
+            self.sio_armed = self.blocks + self.sio_delay      # external clock, 32-bit normal, start
+        elif not v & 0x80:
+            self.sio_armed = None
+
+    def on_block(self, mu, addr, size, _):
+        self.blocks += 1
+        if self.sio_armed is not None and self.blocks >= self.sio_armed:
+            self.sio_armed = None
+            ours = struct.unpack("<I", mu.mem_read(0x04000120, 4))[0]
+            theirs = self.link_partner.out
+            self.link_partner.intr(ours)
+            self.link_words.append((ours, theirs))
+            mu.mem_write(0x04000120, struct.pack("<I", theirs))
+            cnt = struct.unpack("<H", mu.mem_read(0x04000128, 2))[0]
+            mu.mem_write(0x04000128, struct.pack("<H", cnt & ~0x80))
 
     # ------------------------------------------------------------ views
     def overlay(self):

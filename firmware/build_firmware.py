@@ -8,6 +8,7 @@ supply Datel's own 1.06 update file (its CRC-32 must be 1767E827) and this
 script applies the Reckless changes to it, writing
 
     build/duo_1.06_reckless_v4.1.bin     (update CRC A5303402)
+    build/duo_1.06_reckless_v4.2.bin     (v4.1 + run a program from RAM)
 
 which maxduo_saves.py --update can install. With --all it also builds the
 earlier versions the test suite uses (the lab edition, v3.1 and the original v3).
@@ -17,7 +18,8 @@ import os, shutil, struct, sys, zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OFFICIAL_CRC = 0x1767E827
-EXPECTED = {"duo_1.06_reckless_v4.1.bin": 0xA5303402}
+EXPECTED = {"duo_1.06_reckless_v4.1.bin": 0xA5303402,
+            "duo_1.06_reckless_v4.2.bin": 0xDD59ED8A}
 
 
 def load_official(path):
@@ -48,6 +50,19 @@ def main():
     open(name, "wb").write(struct.pack("<I", crc) + image)
     print(f"Built build/{name}: update CRC {crc:08X}"
           + (" - matches the released v4.1" if crc == EXPECTED[name] else " - DIFFERENT from the released v4.1!"))
+    # v4.2 (v4.1 + run a program from RAM) - built in a fresh process, because
+    # build_v4 adjusts settings in the earlier stages' modules as it builds.
+    import subprocess
+    r = subprocess.run([sys.executable, "-c", "import build_v42; build_v42.build('fw_v42.bin')"],
+                       cwd=out, env=dict(os.environ, PYTHONPATH=HERE), capture_output=True, text=True)
+    if r.returncode:
+        sys.exit("v4.2 build failed:\n" + r.stderr[-2000:])
+    img42 = open("fw_v42.bin", "rb").read()
+    name42 = "duo_1.06_reckless_v4.2.bin"
+    crc42 = zlib.crc32(img42)
+    open(name42, "wb").write(struct.pack("<I", crc42) + img42)
+    print(f"Built build/{name42}: update CRC {crc42:08X}"
+          + (" - matches the released v4.2" if crc42 == EXPECTED.get(name42) else " - not a released build"))
     if "--all" in sys.argv:
         import importlib, build_patch2, build_reckless, build_lab
         for mod in (build_patch2, build_reckless, build_lab):

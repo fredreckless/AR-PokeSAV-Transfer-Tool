@@ -42,7 +42,7 @@ Build the firmware from Datel's file:
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE
 ```
 
-It should say `matches the released v4.1`. Then put the DUO in **USB SERVER MODE** from its menu and install the firmware:
+It should say `matches the released v4.1`. It also builds `duo_1.06_reckless_v4.2.bin`, which is v4.1 plus the ability to run this project's programs from the GBA's RAM. You only need v4.2 for the experimental `--adapter-test`. Then put the DUO in **USB SERVER MODE** from its menu and install the firmware:
 
 ```
 python maxduo_saves.py --update firmware/build/duo_1.06_reckless_v4.1.bin
@@ -92,6 +92,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 | `--restart` | Restart the DUO from the PC, straight back into USB server mode |
 | `--list`, no options | List or export the **DS** saves stored on the DUO, as Datel's software did |
 | `--lab script FILE.json` | Run a small read-only experiment on the GBA (see [lab/](lab/)) |
+| `--adapter-test` | *Experimental, firmware v4.2:* the DUO's GBA answers a Pokémon game's Wireless Adapter check on a second GBA, over a GBC link cable. It's the first step towards recreating Mystery Gift events; see [docs/WIRELESS.md](docs/WIRELESS.md) |
 | `--help` | Everything else |
 
 ## If something goes wrong
@@ -124,11 +125,11 @@ This repository holds the whole project, not just the finished tool.
 ```
 pip install -r requirements.txt
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE --all
-python tests/run_each.py      # about 60 tests, each in its own process; around 15 minutes
-python tests/mutate4.py       # plants 12 known bugs; each must be caught
+python tests/run_each.py      # about 70 tests, each in its own process; around 15 minutes
+python tests/mutate4.py       # plants 17 known bugs; each must be caught
 ```
 
-The firmware build is reproducible: the same input always gives the same v4.1, update CRC `A5303402`. The tests use synthetic saves and ROMs, so they need no game data.
+The firmware build is reproducible: the same input always gives the same v4.1, update CRC `A5303402`, and v4.2, update CRC `DD59ED8A`. The tests use synthetic saves and ROMs, so they need no game data.
 
 ### Read more
 
@@ -137,6 +138,7 @@ The firmware build is reproducible: the same input always gives the same v4.1, u
 - [USB protocol](docs/PROTOCOL.md): Datel's commands, our additions, and a comparison with other Action Replay tools
 - [Findings](docs/FINDINGS.md): what the lab measured
 - [History](docs/HISTORY.md): how it got here, including what went wrong
+- [Wireless](docs/WIRELESS.md): work in progress on recreating Mystery Gift distributions
 
 ## Credits
 
