@@ -164,9 +164,31 @@ The `adapter` program now handles this:
 
 The simulator models this, and Emerald's whole search completes there with no retries.
 
+### Sessions 13 and 14: the ready flick
+
+With the first-bit fix, the game accepts every command's first word. The acknowledgement then
+needs the DUO to signal "ready" (SO low) while still delivering a top bit of 1 when the clock
+starts. A two-instruction flick (about 0.25 µs low) was noticed in the probe (session 12), when it
+was repeated every few microseconds. It was almost never noticed at a slower repeat (session 14).
+So the flick is probably too narrow to make it reliably down the cable.
+
+The game starts its clock a microsecond or two after it notices the low. That's
+`handshake_wait(0)` in librfu_intr.c, then `STWI_stop_timer_in_RAM()`, then two SIOCNT writes. So
+there is a window: wide enough to be seen, and over before the first clock edge.
+
+The adapter now **tunes the flick width itself**:
+- If the game doesn't clock the word, it widens the flick every four flicks.
+- If the game clocks the word but then refuses it (first bit wrong), it narrows it.
+- It restarts each word from the last width that worked.
+- After each flick it keeps clear of SIOCNT for longer than a whole word takes.
+
+At the end of a trace, the PC prints a table of flicks per width (clocked, accepted, refused), the
+width it settled on, the measured length of one width step, and a **link scope**: the game's SO
+line sampled after the first few flicks.
+
 ## Next steps
 
-1. **Run `--adapter-trace` again on real hardware** with the first-bit fix.
+1. **Run `--adapter-trace` again on real hardware** and look at the flick table and the scope.
 2. **A distributor in range.** Answer "search results?" with one host whose broadcast data matches
    what Emerald's Mystery Gift looks for. Then handle Connect, and the data commands with real clock
    swaps ("data ready"), carrying librfu's own packet framing.

@@ -1010,11 +1010,29 @@ def _():
 import rfu_game_model as RFU
 
 
-def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits=0, first_bit=False):
+_SYMS = {}
+
+
+def adapter_symbol(name):
+    """Address of a global in the adapter program (needs clang; the embedded copy is checked
+    against a fresh build by another test, so the layouts match)."""
+    if not _SYMS:
+        sys.path.insert(0, paths.FIRMWARE)
+        import programs
+        try:
+            _SYMS.update(programs.symbols("adapter"))
+        except (RuntimeError, OSError, subprocess.CalledProcessError) as e:
+            raise Skip(f"needs clang/llvm to locate program symbols: {e}")
+    return _SYMS[name]
+
+
+def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits=0, first_bit=False,
+                    flick_window=None):
     hw, duo = run42()
     game = RFU.Game()
     if attach:
-        hw.attach_link_game(script(game), lag_bits=lag_bits, first_bit=first_bit)
+        flick = (adapter_symbol("flick_w"),) + tuple(flick_window) if flick_window else None
+        hw.attach_link_game(script(game), lag_bits=lag_bits, first_bit=first_bit, flick=flick)
     r = quiet(M.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds, adapter_probe=seconds), poll_s=0.2,
               stop_when=(lambda: hw.lg_done) if attach else None, program=program)
     entries, st, counters = r[0][:3]
@@ -1106,6 +1124,21 @@ def _():
     assert acks[0x13] == [0x99660193, 0] and acks["sleep"] == [0x996600BD]
     assert game.retries == 0 and not game.errors, (game.retries, game.errors)
     assert counters >> 16 == 0 and "Over-long answers" not in hw.text
+
+
+@test("wireless adapter: the 'ready' flick tunes its own width into the window the game needs (too narrow: unseen, too wide: first bit wrong)")
+def _():
+    def script(game):
+        acks = yield from RFU.mystery_gift_search(game, polls=4)
+        acks["sleep"] = yield from RFU.go_to_sleep(game)
+        return acks
+    for window in ((6, 9), (11, 12), (0, 0)):       # climb, climb to a narrow window, back off
+        hw, game, trace, st, counters = adapter_session(script, first_bit=True, flick_window=window, seconds=60)
+        assert hw.lg_error is None and hw.lg_done, (window, repr(hw.lg_error), game.errors)
+        tuning = M.adapter_trace.last_tuning
+        lo, hi = window
+        assert lo <= tuning["width"] <= hi, (window, tuning["width"], tuning["rows"])
+        assert any(r[2] for r in tuning["rows"]) and tuning["scope"], tuning
 
 
 @test("wireless adapter: with a one-bit lag the simulator reproduces lab session 11 - each command fails three times")

@@ -248,12 +248,61 @@ static void idle_after_command(void)
  * correctly only if SO is already resting at that bit's level (SIOCNT bit 3) - the other 31
  * bits are fine. So every word is loaded with SO at its top bit.
  *   - The first word of a command has no handshake: just rest SO at 1 (0x80000000).
- *   - After a handshake SO must go low to say "ready". For a top-bit-1 word we flick it low and
- *     straight back high; the game starts clocking within a microsecond of seeing the low, so
- *     after each flick we keep our hands off SIOCNT for longer than a whole word takes (16 us at
- *     2 MHz) - lab session 13 showed that touching SIOCNT around a word loses it.
+ *   - After a handshake SO must go low to say "ready", but a top-bit-1 word needs SO high when
+ *     the game's clock starts. So we FLICK it: low for a moment, then high again. The game starts
+ *     its clock a microsecond or two after it notices the low (librfu_intr.c: handshake_wait(0),
+ *     STWI_stop_timer_in_RAM, two SIOCNT writes), so the flick must be long enough to be noticed
+ *     down the cable, and short enough to be over before that first clock edge.
+ *   - Lab sessions 12-14: a two-instruction flick (~0.25 us) is noticed only rarely. The width
+ *     is now tuned while running: if the game never clocks, flicks get wider; if it clocks but
+ *     then rejects the word (first bit wrong), they get narrower. Per-width counts go to the PC.
+ *   - After each flick we keep our hands off SIOCNT for longer than a whole word (16 us):
+ *     touching SIOCNT mid-word loses it (session 13).
  * The end of a command needs a plain low (unarmed) until the game has gone idle. */
 static u32 n_stray, n_flick_timeouts;
+
+#define W_MAX 15
+volatile u32 flick_w = 1;                /* spin-loop iterations the flick stays low (tuned) */
+static u32 w_pulses[W_MAX + 1], w_clocked[W_MAX + 1], w_accepted[W_MAX + 1], w_rejected[W_MAX + 1];
+static int last_flick = -1;              /* width of the flick that started the last word, or -1 */
+static int flick_good = -1;              /* the last width the game accepted, or -1 */
+static u32 spin_per_8_lines, polls_per_8_lines;
+
+/* link-port scope: SI (the game's SO) sampled during the quiet spell after the first flicks */
+#define SCOPE_N 8
+static u32 scope_si[SCOPE_N][2], scope_meta[SCOPE_N], scope_count;
+
+static void spin(u32 n)                  /* two instructions a step: fine, even steps */
+{
+    if (n)
+        __asm__ volatile("1: subs %0, %0, #1\n\tbne 1b" : "+l"(n) : : "cc");
+}
+
+static u32 count_8_lines(int polls)       /* units of work done in 8 scanlines (0 if VCOUNT is stuck) */
+{
+    u32 n = 0, guard = 0, v = VCOUNT & 0xFF;
+    while ((VCOUNT & 0xFF) == v)
+        if (++guard > 200000) return 0;
+    v = (VCOUNT & 0xFF) + 8;
+    if (v >= LINES_PER_FRAME) v -= LINES_PER_FRAME;
+    while ((VCOUNT & 0xFF) != v) {
+        if (polls) {
+            for (int i = 0; i < 16; i++)
+                if (!(SIOCNT & 0x8000)) n++;             /* the same shape as the quiet-spell poll */
+        } else {
+            spin(16);
+            n += 16;
+        }
+        if (n > 4000000) return 0;
+    }
+    return n;
+}
+
+static void calibrate(void)              /* how fast spin() and the polling loop run */
+{
+    spin_per_8_lines = count_8_lines(0);
+    polls_per_8_lines = count_8_lines(1);
+}
 
 static void arm_idle(void)
 {
@@ -261,29 +310,71 @@ static void arm_idle(void)
     SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;
 }
 
-#define FLICK_QUIET 40          /* polls of SIOCNT, ~1 us each in EWRAM: well over one 16 us word */
+#define FLICK_QUIET 40          /* polls of SIOCNT (see calibrate): well over one 16 us word */
+#define PULSES_PER_WIDTH 4
+#define FLICK_LINES 790        /* ~50 ms of flicking: inside librfu's 80 ms handshake timeout */
 
 static void arm_word(u32 w)
 {
-    u32 t0;
+    u32 t0, tries = 0, cap = scope_count < SCOPE_N ? scope_count : SCOPE_N;
     SIODATA32 = w;
+    last_flick = -1;
     if (!(w >> 31)) {
         SIOCNT = CNT_32BIT | CNT_START;
         return;
     }
+    if (flick_good >= 0)
+        flick_w = flick_good;                                 /* start from the last width that worked */
     t0 = now();
     for (;;) {
+        u32 fw = flick_w, si_bits[2] = { 0, 0 }, done_at = 0xFF;
         SIOCNT = CNT_32BIT | CNT_START;                       /* low: ready */
-        SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;         /* high again for the first bit */
-        for (int i = 0; i < FLICK_QUIET; i++)
-            if (!(SIOCNT & CNT_START))
-                return;                                       /* the game clocked the word */
-        if (now() - t0 > HANDSHAKE_LINES) {
+        spin(fw);
+        if (SIOCNT & CNT_START)                               /* (never re-arm a finished word) */
+            SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;     /* high again for the first bit */
+        w_pulses[fw]++;
+        for (u32 i = 0; i < FLICK_QUIET; i++) {
+            u32 c = SIOCNT;
+            if (i < 64 && (c & CNT_SI))
+                si_bits[i >> 5] |= 1u << (i & 31);
+            if (!(c & CNT_START)) { done_at = i; break; }
+        }
+        if (cap < SCOPE_N && (done_at != 0xFF || tries == 0)) {
+            scope_si[cap][0] = si_bits[0];
+            scope_si[cap][1] = si_bits[1];
+            scope_meta[cap] = fw | (done_at << 8) | (w & 0xFFFF0000);
+            scope_count = ++cap;
+        }
+        if (done_at != 0xFF) {
+            w_clocked[fw]++;
+            last_flick = fw;                                  /* judged at the next handshake */
+            return;
+        }
+        if (++tries % PULSES_PER_WIDTH == 0 && flick_w < W_MAX)
+            flick_w++;                                        /* not noticed: wider */
+        if (now() - t0 > FLICK_LINES) {
             n_flick_timeouts++;
             trace(EV_FLICK_TIMEOUT, 0, w);
             return;
         }
     }
+}
+
+/* Called by the next handshake: did the game accept the word that flick started? */
+static void judge_flick(int accepted)
+{
+    if (last_flick < 0)
+        return;
+    if (accepted) {
+        w_accepted[last_flick]++;
+        flick_good = last_flick;
+    } else {
+        w_rejected[last_flick]++;
+        flick_good = -1;
+        if (flick_w > 0 && flick_w >= (u32)last_flick)
+            flick_w = last_flick ? last_flick - 1 : 0;       /* clocked but refused: narrower */
+    }
+    last_flick = -1;
 }
 
 static void idle_after_command(void)
@@ -307,6 +398,9 @@ static int handshake_then_arm(u32 word)
 {
     SIOCNT = CNT_32BIT | CNT_SO_HIGH;
     if (!wait_si(1, HANDSHAKE_LINES)) {
+#ifndef PROBE
+        judge_flick(0);
+#endif
         n_lost++;
         trace(EV_LOST, 0, req_cmd);
 #ifdef PROBE
@@ -320,6 +414,8 @@ static int handshake_then_arm(u32 word)
     if (hs_after_header) acks_ok[enc]++;
     hs_count++;
     hs_after_header = 0;
+#else
+    judge_flick(1);
 #endif
     if (phase == PH_COMMAND) {                                 /* the command is complete */
         idle_after_command();
@@ -509,6 +605,13 @@ static int pc_service(api_t *api)
     case 5: v = n_id | (n_lost << 16); break;
 #ifndef PROBE
     case 8: v = n_stray | (n_flick_timeouts << 16); break;
+    case 9: v = i <= W_MAX ? (w_pulses[i] & 0xFFFF) | (w_clocked[i] << 16) : 0; break;
+    case 10: v = i <= W_MAX ? (w_accepted[i] & 0xFFFF) | (w_rejected[i] << 16) : 0; break;
+    case 11: v = flick_w | (scope_count << 8); break;
+    case 12: v = spin_per_8_lines; break;
+    case 13: v = polls_per_8_lines; break;
+    case 14: v = (i >> 2) < SCOPE_N ? ((i & 3) == 0 ? scope_si[i >> 2][0] : (i & 3) == 1 ? scope_si[i >> 2][1]
+                                        : scope_meta[i >> 2]) : 0; break;
 #endif
 #ifdef PROBE
     case 6: v = i < N_ENC ? (tries[i] | accepts[i] << 16) : 0; break;
@@ -529,6 +632,10 @@ u32 start(api_t *api)
     adapter_state = ST_ASLEEP;
     phase = PH_ID;
     last_vcount = VCOUNT & 0xFF;
+#ifndef PROBE
+    calibrate();
+    last_vcount = VCOUNT & 0xFF;
+#endif
     arm_idle();
     while (!stop_requested) {
         if (!(SIOCNT & CNT_START))

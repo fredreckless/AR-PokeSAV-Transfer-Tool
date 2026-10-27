@@ -202,7 +202,8 @@ class Hw:
         self.mu.hook_add(UC_HOOK_BLOCK, self.on_block)
 
     # ------------------------------------------------------------ link port, line by line
-    def attach_link_game(self, gen, blocks_per_line=25, xfer_blocks=6, lag_bits=0, first_bit=False):
+    def attach_link_game(self, gen, blocks_per_line=25, xfer_blocks=6, lag_bits=0, first_bit=False,
+                         flick=None):
         """A second GBA running librfu (tests/rfu_game_model.py): either side can be the
         clock master, and both see each other's SO line (SIOCNT bit 3 -> the other's bit 2).
         A word only arrives if the receiving side was armed (start bit set) when the clock
@@ -217,6 +218,11 @@ class Hw:
         # read from its SO resting level (SIOCNT bit 3) instead of the word; the rest arrive intact
         self.lg_first = first_bit
         self.duo_low_seen = False         # the DUO dropped SO low, however briefly, while armed
+        # flick=(address of flick_w, narrowest width the game notices, widest width that is over
+        # before its first clock edge): the cable/timing window lab sessions 12-14 point to
+        self.lg_flick = flick
+        self.last_pulse_w = None
+        self.armed_low_since = None
         self.blocks = 0
         self.game_so, self.game_armed, self.game_got = 0, None, []
         self.lg_op, self.lg_deadline, self.lg_xfer = None, 0, None
@@ -246,8 +252,18 @@ class Hw:
         old = self.lg_cnt()
         v = value & 0xFFFF if addr == 0x04000128 and size >= 2 else \
             (old & 0xFF00 | value & 0xFF) if addr == 0x04000128 else (old & 0xFF | (value << 8) & 0xFF00)
+        if v & 0x8 or not v & 0x80:
+            self.armed_low_since = None
         if not v & 0x8:
-            self.duo_low_seen = True            # a real GBA polling SI could catch even a brief low
+            if self.lg_flick and v & 0x80:     # an armed low: a flick of flick_w spin steps
+                addr, wmin, wmax = self.lg_flick
+                w = struct.unpack("<I", mu.mem_read(addr, 4))[0]
+                self.last_pulse_w = w
+                self.duo_low_seen = w >= wmin
+            else:
+                self.duo_low_seen = True        # a real GBA polling SI could catch even a brief low
+            if v & 0x80 and not (old & 0x80 and not old & 0x8):
+                self.armed_low_since = self.blocks
         if self.lg_first and self.lg_xfer is not None and self.lg_xfer[1] is not None:
             # touching SIOCNT while the game clocks a word loses that word (lab session 13)
             self.lg_xfer = (self.lg_xfer[0], self.lg_xfer[1] ^ 0x0000FFFF)
@@ -309,7 +325,11 @@ class Hw:
                     self.lg_resume(None); continue
                 return
             if k == "wait_si":
-                if self.lg_duo_so() == op[1] or (op[1] == 0 and self.duo_low_seen):
+                level = self.lg_duo_so()
+                if (op[1] == 0 and level == 0 and self.lg_flick and self.armed_low_since is not None
+                        and self.blocks - self.armed_low_since < 60):
+                    level = 1                       # a flick in progress: only its width decides
+                if level == op[1] or (op[1] == 0 and self.duo_low_seen):
                     self.lg_resume(True); continue
                 if self.blocks >= self.lg_deadline:
                     self.lg_resume(False); continue
@@ -326,6 +346,10 @@ class Hw:
                     self.lg_resume(None); continue
                 return
             if k == "xfer":
+                if (self.lg_xfer is None and (self.lg_flick or self.lg_first) and self.armed_low_since is not None
+                        and self.blocks - self.armed_low_since < 60):
+                    return      # the game's clock starts a little after it sees the flick (librfu: stop
+                                # the timer, two SIOCNT writes); the flick window decides the first bit
                 if self.lg_xfer is None:
                     cnt = self.lg_cnt()
                     armed = cnt & 0x80 and not cnt & 0x1 and cnt & 0x1000
@@ -334,6 +358,9 @@ class Hw:
                         duo_word = ((cnt >> 3 & 1) << 31) | (duo_word >> 1)
                     if armed and self.lg_first and len(op) > 2 and op[2] == 2:
                         duo_word = ((cnt >> 3 & 1) << 31) | (duo_word & 0x7FFFFFFF)
+                        if self.lg_flick and self.last_pulse_w is not None and self.last_pulse_w > self.lg_flick[2]:
+                            duo_word &= 0x7FFFFFFF      # the flick was still low at the first clock edge
+                    self.last_pulse_w = None
                     self.lg_xfer = (self.blocks + self.lg_x, duo_word)
                     return
                 done_at, duo_word = self.lg_xfer

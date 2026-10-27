@@ -15,11 +15,13 @@ FW42_MUTANTS = {
     "run accepts an entry point outside the code": ("    cmp  r1, r4\n    bhs  run_bad\n", "", "refused"),
 }
 PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a copy of the tool
-    "adapter skips the ready handshake": ("    if (!wait_si(1, HANDSHAKE_LINES)) {\n        n_lost++;", "    if (0) {\n        n_lost++;", "wireless adapter"),
+    "adapter skips the ready handshake": ("    if (!wait_si(1, HANDSHAKE_LINES)) {\n#ifndef PROBE\n        judge_flick(0);", "    if (0) {\n#ifndef PROBE\n        judge_flick(0);", "wireless adapter"),
     "adapter acknowledges without the 0x80": ("((cmd + 0x80) & 0xFF)", "(cmd & 0xFF)", "wireless adapter: Emerald"),
     "adapter never takes its turn after a wait": ("frames * LINES_PER_FRAME)\n            break;", "frames * LINES_PER_FRAME * 100000)\n            break;", "wireless adapter: Emerald"),
     "adapter rests SO low before a command (no first-bit fix)": ("    SIODATA32 = IDLE_WORD;\n    SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;\n}", "    SIODATA32 = IDLE_WORD;\n    SIOCNT = CNT_32BIT | CNT_START;\n}", "first-bit behaviour"),
     "adapter flicks again without waiting out the word": ("#define FLICK_QUIET 40", "#define FLICK_QUIET 1", "first-bit behaviour"),
+    "adapter's flick never gets wider": ("            flick_w++;                                        /* not noticed: wider */", "            ;", "tunes its own width"),
+    "adapter's flick never gets narrower": ("            flick_w = last_flick ? last_flick - 1 : 0;       /* clocked but refused: narrower */", "            ;", "tunes its own width"),
     "adapter has no watchdog mid-command": ("        if (phase != PH_COMMAND && phase != PH_ID && now() - last_word_at > WATCHDOG_LINES) {", "        if (0) {", "wireless adapter: the game gives up"),
 }
 

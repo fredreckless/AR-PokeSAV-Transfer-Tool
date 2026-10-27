@@ -242,6 +242,21 @@ def clang_version():
     return m.group(1) if m else "?"
 
 
+def symbols(name):
+    """Addresses of a C program's global symbols (for the simulator's hardware models)."""
+    src_name, defines = C_PROGRAMS[name]
+    src = os.path.join(_HERE, "programs", src_name)
+    ld = os.path.join(_HERE, "programs", "link.ld")
+    with tempfile.TemporaryDirectory() as work:
+        obj, elf = os.path.join(work, "p.o"), os.path.join(work, "p.elf")
+        subprocess.run([_tool("clang"), "--target=armv4t-none-eabi", "-mthumb", "-Os", "-ffreestanding",
+                        "-fno-builtin", "-nostdlib", "-fno-pic", "-Wall", "-Werror", *defines, "-c", src, "-o", obj],
+                       check=True)
+        subprocess.run([_tool("ld.lld"), "-T", ld, obj, "-o", elf], check=True)
+        out = subprocess.run([_tool("llvm-nm"), elf], capture_output=True, text=True, check=True).stdout
+    return {parts[2]: int(parts[0], 16) for parts in (l.split() for l in out.splitlines()) if len(parts) == 3}
+
+
 def build_c(name):
     src_name, defines = C_PROGRAMS[name]
     src = os.path.join(_HERE, "programs", src_name)
