@@ -32,6 +32,7 @@ python lab_runner.py                                                     # run t
 | 25 Oct, 06:47 | session 8 | Restart then save, three times, with the new guard read | All clean |
 | 25 Oct, 09:20 | session 9 | Cold start then save; speed against compressibility; a soak of 20 saves | The cold-start save was clean. Time is about 2.6 s plus about 18 ms per 8-byte packet. 21 identical saves |
 | 27 Oct, 16:45 | session 10 | v4.2: does a real Japanese Emerald accept the DUO as a Wireless Adapter? (MGB-010 cable, small plug to small plug) | **PASS** after 111.8 s: 14 transfers, ID 0x8001 accepted. The game then sent its first adapter command, `9966003D` |
+| 27 Oct, 21:15 | session 11 | First real run of the adapter program: Mystery Gift → じゅしん スポット | The ID exchange works, but the first command stalls: the 2 MHz answer from the DUO doesn't reach the game correctly ([details](sessions/session11/README.md)) |
 
 Experiments deliberately **not** done:
 - two GBA packets in a row, which would hang the GBA;
