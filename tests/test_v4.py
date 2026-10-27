@@ -1070,7 +1070,7 @@ def _():
     assert hw.lg_error is None and hw.lg_done, repr(hw.lg_error)
     acks = hw.lg_result
     assert acks[0x10] == [0x99660090] and acks[0x17] == [0x99660097] and acks[0x16] == [0x99660096]
-    assert acks[0x1C] == [0x9966009C] and acks[0x1D] == [0x9966009D] and acks[0x1E] == [0x9966009E]
+    assert acks[0x1C] == [0x9966009C] and acks[0x1D][:2] == [0x9966079D, 0x7DA5] and acks[0x1E][:2] == [0x9966079E, 0x7DA5]
     assert acks["wait"] == 0x99660027                                  # the adapter's turn: nothing happened
     assert acks[0x13] == [0x99660193, 0]                               # idle, no ID
     assert acks[0x99] == "rejected" and acks["sleep"] == [0x996600BD]
@@ -1083,6 +1083,23 @@ def _():
     assert len(names) == len(expect) and all(n.startswith(e) for n, e in zip(names, expect)), names
     assert trace[5][1] == 12                                          # 12 polls, one line
     assert counters & 0xFFFF == 2 and counters >> 16 == 0
+
+
+@test("distributor: Emerald's search finds a Wonder Card distributor (serial 0x7F7D, checksum good, hasCard) and connects")
+def _():
+    def script(game):
+        found = yield from RFU.find_distributor(game)
+        conn = yield from RFU.connect_to(game, found["id"])
+        return found, conn
+    hw, game, trace, st, counters = adapter_session(script, first_bit=True)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors)
+    found, conn = hw.lg_result
+    assert found["serial"] == 0x7F7D and found["checksum_ok"] and found["gname"]["hasCard"], found
+    assert found["gname"]["language"] == 1 and found["gname"]["version"] == 3 and found["uname"][:3] == bytes([0xBE, 0xCF, 0xC9])
+    assert conn["status"] == 0 and conn["child_id"] == 0x2C41 and conn["swap"] == 0x99660027, conn
+    names = [t for t, _ in trace]
+    assert any(n.startswith("the game connected to the distributor") for n in names), names
+    assert game.retries == 0, game.retries
 
 
 @test("wireless adapter: the game gives up half-way through a command and starts it again; the adapter follows")
@@ -1120,7 +1137,7 @@ def _():
     hw, game, trace, st, counters = adapter_session(script, first_bit=True)
     assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors, [t for t, _ in trace][-6:])
     acks = hw.lg_result
-    assert acks[0x10] == [0x99660090] and acks[0x1D] == [0x9966009D] and acks["wait"] == 0x99660027
+    assert acks[0x10] == [0x99660090] and acks[0x1D][:2] == [0x9966079D, 0x7DA5] and acks["wait"] == 0x99660027
     assert acks[0x13] == [0x99660193, 0] and acks["sleep"] == [0x996600BD]
     assert game.retries == 0 and not game.errors, (game.retries, game.errors)
     assert counters >> 16 == 0 and "Over-long answers" not in hw.text

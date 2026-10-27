@@ -94,6 +94,7 @@ static int wait_si(int level, u32 lines)
 #define EV_SWAP_FAILED   0x04
 #define EV_STRAY         0x05    /* the game wanted more of an answer than we sent */
 #define EV_FLICK_TIMEOUT 0x06    /* the game never noticed we were ready */
+#define EV_CONNECTED     0x07    /* the game has connected to our distributor */
 
 static u32 trace_head[TRACE_N], trace_data[TRACE_N], trace_count;
 static u32 n_commands, n_id, n_lost, last_word;
@@ -123,16 +124,51 @@ static u32 req[32], req_len, req_cmd;
 static u32 ack[32], ack_len;
 static int swap_after;                 /* the game hands us the clock after this command */
 
+/* ------------------------------------------------------------------ a distributor in range
+ * What a searching game sees (0x1D): one host, broadcasting what Emerald's Mystery Gift looks
+ * for (link_rfu_2.c / union_room.c in the decomp): serial number 0x7F7D, RFU_SERIAL_WONDER_
+ * DISTRIBUTOR, and as its "game name" a struct RfuGameData with compatibility.hasCard set.
+ * Layout as librfu's rfu_REQ_configGameData builds it: serial (2), gname (13), checksum (1),
+ * uname (8); checksum = ~(sum of gname[0..7] + uname[0..7]). */
+#define HOST_ID      0x7DA5
+#define CHILD_ID     0x2C41
+#define SERIAL_WONDER_DISTRIBUTOR 0x7F7D
+static u32 host_cfg[6], host_on = 1, connect_polls, child_connected;
+
+static void build_host(void)
+{
+    u8 b[24];
+    u32 compat = 1                       /* language: Japanese */
+               | 1 << 5                  /* hasCard */
+               | 1 << 7 | 1 << 8 | 1 << 9 /* canLinkNationally, hasNationalDex, gameClear */
+               | 3 << 10;                /* version: Emerald */
+    static const u8 uname[8] = { 0xBE, 0xCF, 0xC9, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };   /* "DUO" */
+    u8 sum = 0;
+    memset(b, 0, sizeof b);
+    b[0] = SERIAL_WONDER_DISTRIBUTOR & 0xFF;
+    b[1] = SERIAL_WONDER_DISTRIBUTOR >> 8;
+    b[2] = compat; b[3] = compat >> 8;   /* RfuGameData.compatibility */
+    b[4] = 0x34;   b[5] = 0x12;          /* .playerTrainerId */
+    b[12] = 21;                          /* .activity = ACTIVITY_WONDER_CARD, not started */
+    memcpy(b + 16, uname, 8);
+    for (int i = 0; i < 8; i++)
+        sum += b[2 + i] + uname[i];
+    b[15] = ~sum;
+    for (int i = 0; i < 6; i++)
+        host_cfg[i] = b[4 * i] | b[4 * i + 1] << 8 | b[4 * i + 2] << 16 | (u32)b[4 * i + 3] << 24;
+}
+
 static void respond(void)
 {
     u32 cmd = req_cmd;
     ack_len = 0;
     swap_after = 0;
     switch (cmd) {
-    case 0x10: adapter_state = ST_IDLE; break;                         /* Hello / reset */
-    case 0x11: ack[0] = 0; ack_len = 1; break;                         /* signal levels */
+    case 0x10: adapter_state = ST_IDLE; child_connected = 0; break;   /* Hello / reset */
+    case 0x11: ack[0] = child_connected ? 0xFF : 0; ack_len = 1; break; /* signal levels */
     case 0x12: ack[0] = 0x00830117; ack_len = 1; break;                /* version */
-    case 0x13: ack[0] = (adapter_state == ST_ASLEEP ? 0 : adapter_state) << 24; ack_len = 1; break;
+    case 0x13: ack[0] = (adapter_state == ST_ASLEEP ? 0 : adapter_state) << 24
+                       | (child_connected ? 1 << 16 | CHILD_ID : 0); ack_len = 1; break;
     case 0x14: ack[0] = 0xFF; ack_len = 1; break;                      /* slot status */
     case 0x15: memset(ack, 0, 7 * 4); ack[6] = 257; ack_len = 7; break;
     case 0x16: memcpy(game_config, req, sizeof game_config); break;    /* broadcast data */
@@ -141,16 +177,35 @@ static void respond(void)
     case 0x1A: break;                                                  /* nobody joined */
     case 0x1B: adapter_state = ST_HOST_CLOSED; break;
     case 0x1C: adapter_state = ST_SEARCHING; break;
-    case 0x1D: break;                                                  /* nobody in range */
-    case 0x1E: adapter_state = ST_IDLE; break;
-    case 0x1F: adapter_state = ST_CONNECTING; break;
-    case 0x20: ack[0] = 0x01000000; ack_len = 1; break;                /* still trying */
-    case 0x21: ack[0] = 0x01000000; ack_len = 1; adapter_state = ST_IDLE; break;   /* failed */
+    case 0x1D: case 0x1E:                                              /* who is in range */
+        if (host_on && (adapter_state == ST_SEARCHING || cmd == 0x1E)) {
+            ack[0] = HOST_ID;                                          /* id, next free slot 0 */
+            memcpy(ack + 1, host_cfg, sizeof host_cfg);
+            ack_len = 7;
+        }
+        if (cmd == 0x1E) adapter_state = ST_IDLE;
+        break;
+    case 0x1F:
+        adapter_state = ST_CONNECTING;
+        connect_polls = host_on && (req[0] & 0xFFFF) == HOST_ID ? 1 : 0;
+        break;
+    case 0x20: case 0x21:                                              /* connected yet? */
+        if (connect_polls && (cmd == 0x21 || ++connect_polls > 2)) {
+            ack[0] = CHILD_ID;                                         /* slot 0, status 0: done */
+            child_connected = 1;
+            adapter_state = ST_CONNECTED;
+            if (cmd == 0x21) trace(EV_CONNECTED, 0, CHILD_ID);
+        } else {
+            ack[0] = connect_polls ? 0x01000000 : 0x04000000;          /* trying / failed */
+            if (cmd == 0x21) adapter_state = ST_IDLE;
+        }
+        ack_len = 1;
+        break;
     case 0x24: break;
     case 0x25: swap_after = 1; break;
     case 0x26: break;                                                  /* no data */
     case 0x27: swap_after = 1; break;
-    case 0x30: break;
+    case 0x30: child_connected = 0; adapter_state = ST_IDLE; break;
     case 0x32: case 0x34: break;
     case 0x33: ack[0] = 0x01000000; ack_len = 1; break;
     case 0x35: case 0x37: swap_after = 1; break;
@@ -632,6 +687,7 @@ u32 start(api_t *api)
     adapter_state = ST_ASLEEP;
     phase = PH_ID;
     last_vcount = VCOUNT & 0xFF;
+    build_host();
 #ifndef PROBE
     calibrate();
     last_vcount = VCOUNT & 0xFF;

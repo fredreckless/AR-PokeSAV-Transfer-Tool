@@ -186,9 +186,23 @@ At the end of a trace, the PC prints a table of flicks per width (clocked, accep
 width it settled on, the measured length of one width step, and a **link scope**: the game's SO
 line sampled after the first few flicks.
 
+## Step 3, stage B: a distributor in range (done in the simulator)
+
+The adapter now has one host in range. It broadcasts what Emerald's Mystery Gift looks for:
+- serial number **0x7F7D** (`RFU_SERIAL_WONDER_DISTRIBUTOR`);
+- as its game name, a `struct RfuGameData` saying "Japanese, Emerald, has a Wonder Card";
+- user name "DUO";
+- the checksum librfu insists on.
+
+When the game connects (`0x1F`, `0x20`, `0x21`), the adapter accepts it. The trace says "the game
+connected to the distributor". In the simulator, a model of Emerald's search filter and
+connection sequence finds the host and connects. See [DISTRIBUTOR.md](DISTRIBUTOR.md) for the
+whole plan.
+
 ## Next steps
 
-1. **Run `--adapter-trace` again on real hardware** and look at the flick table and the scope.
+1. **Run `--adapter-trace` again on real hardware.** Look at the flick table and the scope, and
+   whether the game finds and connects to "DUO".
 2. **A distributor in range.** Answer "search results?" with one host whose broadcast data matches
    what Emerald's Mystery Gift looks for. Then handle Connect, and the data commands with real clock
    swaps ("data ready"), carrying librfu's own packet framing.

@@ -22,6 +22,8 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "adapter flicks again without waiting out the word": ("#define FLICK_QUIET 40", "#define FLICK_QUIET 1", "first-bit behaviour"),
     "adapter's flick never gets wider": ("            flick_w++;                                        /* not noticed: wider */", "            ;", "tunes its own width"),
     "adapter's flick never gets narrower": ("            flick_w = last_flick ? last_flick - 1 : 0;       /* clocked but refused: narrower */", "            ;", "tunes its own width"),
+    "distributor's broadcast checksum is wrong": ("    b[15] = ~sum;", "    b[15] = sum;", "distributor"),
+    "distributor doesn't say it has a card": ("               | 1 << 5                  /* hasCard */", "               | 0 << 5                  /* hasCard */", "distributor"),
     "adapter has no watchdog mid-command": ("        if (phase != PH_COMMAND && phase != PH_ID && now() - last_word_at > WATCHDOG_LINES) {", "        if (0) {", "wireless adapter: the game gives up"),
 }
 

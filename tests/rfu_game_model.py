@@ -202,3 +202,58 @@ def go_to_sleep(game):
     if (yield from game.check_id(8)) != 0x8001:
         raise LinkError("adapter not found before sleep")
     return (yield from game.command(0x3D))
+
+
+def parse_candidates(ack):
+    """librfu's rfu_STC_readParentCandidateList: up to four hosts from a 0x1D/0x1E answer."""
+    raw = b"".join(w.to_bytes(4, "little") for w in ack[1:])
+    hosts = []
+    for i in range(0, len(raw) - 27, 28):
+        e = raw[i:i + 28]
+        gname, uname = e[6:19], e[20:28]
+        ok = (~e[19] & 0xFF) == (sum(gname[:8]) + sum(uname)) & 0xFF
+        compat = gname[0] | gname[1] << 8
+        hosts.append(dict(id=e[0] | e[1] << 8, slot=e[2], serial=(e[4] | e[5] << 8) & 0x7FFF, checksum_ok=ok,
+                          uname=uname, gname=dict(language=compat & 0xF, hasNews=compat >> 4 & 1,
+                                                  hasCard=compat >> 5 & 1, version=compat >> 10 & 0xF,
+                                                  trainer=gname[2] | gname[3] << 8, activity=gname[10] & 0x7F,
+                                                  started=gname[10] >> 7)))
+    return hosts
+
+
+def find_distributor(game, polls=150):
+    """Emerald's Mystery Gift search (InitializeRfuLinkManager_JoinGroup + the union room's
+    wonder-distributor filter): keep polling until a host with serial 0x7F7D and hasCard shows."""
+    yield ("until_ready",)
+    if (yield from game.check_id()) != 0x8001:
+        raise LinkError("adapter not found")
+    yield from game.command(0x10)
+    yield from game.command(0x17, [0x003C0420])
+    yield from game.command(0x16, [0x00000002, 0, 0, 0, 0, 0xFFFFFFFF])
+    yield from game.command(0x1C)
+    for _ in range(polls):
+        ack = yield from game.command(0x1D)
+        for h in parse_candidates(ack):
+            if h["checksum_ok"] and h["serial"] == 0x7F7D and h["gname"]["hasCard"] and not h["gname"]["started"]:
+                yield from game.command(0x1E)
+                return h
+        yield ("delay", 16 * MS)
+    raise LinkError("no distributor found")
+
+
+def connect_to(game, host_id, polls=60):
+    """rfu_LMAN_CHILD_connectParent: 0x1F, poll 0x20 until done, 0x21, then the clock swap."""
+    yield from game.command(0x1F, [host_id])
+    status = None
+    for _ in range(polls):
+        ack = yield from game.command(0x20)
+        status = ack[1] >> 24 if len(ack) > 1 else None
+        if status == 0:
+            break
+        yield ("delay", 16 * MS)
+    ack = yield from game.command(0x21)
+    word = ack[1]
+    res = dict(status=word >> 24, child_id=word & 0xFFFF, slot=word >> 16 & 0xFF)
+    if res["status"] == 0:
+        res["swap"] = yield from game.change(0x27)
+    return res
