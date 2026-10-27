@@ -202,7 +202,7 @@ class Hw:
         self.mu.hook_add(UC_HOOK_BLOCK, self.on_block)
 
     # ------------------------------------------------------------ link port, line by line
-    def attach_link_game(self, gen, blocks_per_line=25, xfer_blocks=6, lag_bits=0):
+    def attach_link_game(self, gen, blocks_per_line=25, xfer_blocks=6, lag_bits=0, first_bit=False):
         """A second GBA running librfu (tests/rfu_game_model.py): either side can be the
         clock master, and both see each other's SO line (SIOCNT bit 3 -> the other's bit 2).
         A word only arrives if the receiving side was armed (start bit set) when the clock
@@ -213,6 +213,10 @@ class Hw:
         # lag_bits=1: what lab session 11 suggests - the DUO, as clock slave at 2 MHz, answers one
         # clock late, so the game reads the DUO's idle SO level first, then its word minus the last bit
         self.lg_lag = lag_bits
+        # first_bit=True: what lab session 12 measured - at 2 MHz the clock slave's FIRST bit is
+        # read from its SO resting level (SIOCNT bit 3) instead of the word; the rest arrive intact
+        self.lg_first = first_bit
+        self.duo_low_seen = False         # the DUO dropped SO low, however briefly, while armed
         self.blocks = 0
         self.game_so, self.game_armed, self.game_got = 0, None, []
         self.lg_op, self.lg_deadline, self.lg_xfer = None, 0, None
@@ -242,11 +246,13 @@ class Hw:
         old = self.lg_cnt()
         v = value & 0xFFFF if addr == 0x04000128 and size >= 2 else \
             (old & 0xFF00 | value & 0xFF) if addr == 0x04000128 else (old & 0xFF | (value << 8) & 0xFF00)
+        if not v & 0x8:
+            self.duo_low_seen = True            # a real GBA polling SI could catch even a brief low
         if v & 0x80 and v & 0x1 and not (old & 0x80 and old & 0x1):        # the DUO clocks a word
             if self.lg_xfer is not None:
                 self.link_trouble.append("both sides started a transfer as clock master")
             word = struct.unpack("<I", mu.mem_read(0x04000120, 4))[0]
-            self.duo_xfer = (self.blocks + self.lg_x, word)
+            self.duo_xfer = (self.blocks + self.lg_x, word, bool(v & 0x2))
 
     def lg_resume(self, value):
         try:
@@ -258,17 +264,21 @@ class Hw:
             self.lg_op, self.lg_error, self.lg_done = None, e, True
             return
         op = self.lg_op
+        if op[0] == "wait_si":
+            self.duo_low_seen = False
         if op[0] in ("wait_si", "wait_xfer", "delay"):
             self.lg_deadline = self.blocks + (op[1] if op[0] == "delay" else op[2] if op[0] == "wait_si" else op[1])
         self.lg_xfer = None
 
     def lg_finish_duo_xfer(self, mu):
-        done_at, word = self.duo_xfer
+        done_at, word, fast = self.duo_xfer
         if self.blocks < done_at:
             return
         self.duo_xfer = None
         if self.game_armed is not None:
             got_back, self.game_armed = self.game_armed, None
+            if self.lg_first and fast:              # the game is the late clock slave now
+                got_back = (self.game_so << 31) | (got_back & 0x7FFFFFFF)
             self.game_got.append(word)
         else:
             got_back = 0xFFFFFFFF if self.game_so else 0
@@ -295,7 +305,7 @@ class Hw:
                     self.lg_resume(None); continue
                 return
             if k == "wait_si":
-                if self.lg_duo_so() == op[1]:
+                if self.lg_duo_so() == op[1] or (op[1] == 0 and self.duo_low_seen):
                     self.lg_resume(True); continue
                 if self.blocks >= self.lg_deadline:
                     self.lg_resume(False); continue
@@ -318,6 +328,8 @@ class Hw:
                     duo_word = struct.unpack("<I", mu.mem_read(0x04000120, 4))[0] if armed else None
                     if armed and self.lg_lag and len(op) > 2 and op[2] == 2:
                         duo_word = ((cnt >> 3 & 1) << 31) | (duo_word >> 1)
+                    if armed and self.lg_first and len(op) > 2 and op[2] == 2:
+                        duo_word = ((cnt >> 3 & 1) << 31) | (duo_word & 0x7FFFFFFF)
                     self.lg_xfer = (self.blocks + self.lg_x, duo_word)
                     return
                 done_at, duo_word = self.lg_xfer

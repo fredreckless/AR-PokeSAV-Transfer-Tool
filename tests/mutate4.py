@@ -18,6 +18,8 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "adapter skips the ready handshake": ("    if (!wait_si(1, HANDSHAKE_LINES)) {\n        n_lost++;", "    if (0) {\n        n_lost++;", "wireless adapter"),
     "adapter acknowledges without the 0x80": ("((cmd + 0x80) & 0xFF)", "(cmd & 0xFF)", "wireless adapter: Emerald"),
     "adapter never takes its turn after a wait": ("frames * LINES_PER_FRAME)\n            break;", "frames * LINES_PER_FRAME * 100000)\n            break;", "wireless adapter: Emerald"),
+    "adapter rests SO low before a command (no first-bit fix)": ("    SIODATA32 = IDLE_WORD;\n    SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;\n}", "    SIODATA32 = IDLE_WORD;\n    SIOCNT = CNT_32BIT | CNT_START;\n}", "first-bit behaviour"),
+    "adapter keeps flicking while the game clocks": ("        if (!si() || !(SIOCNT & CNT_START))\n            return;", "        if (!(SIOCNT & CNT_START))\n            return;", "first-bit behaviour"),
     "adapter has no watchdog mid-command": ("        if (phase != PH_COMMAND && phase != PH_ID && now() - last_word_at > WATCHDOG_LINES) {", "        if (0) {", "wireless adapter: the game gives up"),
 }
 
@@ -107,7 +109,10 @@ def run(kind, name):
             mutated = mutated.replace('if name == "crct" and 0x0E000000 <= addr < 0x0F000000:', 'if False:')
         open(os.path.join(work, "maxduo_saves.py"), "w").write(mutated)
         env = dict(os.environ, MAXDUO_TOOL_DIR=work)
-    r = subprocess.run([sys.executable, "test_v4.py", pick], cwd=paths.HERE, capture_output=True, text=True, env=env, timeout=1800)
+    for attempt in range(3):               # the emulator itself can segfault under load: run again
+        r = subprocess.run([sys.executable, "test_v4.py", pick], cwd=paths.HERE, capture_output=True, text=True, env=env, timeout=1800)
+        if r.returncode >= 0:
+            break
     summary = [l for l in r.stdout.splitlines() if l.startswith("[") or "passed" in l]
     caught = any(l.startswith("[FAIL]") for l in summary)
     print(f"{'CAUGHT' if caught else 'MISSED'}  {kind}: {name}  ->  {summary[-1] if summary else r.stderr[-200:]}", flush=True)

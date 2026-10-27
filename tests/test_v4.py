@@ -1010,11 +1010,11 @@ def _():
 import rfu_game_model as RFU
 
 
-def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits=0):
+def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits=0, first_bit=False):
     hw, duo = run42()
     game = RFU.Game()
     if attach:
-        hw.attach_link_game(script(game), lag_bits=lag_bits)
+        hw.attach_link_game(script(game), lag_bits=lag_bits, first_bit=first_bit)
     r = quiet(M.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds, adapter_probe=seconds), poll_s=0.2,
               stop_when=(lambda: hw.lg_done) if attach else None, program=program)
     entries, st, counters = r[0][:3]
@@ -1089,6 +1089,22 @@ def _():
     names = [t for t, _ in trace]
     assert names[2].startswith("the game stopped answering") and names[3].startswith("broadcast data (0x16) 00000001"), names
     assert counters >> 16 == 1 and game.retries == 0, (counters, game.retries)
+
+
+@test("wireless adapter: with the first-bit behaviour measured on real hardware, Emerald's search completes cleanly")
+def _():
+    def script(game):
+        acks = yield from RFU.mystery_gift_search(game, polls=6)
+        yield ("delay", 40 * RFU.MS)
+        acks["sleep"] = yield from RFU.go_to_sleep(game)
+        return acks
+    hw, game, trace, st, counters = adapter_session(script, first_bit=True)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors, [t for t, _ in trace][-6:])
+    acks = hw.lg_result
+    assert acks[0x10] == [0x99660090] and acks[0x1D] == [0x9966009D] and acks["wait"] == 0x99660027
+    assert acks[0x13] == [0x99660193, 0] and acks["sleep"] == [0x996600BD]
+    assert game.retries == 0 and not game.errors, (game.retries, game.errors)
+    assert counters >> 16 == 0 and "Over-long answers" not in hw.text
 
 
 @test("wireless adapter: with a one-bit lag the simulator reproduces lab session 11 - each command fails three times")

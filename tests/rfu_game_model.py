@@ -105,6 +105,7 @@ class Game:
             if not (yield ("wait_si", 1, 80 * MS)):
                 yield ("delay", 50 * MS)
                 return None
+            yield ("delay", 8)                                # the loop exits, then SIOCNT |= SD (generous)
             yield ("so", 1)
             if not (yield ("wait_si", 0, 80 * MS)):
                 yield ("delay", 50 * MS)

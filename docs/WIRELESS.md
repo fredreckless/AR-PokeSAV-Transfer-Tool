@@ -8,7 +8,7 @@ events.
 
 **Status:**
 - Step 1 (detection) passes on real hardware: a Japanese Emerald accepted the DUO as a Wireless Adapter (lab session 10).
-- Step 2 (the command layer) passes in the simulator. On real hardware, commands stall at 2 MHz (lab session 11); a probe is ready to find out why.
+- Step 2 (the command layer) passes in the simulator. On real hardware, commands stalled at 2 MHz (lab session 11). A probe found why (session 12), and the fix is ready to try.
 
 ## Why the adapter, and why it can be faked
 
@@ -150,11 +150,23 @@ the probe briefly flicks SO low and back high before the game's first clock edge
 gets the acknowledgement through is counted too. The simulator can't judge this part, because it
 only sees the lines between instruction blocks.
 
+### The answer (lab session 12)
+
+The probe showed that only the **first bit** is late. At 2 MHz, the game reads the first bit of each
+of the DUO's words from its SO resting level; the other 31 bits arrive intact.
+
+The `adapter` program now handles this:
+- It loads every answer with SO already at the word's top bit.
+- After a handshake it flicks SO low ("ready") and straight back high. It stops the moment the
+  game's SO shows it is about to clock, and leaves SIOCNT alone for the rest of the word.
+- When the DUO takes its turn as clock master, it ignores the first bit of the game's
+  acknowledgement, which arrives late the same way.
+
+The simulator models this, and Emerald's whole search completes there with no retries.
+
 ## Next steps
 
-1. **Run the 2 MHz probe on real hardware.** Then, depending on the result, try a fix in the
-   program, a very short hand-made cable, or a Raspberry Pi Pico as the adapter (as GBA-Global-Link
-   does).
+1. **Run `--adapter-trace` again on real hardware** with the first-bit fix.
 2. **A distributor in range.** Answer "search results?" with one host whose broadcast data matches
    what Emerald's Mystery Gift looks for. Then handle Connect, and the data commands with real clock
    swaps ("data ready"), carrying librfu's own packet framing.

@@ -21,15 +21,22 @@ except (OSError, ValueError):
 order = sorted(names, key=lambda n: -times.get(n, 60))
 
 
+CRASHES = []      # the emulator library itself occasionally segfaults under load (exit -11): run again
+
+
 def one(n):
     t0 = time.time()
-    r = subprocess.run([sys.executable, "test_v4.py", n], cwd=HERE, capture_output=True, text=True, timeout=1800)
+    for attempt in range(3):
+        r = subprocess.run([sys.executable, "test_v4.py", n], cwd=HERE, capture_output=True, text=True, timeout=1800)
+        if r.returncode >= 0:
+            break
+        CRASHES.append((n, r.returncode))
     lines = [l for l in r.stdout.splitlines() if l.startswith(("[PASS]", "[FAIL]", "[SKIP]"))]
     mine = [l for l in lines if n in l]
     status = mine[0][1:5] if mine else "FAIL"
     if r.returncode not in (0, 1) and status != "FAIL":
         status = "FAIL"
-    return n, status, time.time() - t0, r.stdout[-800:] + r.stderr[-800:]
+    return n, status, time.time() - t0, f"(exit code {r.returncode})\n" + r.stdout[-800:] + r.stderr[-800:]
 
 
 counts = {"PASS": 0, "FAIL": 0, "SKIP": 0}
@@ -45,6 +52,9 @@ try:
     json.dump(times, open(TIMES, "w"), indent=0, sort_keys=True)
 except OSError:
     pass
+if CRASHES:
+    print(f"(the simulator crashed {len(CRASHES)} time(s) and those tests were run again: "
+          + ", ".join(sorted({c[0][:40] for c in CRASHES})) + ")")
 print(f"{counts['PASS']} passed, {counts['FAIL']} failed, {counts['SKIP']} skipped "
       f"in {time.time() - t_start:.0f} s with {jobs} at a time")
 sys.exit(1 if counts["FAIL"] else 0)

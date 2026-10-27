@@ -92,6 +92,8 @@ static int wait_si(int level, u32 lines)
 #define EV_WAIT_TIMEOUT  0x02
 #define EV_LOST          0x03
 #define EV_SWAP_FAILED   0x04
+#define EV_STRAY         0x05    /* the game wanted more of an answer than we sent */
+#define EV_FLICK_TIMEOUT 0x06    /* the game never noticed we were ready */
 
 static u32 trace_head[TRACE_N], trace_data[TRACE_N], trace_count;
 static u32 n_commands, n_id, n_lost, last_word;
@@ -242,8 +244,49 @@ static void idle_after_command(void)
         arm_idle();
 }
 #else
-#define arm_idle() arm(IDLE_WORD)
-static void arm_word(u32 w) { SIODATA32 = w; SIOCNT = CNT_32BIT | CNT_START; }
+/* Real hardware (lab session 12): at 2 MHz the game takes the FIRST bit of each of our words
+ * from our SO line's resting level (SIOCNT bit 3), not from the word; the other 31 bits are
+ * fine. So every word is loaded with SO already at its top bit.
+ *   - The first word of a command has no handshake: just rest SO at 1 (0x80000000).
+ *   - After a handshake SO must go low to say "ready". For a top-bit-1 word we flick it low and
+ *     straight back high, until the game shows (its SO going low) that it saw us and is about
+ *     to clock - then we leave SIOCNT alone for the whole word. */
+static u32 n_stray, n_flick_timeouts;
+
+static void arm_idle(void)
+{
+    SIODATA32 = IDLE_WORD;
+    SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;
+}
+
+static void arm_word(u32 w)
+{
+    u32 t0;
+    SIODATA32 = w;
+    if (!(w >> 31)) {
+        SIOCNT = CNT_32BIT | CNT_START;
+        return;
+    }
+    t0 = now();
+    for (;;) {
+        SIOCNT = CNT_32BIT | CNT_START;                       /* low: ready */
+        SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;         /* high again for the first bit */
+        if (!si() || !(SIOCNT & CNT_START))
+            return;                                           /* the game is clocking: hands off */
+        if (now() - t0 > HANDSHAKE_LINES) {
+            n_flick_timeouts++;
+            trace(EV_FLICK_TIMEOUT, 0, w);
+            return;
+        }
+    }
+}
+
+/* End of a command: the game's last handshake wants to see us low, but its next command's
+ * first word wants SO resting high - and may follow at once. The same flick does both. */
+static void idle_after_command(void)
+{
+    arm_word(IDLE_WORD);
+}
 #endif
 
 static void back_to_idle(void)
@@ -272,11 +315,11 @@ static int handshake_then_arm(u32 word)
     if (hs_after_header) acks_ok[enc]++;
     hs_count++;
     hs_after_header = 0;
+#endif
     if (phase == PH_COMMAND) {                                 /* the command is complete */
         idle_after_command();
         return 1;
     }
-#endif
     arm_word(word);
     return 1;
 }
@@ -317,7 +360,7 @@ static void clock_master_turn(api_t *api)
     SIOCNT = CNT_32BIT | CNT_2MHZ | CNT_INTERNAL | CNT_SO_HIGH;
     for (volatile int i = 0; i < 40; i++) ;                    /* the game wants >= 40 us */
     if (!master_word(IDLE_WORD, &got)) goto failed;
-    if (got != 0x996600A7) goto failed;
+    if ((got & 0x7FFFFFFF) != (0x996600A7 & 0x7FFFFFFF)) goto failed;   /* its first bit is late too */
     /* final handshake, then the game is clock master again */
     if (!wait_si(1, HANDSHAKE_LINES)) goto failed;
     SIOCNT = CNT_32BIT | CNT_2MHZ | CNT_INTERNAL | CNT_SO_HIGH;
@@ -363,6 +406,10 @@ static void link_word(api_t *api, u32 in)
             return;
         }
         if (phase == PH_COMMAND && in == IDLE_WORD) {          /* nothing for us */
+#ifndef PROBE
+            n_stray++;
+            trace(EV_STRAY, 0, req_cmd);
+#endif
             arm_idle();
             return;
         }
@@ -455,6 +502,9 @@ static int pc_service(api_t *api)
     case 3: v = trace_head[i]; break;
     case 4: v = trace_data[i]; break;
     case 5: v = n_id | (n_lost << 16); break;
+#ifndef PROBE
+    case 8: v = n_stray | (n_flick_timeouts << 16); break;
+#endif
 #ifdef PROBE
     case 6: v = i < N_ENC ? (tries[i] | accepts[i] << 16) : 0; break;
     case 7: v = i < N_ENC ? acks_ok[i] : 0; break;
