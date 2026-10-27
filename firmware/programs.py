@@ -223,7 +223,7 @@ PROGRAMS = {"adapter_detect": ADAPTER_DETECT}
 
 # Programs written in C (firmware/programs/<name>.c), built with clang + lld for the
 # ARM7TDMI (ARMv4T, Thumb), linked to run at PROGRAM_AT, variables included in the image.
-C_PROGRAMS = {"adapter": "adapter.c"}
+C_PROGRAMS = {"adapter": ("adapter.c", []), "adapter_probe": ("adapter.c", ["-DPROBE"])}
 CLANG_VERSION = "18.1"                       # the version the embedded copies were built with
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -243,12 +243,13 @@ def clang_version():
 
 
 def build_c(name):
-    src = os.path.join(_HERE, "programs", C_PROGRAMS[name])
+    src_name, defines = C_PROGRAMS[name]
+    src = os.path.join(_HERE, "programs", src_name)
     ld = os.path.join(_HERE, "programs", "link.ld")
     with tempfile.TemporaryDirectory() as work:
         obj, elf, binf = (os.path.join(work, f) for f in ("p.o", "p.elf", "p.bin"))
         subprocess.run([_tool("clang"), "--target=armv4t-none-eabi", "-mthumb", "-Os", "-ffreestanding",
-                        "-fno-builtin", "-nostdlib", "-fno-pic", "-Wall", "-Werror", "-c", src, "-o", obj],
+                        "-fno-builtin", "-nostdlib", "-fno-pic", "-Wall", "-Werror", *defines, "-c", src, "-o", obj],
                        check=True)
         subprocess.run([_tool("ld.lld"), "-T", ld, obj, "-o", elf], check=True)
         subprocess.run([_tool("llvm-objcopy"), "-O", "binary", elf, binf], check=True)
@@ -262,7 +263,7 @@ def build_c(name):
             continue                                          # labels, literal pools (.word)
         mnem = m.group(3).split(".")[0]
         size = len(m.group(2).replace(" ", "")) // 2
-        if mnem not in thumbcheck.THUMB1 or (size == 4 and mnem != "bl"):
+        if mnem not in thumbcheck.THUMB1 | {"adcs"} or (size == 4 and mnem != "bl"):
             bad.append(line.strip())
     if bad:
         raise ValueError(f"{name}: not ARM7TDMI-compatible:\n  " + "\n  ".join(bad[:20]))

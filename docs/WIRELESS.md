@@ -8,7 +8,7 @@ events.
 
 **Status:**
 - Step 1 (detection) passes on real hardware: a Japanese Emerald accepted the DUO as a Wireless Adapter (lab session 10).
-- Step 2 (the command layer) passes in the simulator. It hasn't been tried on hardware yet.
+- Step 2 (the command layer) passes in the simulator. On real hardware, commands stall at 2 MHz (lab session 11); a probe is ready to find out why.
 
 ## Why the adapter, and why it can be faked
 
@@ -123,9 +123,38 @@ All three pass with no retries. Four planted bugs are each caught:
    another ID exchange and "sleep (0x3D)". The game says the search was cancelled and returns to its
    menu, with no link error.
 
+### What real hardware showed (lab session 11)
+
+The ID exchange works, but the first command never completes. The game clocks commands at
+**2 MHz**, eight times faster than the ID exchange. Its words reach the DUO intact, but it rejects the
+DUO's answer three times and gives up.
+
+A GBA clock slave answering over a link cable seems too slow at 2 MHz: gba-link-connection warns
+against GBA-to-GBA 2 Mbps except with very short wires. When the simulator adds a one-bit lag to the
+DUO's 2 MHz answers, it reproduces the session exactly.
+
+### The 2 MHz probe
+
+```
+python maxduo_saves.py --adapter-probe
+```
+
+This works like `--adapter-trace`, but it answers each attempt of a command a different way:
+- **a one-bit lag:** load `W << 1`, with SO at W's top bit;
+- **only the first bit late:** load `W`, with SO at its top bit;
+- **as designed.**
+
+The game only moves on to the ready handshake when it got exactly `0x80000000`, so the table at
+the end shows which way works. For words after a handshake, which must be loaded "ready" (SO low),
+the probe briefly flicks SO low and back high before the game's first clock edge. Whether that
+gets the acknowledgement through is counted too. The simulator can't judge this part, because it
+only sees the lines between instruction blocks.
+
 ## Next steps
 
-1. **Real-hardware command test** with `--adapter-trace`, as above.
+1. **Run the 2 MHz probe on real hardware.** Then, depending on the result, try a fix in the
+   program, a very short hand-made cable, or a Raspberry Pi Pico as the adapter (as GBA-Global-Link
+   does).
 2. **A distributor in range.** Answer "search results?" with one host whose broadcast data matches
    what Emerald's Mystery Gift looks for. Then handle Connect, and the data commands with real clock
    swaps ("data ready"), carrying librfu's own packet framing.

@@ -1010,13 +1010,16 @@ def _():
 import rfu_game_model as RFU
 
 
-def adapter_session(script, seconds=20, attach=True):
+def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits=0):
     hw, duo = run42()
     game = RFU.Game()
     if attach:
-        hw.attach_link_game(script(game))
-    entries, st, counters = quiet(M.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds), poll_s=0.2,
-                                  stop_when=(lambda: hw.lg_done) if attach else None)[0]
+        hw.attach_link_game(script(game), lag_bits=lag_bits)
+    r = quiet(M.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds, adapter_probe=seconds), poll_s=0.2,
+              stop_when=(lambda: hw.lg_done) if attach else None, program=program)
+    entries, st, counters = r[0][:3]
+    hw.probe = r[0][3] if len(r[0]) > 3 else None
+    hw.text = r[1]
     assert duo.hello() == 0x104 and duo.reckless() == "v4"          # back in USB server mode
     hw.stop(); clean(hw)
     assert any(l.startswith("Program finished") for l in hw.log)
@@ -1035,6 +1038,7 @@ def _():
     if version != programs.CLANG_VERSION:
         raise Skip(f"clang {version} here; the embedded copy was built with {programs.CLANG_VERSION}")
     assert programs.build("adapter") == M.PROGRAMS["adapter"]
+    assert programs.build("adapter_probe") == M.PROGRAMS["adapter_probe"]
 
 
 @test("wireless adapter: Emerald's Mystery Gift search, command by command, answered as a real adapter would")
@@ -1085,6 +1089,54 @@ def _():
     names = [t for t, _ in trace]
     assert names[2].startswith("the game stopped answering") and names[3].startswith("broadcast data (0x16) 00000001"), names
     assert counters >> 16 == 1 and game.retries == 0, (counters, game.retries)
+
+
+@test("wireless adapter: with a one-bit lag the simulator reproduces lab session 11 - each command fails three times")
+def _():
+    def script(game):
+        yield ("until_ready",)
+        assert (yield from game.check_id()) == 0x8001
+        try:
+            yield from game.command(0x3D)
+            return "accepted"
+        except RFU.LinkError:
+            return "failed"
+    hw, game, trace, st, counters = adapter_session(script, lag_bits=1)
+    names = [t for t, _ in trace]
+    assert hw.lg_result == "failed" and game.retries == 2, (hw.lg_result, game.retries)
+    assert names[0].startswith("ID exchange") and names.count("the game stopped answering in the middle of a command (0x3d)") == 3, names
+
+
+@test("2 MHz probe: on perfect wires the lagged answer is refused and the unshifted ones are accepted")
+def _():
+    def script(game):
+        yield ("until_ready",)
+        assert (yield from game.check_id()) == 0x8001
+        for cmd in (0x10, 0x13):
+            try:
+                yield from game.command(cmd)
+            except RFU.LinkError:
+                pass
+        return "done"
+    hw, game, trace, st, counters = adapter_session(script, program="adapter_probe")
+    (lag, first, plain) = hw.probe
+    assert lag[1] >= 1 and lag[2] == 0 and first[2] >= 1, hw.probe     # the same word, just SO high
+
+
+@test("2 MHz probe: with a one-bit lag (as lab session 11 suggests) only the lagged answer is accepted")
+def _():
+    def script(game):
+        yield ("until_ready",)
+        assert (yield from game.check_id()) == 0x8001
+        try:
+            yield from game.command(0x10)
+        except RFU.LinkError:
+            pass
+        return "done"
+    hw, game, trace, st, counters = adapter_session(script, program="adapter_probe", lag_bits=1)
+    (lag, first, plain) = hw.probe
+    assert lag[1] >= 1 and lag[2] >= 1 and first[2] == 0 and plain[2] == 0, hw.probe
+    assert "consistent one-bit lag" in hw.text, hw.text[-600:]
 
 
 @test("wireless adapter: with nothing on the cable the trace stays empty and the program stops cleanly")

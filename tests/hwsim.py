@@ -202,7 +202,7 @@ class Hw:
         self.mu.hook_add(UC_HOOK_BLOCK, self.on_block)
 
     # ------------------------------------------------------------ link port, line by line
-    def attach_link_game(self, gen, blocks_per_line=25, xfer_blocks=6):
+    def attach_link_game(self, gen, blocks_per_line=25, xfer_blocks=6, lag_bits=0):
         """A second GBA running librfu (tests/rfu_game_model.py): either side can be the
         clock master, and both see each other's SO line (SIOCNT bit 3 -> the other's bit 2).
         A word only arrives if the receiving side was armed (start bit set) when the clock
@@ -210,6 +210,9 @@ class Hw:
         hardware. VCOUNT advances one line every blocks_per_line blocks."""
         self.lg = gen
         self.lg_bpl, self.lg_x = blocks_per_line, xfer_blocks
+        # lag_bits=1: what lab session 11 suggests - the DUO, as clock slave at 2 MHz, answers one
+        # clock late, so the game reads the DUO's idle SO level first, then its word minus the last bit
+        self.lg_lag = lag_bits
         self.blocks = 0
         self.game_so, self.game_armed, self.game_got = 0, None, []
         self.lg_op, self.lg_deadline, self.lg_xfer = None, 0, None
@@ -313,6 +316,8 @@ class Hw:
                     cnt = self.lg_cnt()
                     armed = cnt & 0x80 and not cnt & 0x1 and cnt & 0x1000
                     duo_word = struct.unpack("<I", mu.mem_read(0x04000120, 4))[0] if armed else None
+                    if armed and self.lg_lag and len(op) > 2 and op[2] == 2:
+                        duo_word = ((cnt >> 3 & 1) << 31) | (duo_word >> 1)
                     self.lg_xfer = (self.blocks + self.lg_x, duo_word)
                     return
                 done_at, duo_word = self.lg_xfer

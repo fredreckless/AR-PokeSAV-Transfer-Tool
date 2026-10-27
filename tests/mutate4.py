@@ -35,6 +35,10 @@ PC_MUTANTS = {
 }
 
 
+import threading
+BUILD_LOCK = threading.Lock()
+
+
 def run(kind, name):
     import paths, tempfile
     work = tempfile.mkdtemp()
@@ -65,16 +69,18 @@ def run(kind, name):
         src_path = os.path.join(paths.FIRMWARE, "programs", "adapter.c")
         good_src = open(src_path).read()
         assert good_src.count(old) == 1, name
-        good = programs.build("adapter").hex()
+        with BUILD_LOCK:
+            good = programs.build("adapter").hex()
         os.makedirs(os.path.join(work, "programs"))
         open(os.path.join(work, "programs", "adapter.c"), "w").write(good_src.replace(old, new))
         shutil.copy(os.path.join(paths.FIRMWARE, "programs", "link.ld"), os.path.join(work, "programs"))
-        saved = programs._HERE
-        programs._HERE = work
-        try:
-            bad = programs.build("adapter").hex()
-        finally:
-            programs._HERE = saved
+        with BUILD_LOCK:
+            saved = programs._HERE
+            programs._HERE = work
+            try:
+                bad = programs.build("adapter").hex()
+            finally:
+                programs._HERE = saved
         assert good != bad
         tool = open(os.path.join(paths.ROOT, "maxduo_saves.py")).read()
         assert tool.count(good) == 1
@@ -86,9 +92,13 @@ def run(kind, name):
         if old == "ADAPTER_IMAGE":                     # rebuild the embedded program with a wrong ID (valid CRC)
             sys.path.insert(0, paths.FIRMWARE)
             import programs
-            good = programs.build("adapter_detect").hex()
-            programs.PROGRAMS["adapter_detect"] = programs.ADAPTER_DETECT.replace(f"{programs.RFU_ID:#x}", "0x8002")
-            bad = programs.build("adapter_detect").hex()
+            with BUILD_LOCK:
+                good = programs.build("adapter_detect").hex()
+                programs.PROGRAMS["adapter_detect"] = programs.ADAPTER_DETECT.replace(f"{programs.RFU_ID:#x}", "0x8002")
+                try:
+                    bad = programs.build("adapter_detect").hex()
+                finally:
+                    programs.PROGRAMS["adapter_detect"] = programs.ADAPTER_DETECT
             assert good != bad
             old, new = good, bad
         assert src.count(old) == 1, name
@@ -106,10 +116,15 @@ def run(kind, name):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 3:
+    if len(sys.argv) == 3 and not sys.argv[2].startswith("--"):
         ok = run(sys.argv[1], sys.argv[2])
     else:
-        ok = all([run("fw", n) for n in FW_MUTANTS] + [run("fw42", n) for n in FW42_MUTANTS]
-                 + [run("prog", n) for n in PROG_MUTANTS] + [run("pc", n) for n in PC_MUTANTS])
+        import concurrent.futures as cf
+        jobs = next((int(a.split("=", 1)[1]) for a in sys.argv[1:] if a.startswith("--jobs=")),
+                    (os.cpu_count() or 2) * 2)
+        todo = ([("fw", n) for n in FW_MUTANTS] + [("fw42", n) for n in FW42_MUTANTS]
+                + [("prog", n) for n in PROG_MUTANTS] + [("pc", n) for n in PC_MUTANTS])
+        with cf.ThreadPoolExecutor(max_workers=jobs) as pool:
+            ok = all(list(pool.map(lambda kn: run(*kn), todo)))
         print("every planted bug was caught" if ok else "SOME PLANTED BUGS WERE MISSED")
     sys.exit(0 if ok else 1)

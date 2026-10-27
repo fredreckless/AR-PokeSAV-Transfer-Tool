@@ -194,11 +194,63 @@ static void arm(u32 word)                /* clock slave, ready: next word loaded
     SIOCNT = CNT_32BIT | CNT_START;
 }
 
+#ifdef PROBE
+/* ------------------------------------------------------------------ 2 MHz probe (adapter_probe)
+ * Real hardware (lab session 11): the game's words reach us at 2 MHz, but it rejects our
+ * 0x80000000. Each attempt of a command tries one way of loading that answer:
+ *   E_LAG1      every bit arrives one clock late: load W << 1 and hold SO at W's top bit
+ *   E_FIRSTBIT  only the first bit is late: load W and hold SO at its top bit
+ *   E_PLAIN     as designed (fails on real hardware so far)
+ * The game only goes on to the ready handshake if it got exactly 0x80000000, so a handshake
+ * after the first word means that encoding works. Words after a handshake must be loaded with
+ * SO low ("ready"); for top-bit-1 words we flick SO low just long enough for the game to see
+ * it, and back high before its first clock edge - the counters say whether that worked. */
+enum { E_LAG1, E_FIRSTBIT, E_PLAIN, N_ENC };
+static u32 enc, tries[N_ENC], accepts[N_ENC], acks_ok[N_ENC], hs_count, hs_after_header;
+
+static void arm_idle(void)
+{
+    if (enc == E_PLAIN) { arm(IDLE_WORD); return; }
+    SIODATA32 = enc == E_LAG1 ? IDLE_WORD << 1 : IDLE_WORD;
+    SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;
+}
+
+static void arm_word(u32 w)
+{
+    u32 b = enc == E_PLAIN ? 0 : w >> 31, t0;
+    SIODATA32 = enc == E_LAG1 ? w << 1 : w;
+    if (!b) {
+        SIOCNT = CNT_32BIT | CNT_START;
+        return;
+    }
+    t0 = now();
+    while (SIOCNT & CNT_START) {
+        SIOCNT = CNT_32BIT | CNT_START;                       /* low: ready */
+        SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;         /* high before the first clock edge */
+        for (volatile int i = 0; i < 2; i++) ;
+        if (now() - t0 > HANDSHAKE_LINES)
+            break;
+    }
+}
+
+/* End of a command: the game's last handshake wants us low; once it has gone idle (low too),
+ * load the next idle answer the probe's way (SO high). */
+static void idle_after_command(void)
+{
+    arm(IDLE_WORD);
+    if (enc != E_PLAIN && wait_si(0, HANDSHAKE_LINES))
+        arm_idle();
+}
+#else
+#define arm_idle() arm(IDLE_WORD)
+static void arm_word(u32 w) { SIODATA32 = w; SIOCNT = CNT_32BIT | CNT_START; }
+#endif
+
 static void back_to_idle(void)
 {
     phase = PH_COMMAND;
     SIOCNT = CNT_32BIT;
-    arm(IDLE_WORD);
+    arm_idle();
 }
 
 /* After every word of a command: SO high, wait for the game's SO high, then load the next
@@ -209,11 +261,23 @@ static int handshake_then_arm(u32 word)
     if (!wait_si(1, HANDSHAKE_LINES)) {
         n_lost++;
         trace(EV_LOST, 0, req_cmd);
+#ifdef PROBE
+        enc = enc + 1 < N_ENC ? enc + 1 : 0;                   /* the game will try again */
+#endif
         back_to_idle();
         return 0;
     }
-    SIODATA32 = word;
-    SIOCNT = CNT_32BIT | CNT_START;
+#ifdef PROBE
+    if (hs_count == 0) accepts[enc]++;
+    if (hs_after_header) acks_ok[enc]++;
+    hs_count++;
+    hs_after_header = 0;
+    if (phase == PH_COMMAND) {                                 /* the command is complete */
+        idle_after_command();
+        return 1;
+    }
+#endif
+    arm_word(word);
     return 1;
 }
 
@@ -280,10 +344,15 @@ static void link_word(api_t *api, u32 in)
             /* Our answer to this word was part of the ID exchange, not 0x80000000, so the
              * game ignores it and sends the command again ~130 ms later. Be ready for it. */
             phase = PH_COMMAND;
-            arm(IDLE_WORD);
+            arm_idle();
             return;
         }
         if ((in >> 16) == 0x9966) {
+#ifdef PROBE
+            tries[enc]++;
+            hs_count = 0;
+            hs_after_header = 0;
+#endif
             req_cmd = in & 0xFF;
             req_len = (in >> 8) & 0xFF;
             req_next = 0;
@@ -294,7 +363,7 @@ static void link_word(api_t *api, u32 in)
             return;
         }
         if (phase == PH_COMMAND && in == IDLE_WORD) {          /* nothing for us */
-            arm(IDLE_WORD);
+            arm_idle();
             return;
         }
         if (phase != PH_ID) {                                  /* the game is resetting us */
@@ -310,7 +379,10 @@ static void link_word(api_t *api, u32 in)
                 n_id++;
                 trace(EV_ID_EXCHANGE, 0, id_last);
                 phase = PH_COMMAND;
-                arm(IDLE_WORD);
+#ifdef PROBE
+                enc = E_LAG1;
+#endif
+                arm_idle();
                 return;
             }
             arm(w);                                            /* no handshake in the ID exchange */
@@ -332,6 +404,9 @@ static void link_word(api_t *api, u32 in)
         return;
     case PH_ACK_HEADER:
     case PH_ACK_DATA:
+#ifdef PROBE
+        hs_after_header = phase == PH_ACK_HEADER;
+#endif
         if (phase == PH_ACK_HEADER)
             ack_next = 0;
         if (ack_next < ack_len) {
@@ -380,6 +455,10 @@ static int pc_service(api_t *api)
     case 3: v = trace_head[i]; break;
     case 4: v = trace_data[i]; break;
     case 5: v = n_id | (n_lost << 16); break;
+#ifdef PROBE
+    case 6: v = i < N_ENC ? (tries[i] | accepts[i] << 16) : 0; break;
+    case 7: v = i < N_ENC ? acks_ok[i] : 0; break;
+#endif
     default: v = 0xFFFFFFFF; break;
     }
     api->reply(0x2A, v);
@@ -395,7 +474,7 @@ u32 start(api_t *api)
     adapter_state = ST_ASLEEP;
     phase = PH_ID;
     last_vcount = VCOUNT & 0xFF;
-    arm(IDLE_WORD);
+    arm_idle();
     while (!stop_requested) {
         if (!(SIOCNT & CNT_START))
             link_word(api, SIODATA32);

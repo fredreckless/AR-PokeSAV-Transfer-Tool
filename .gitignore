@@ -12,3 +12,4 @@ cart_references.json
 # Python
 __pycache__/
 *.pyc
+tests/.test_times.json

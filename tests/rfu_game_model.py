@@ -8,7 +8,7 @@ result. Time is counted in emulator blocks; hwsim.BLOCKS_PER_LINE converts scanl
 
   ("so", level)              the game's SO line (its SIOCNT bit 3)
   ("wait_si", level, t)      wait until the DUO's SO is at level; True, or False after t
-  ("xfer", word)             clock one 32-bit word as master; returns the DUO's word
+  ("xfer", word[, 2])        clock one 32-bit word as master (2 = at 2 MHz); returns the DUO's word
   ("arm", word)              ready as clock slave with word loaded (SO low)
   ("wait_xfer", t)           wait for the DUO to clock a word; returns it, or None after t
   ("delay", t)
@@ -76,7 +76,7 @@ class Game:
         out = words[0]
         yield ("so", 0)
         while True:
-            got = yield ("xfer", out)                         # STWI_start_Command / SIOCNT start
+            got = yield ("xfer", out, 2)                      # STWI_start_Command: 2 MHz
             if state == 0:
                 if got != IDLE:
                     yield ("delay", 130 * MS)                 # timer 130 -> STWI_restart_Command
