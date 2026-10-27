@@ -6,7 +6,9 @@ Game Boy Advance Wireless Adapter *and* of the distributor on the other side of 
 Pokémon game on a second GBA then receives and saves the gift itself, exactly as it did at the 2005
 events.
 
-**Status:** step 1 (detection) passes on real hardware: a Japanese Emerald accepted the DUO as a Wireless Adapter (lab session 10).
+**Status:**
+- Step 1 (detection) passes on real hardware: a Japanese Emerald accepted the DUO as a Wireless Adapter (lab session 10).
+- Step 2 (the command layer) passes in the simulator. It hasn't been tried on hardware yet.
 
 ## Why the adapter, and why it can be faked
 
@@ -58,13 +60,75 @@ Notes for the real test:
 - **After detection,** the game sends one adapter command ("stop mode"), which this first program doesn't
   answer. The game ignores the result of that command, so the menu carries on normally.
 
+## Step 2: the command layer (done in the simulator)
+
+The second program, `adapter` (`firmware/programs/adapter.c`), plays a whole Wireless Adapter with
+nobody else in range. It is written in C and built with clang for the GBA's ARM7TDMI. It does four
+things:
+
+- **The ID exchange**, as in step 1. It repeats the exchange whenever the game resets the adapter,
+  which librfu does before every session and before putting the adapter to sleep.
+- **Commands.** The game sends `0x9966LLCC` plus `LL` data words, and the adapter answers each with
+  `0x80000000`. Then it acknowledges with `0x9966LL(CC+0x80)` plus its response. The game clocks every
+  word at 2 MHz. Between words, both sides signal "ready" on their SO lines. On the DUO that's SIOCNT
+  bit 3 out and bit 2 in, ported from `librfu_intr.c`.
+- **The clock swap.** After `0x25`, `0x27`, `0x35` or `0x37`, the game becomes the clock slave, and the
+  adapter takes its turn. With no-one in range, there's only ever one thing to say: `0x99660027`,
+  "nothing happened". It's sent after the number of frames the game chose in its Setup command
+  (32 for Pokémon), with the inverted handshake.
+- **The answers.**
+  - Searches find nobody.
+  - Status reports "idle".
+  - Unknown commands are refused politely with `0x996601EE`, as the real adapter does.
+
+Every command the game sends is kept in a trace. The PC reads it and prints it as it happens:
+
+```
+python maxduo_saves.py --adapter-trace        # needs firmware v4.2; Ctrl+C or 10 minutes to stop
+```
+
+**Testing in the simulator.** `tests/rfu_game_model.py` is the game's side of the link, ported from
+librfu:
+- the master and slave word handlers;
+- the timeouts and the two retries;
+- the ID exchange.
+
+The simulator now models both SO lines, either GBA being clock master, and a word being lost when
+the receiving side wasn't ready, as on hardware. The tests play:
+
+- the whole Mystery Gift search, as Emerald drives it with nobody in range;
+- a command abandoned half-way and started again;
+- a silent cable.
+
+All three pass with no retries. Four planted bugs are each caught:
+- skipping the handshake;
+- a wrong acknowledgement;
+- never taking the adapter's turn;
+- no recovery from an abandoned command.
+
+### What to look for on real hardware
+
+1. Enable Mystery Gift in the game first. Answer the Poké Mart questionnaire with the phrase. One
+   source (WikiDex) gives the Japanese phrase as **ともだち いっぱい ふしぎ つうしん**; English games use
+   LINK TOGETHER WITH ALL. Then save the game. That's the game's own save, done by the player; the
+   tool never writes saves.
+2. Run `--adapter-trace`, then choose **Mystery Gift → Wonder Cards → Wireless Communication**.
+3. A healthy trace is:
+   1. "ID exchange completed";
+   2. Hello, setup and broadcast data;
+   3. "start searching";
+   4. "search results?" repeated about once a frame.
+
+   The game should keep showing its searching message. Press B to cancel: the trace should end with
+   another ID exchange and "sleep (0x3D)". The game says the search was cancelled and returns to its
+   menu, with no link error.
+
 ## Next steps
 
-1. **Real-hardware detection test**, with a GBC cable and the Japanese Emerald.
-2. **The adapter command layer:**
-   - the `0x9966` packets and the SO/SI ready handshake;
-   - clock inversion after `0x25`/`0x27`;
-   - Hello, Setup, SystemStatus, BroadcastRead…, Connect, SendData and ReceiveData.
+1. **Real-hardware command test** with `--adapter-trace`, as above.
+2. **A distributor in range.** Answer "search results?" with one host whose broadcast data matches
+   what Emerald's Mystery Gift looks for. Then handle Connect, and the data commands with real clock
+   swaps ("data ready"), carrying librfu's own packet framing.
 3. **The distributor:** the host side of Mystery Gift, from the decompilation's `mystery_gift_server.c`.
    It sends the genuine Wonder Card and its script (`E - Item Old Sea Map (JPN).wc3` from Project
    Pokémon's EventsGallery, supplied by the user, never stored in this repository).

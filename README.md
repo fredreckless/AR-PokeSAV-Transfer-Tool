@@ -93,6 +93,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 | `--list`, no options | List or export the **DS** saves stored on the DUO, as Datel's software did |
 | `--lab script FILE.json` | Run a small read-only experiment on the GBA (see [lab/](lab/)) |
 | `--adapter-test` | *Experimental, firmware v4.2:* the DUO's GBA answers a Pokémon game's Wireless Adapter check on a second GBA, over a GBC link cable. It's the first step towards recreating Mystery Gift events; see [docs/WIRELESS.md](docs/WIRELESS.md) |
+| `--adapter-trace` | *Experimental, firmware v4.2:* the DUO's GBA plays a whole Wireless Adapter (with nobody in range) and lists every command the game sends it |
 | `--help` | Everything else |
 
 ## If something goes wrong
@@ -125,9 +126,11 @@ This repository holds the whole project, not just the finished tool.
 ```
 pip install -r requirements.txt
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE --all
-python tests/run_each.py      # about 70 tests, each in its own process; around 15 minutes
-python tests/mutate4.py       # plants 17 known bugs; each must be caught
+python tests/run_each.py      # about 75 tests, each in its own process; around 15 minutes
+python tests/mutate4.py       # plants 21 known bugs; each must be caught
 ```
+
+The adapter program (`firmware/programs/adapter.c`) is built with clang and lld (LLVM 18). You only need them to rebuild it: the tool carries a copy, which a test checks against a fresh build.
 
 The firmware build is reproducible: the same input always gives the same v4.1, update CRC `A5303402`, and v4.2, update CRC `DD59ED8A`. The tests use synthetic saves and ROMs, so they need no game data.
 

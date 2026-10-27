@@ -201,6 +201,134 @@ class Hw:
         self.mu.hook_add(UC_HOOK_MEM_WRITE, self.on_siocnt, begin=0x04000128, end=0x04000129)
         self.mu.hook_add(UC_HOOK_BLOCK, self.on_block)
 
+    # ------------------------------------------------------------ link port, line by line
+    def attach_link_game(self, gen, blocks_per_line=25, xfer_blocks=6):
+        """A second GBA running librfu (tests/rfu_game_model.py): either side can be the
+        clock master, and both see each other's SO line (SIOCNT bit 3 -> the other's bit 2).
+        A word only arrives if the receiving side was armed (start bit set) when the clock
+        ran; otherwise it sees its partner's idle SO level and the word is lost, as on
+        hardware. VCOUNT advances one line every blocks_per_line blocks."""
+        self.lg = gen
+        self.lg_bpl, self.lg_x = blocks_per_line, xfer_blocks
+        self.blocks = 0
+        self.game_so, self.game_armed, self.game_got = 0, None, []
+        self.lg_op, self.lg_deadline, self.lg_xfer = None, 0, None
+        self.duo_xfer = None
+        self.lg_result, self.lg_error, self.lg_done = None, None, False
+        self.link_trouble = []
+        self.mu.hook_add(UC_HOOK_MEM_WRITE, self.lg_on_siocnt, begin=0x04000128, end=0x04000129)
+        self.mu.hook_add(UC_HOOK_MEM_READ, self.lg_on_read, begin=0x04000006, end=0x04000007)
+        self.mu.hook_add(UC_HOOK_MEM_READ, self.lg_on_read, begin=0x04000128, end=0x04000129)
+        self.mu.hook_add(UC_HOOK_BLOCK, self.lg_on_block)
+        self.lg_resume(None)
+
+    def lg_cnt(self):
+        return struct.unpack("<H", self.mu.mem_read(0x04000128, 2))[0]
+
+    def lg_duo_so(self):
+        return (self.lg_cnt() >> 3) & 1
+
+    def lg_on_read(self, mu, access, addr, size, value, _):
+        if addr in (0x04000006, 0x04000007):
+            mu.mem_write(0x04000006, struct.pack("<H", (self.blocks // self.lg_bpl) % 228))
+        else:
+            c = self.lg_cnt() & ~4 | (4 if self.game_so else 0)
+            mu.mem_write(0x04000128, struct.pack("<H", c))
+
+    def lg_on_siocnt(self, mu, access, addr, size, value, _):
+        old = self.lg_cnt()
+        v = value & 0xFFFF if addr == 0x04000128 and size >= 2 else \
+            (old & 0xFF00 | value & 0xFF) if addr == 0x04000128 else (old & 0xFF | (value << 8) & 0xFF00)
+        if v & 0x80 and v & 0x1 and not (old & 0x80 and old & 0x1):        # the DUO clocks a word
+            if self.lg_xfer is not None:
+                self.link_trouble.append("both sides started a transfer as clock master")
+            word = struct.unpack("<I", mu.mem_read(0x04000120, 4))[0]
+            self.duo_xfer = (self.blocks + self.lg_x, word)
+
+    def lg_resume(self, value):
+        try:
+            self.lg_op = self.lg.send(value)
+        except StopIteration as e:
+            self.lg_op, self.lg_result, self.lg_done = None, e.value, True
+            return
+        except Exception as e:                     # the game's own error (LinkError etc.)
+            self.lg_op, self.lg_error, self.lg_done = None, e, True
+            return
+        op = self.lg_op
+        if op[0] in ("wait_si", "wait_xfer", "delay"):
+            self.lg_deadline = self.blocks + (op[1] if op[0] == "delay" else op[2] if op[0] == "wait_si" else op[1])
+        self.lg_xfer = None
+
+    def lg_finish_duo_xfer(self, mu):
+        done_at, word = self.duo_xfer
+        if self.blocks < done_at:
+            return
+        self.duo_xfer = None
+        if self.game_armed is not None:
+            got_back, self.game_armed = self.game_armed, None
+            self.game_got.append(word)
+        else:
+            got_back = 0xFFFFFFFF if self.game_so else 0
+            self.link_trouble.append(f"the DUO clocked {word:#010x} but the game wasn't ready")
+        self.link_words.append((word, got_back))
+        mu.mem_write(0x04000120, struct.pack("<I", got_back))
+        mu.mem_write(0x04000128, struct.pack("<H", self.lg_cnt() & ~0x80))
+
+    def lg_on_block(self, mu, addr, size, _):
+        self.blocks += 1
+        if self.duo_xfer is not None:
+            self.lg_finish_duo_xfer(mu)
+        for _ in range(64):
+            op = self.lg_op
+            if op is None:
+                return
+            k = op[0]
+            if k == "so":
+                self.game_so = op[1]; self.lg_resume(None); continue
+            if k == "arm":
+                self.game_armed, self.game_so = op[1], 0; self.game_got = []; self.lg_resume(None); continue
+            if k == "delay":
+                if self.blocks >= self.lg_deadline:
+                    self.lg_resume(None); continue
+                return
+            if k == "wait_si":
+                if self.lg_duo_so() == op[1]:
+                    self.lg_resume(True); continue
+                if self.blocks >= self.lg_deadline:
+                    self.lg_resume(False); continue
+                return
+            if k == "until_ready":                       # the player switches the game on
+                cnt = self.lg_cnt()
+                if cnt & 0x80 and not cnt & 0x1 and cnt & 0x1000:
+                    self.lg_resume(True); continue
+                return
+            if k == "wait_xfer":
+                if self.game_got:
+                    self.lg_resume(self.game_got.pop(0)); continue
+                if self.blocks >= self.lg_deadline:
+                    self.lg_resume(None); continue
+                return
+            if k == "xfer":
+                if self.lg_xfer is None:
+                    cnt = self.lg_cnt()
+                    armed = cnt & 0x80 and not cnt & 0x1 and cnt & 0x1000
+                    duo_word = struct.unpack("<I", mu.mem_read(0x04000120, 4))[0] if armed else None
+                    self.lg_xfer = (self.blocks + self.lg_x, duo_word)
+                    return
+                done_at, duo_word = self.lg_xfer
+                if self.blocks < done_at:
+                    return
+                if duo_word is None:
+                    got = 0xFFFFFFFF if self.lg_duo_so() else 0
+                    self.link_trouble.append(f"the game clocked {op[1]:#010x} but the DUO wasn't ready")
+                else:
+                    got = duo_word
+                    mu.mem_write(0x04000120, struct.pack("<I", op[1]))
+                    mu.mem_write(0x04000128, struct.pack("<H", self.lg_cnt() & ~0x80))
+                self.link_words.append((got, op[1]))
+                self.lg_resume(got); continue
+            return
+
     def on_siocnt(self, mu, access, addr, size, value, _):
         v = value & 0xFFFF if addr == 0x04000128 else (value << 8) & 0xFF00
         if v & 0x80 and not v & 0x1 and v & 0x1000 and not v & 0x2000:

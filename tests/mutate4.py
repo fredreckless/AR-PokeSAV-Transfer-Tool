@@ -14,6 +14,13 @@ FW42_MUTANTS = {
     "run never replies before starting the program": ("    movs r0, #{CMD_RUN:#x}\n    ldr  r1, lit_ack\n    bl   {v4.AT['send_sbw']:#x}\n", "", "adapter test: answers"),
     "run accepts an entry point outside the code": ("    cmp  r1, r4\n    bhs  run_bad\n", "", "refused"),
 }
+PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a copy of the tool
+    "adapter skips the ready handshake": ("    if (!wait_si(1, HANDSHAKE_LINES)) {\n        n_lost++;", "    if (0) {\n        n_lost++;", "wireless adapter"),
+    "adapter acknowledges without the 0x80": ("((cmd + 0x80) & 0xFF)", "(cmd & 0xFF)", "wireless adapter: Emerald"),
+    "adapter never takes its turn after a wait": ("frames * LINES_PER_FRAME)\n            break;", "frames * LINES_PER_FRAME * 100000)\n            break;", "wireless adapter: Emerald"),
+    "adapter has no watchdog mid-command": ("        if (phase != PH_COMMAND && phase != PH_ID && now() - last_word_at > WATCHDOG_LINES) {", "        if (0) {", "wireless adapter: the game gives up"),
+}
+
 PC_MUTANTS = {
     "fast 32-bit checksum on the save": ('("r8", SAVE_BASE, 0x10000), ("crc", SAVE_BASE, 0x10000), ("w16", MAP_REG, 0x0120)]', '("r8", SAVE_BASE, 0x10000), ("crct", SAVE_BASE, 0x10000), ("w16", MAP_REG, 0x0120)]', "8-bit"),
     "no stale-packet clearing": ("        cleared = self.drain()\n", "        cleared = 0\n", "connect"),
@@ -51,6 +58,28 @@ def run(kind, name):
                            capture_output=True, text=True, env=dict(os.environ, PYTHONPATH=paths.FIRMWARE))
         assert r.returncode == 0, r.stderr[-800:]
         env = dict(os.environ, V3_FW=os.path.join(work, "fw_mut.bin"))
+    elif kind == "prog":
+        old, new, pick = PROG_MUTANTS[name]
+        sys.path.insert(0, paths.FIRMWARE)
+        import programs
+        src_path = os.path.join(paths.FIRMWARE, "programs", "adapter.c")
+        good_src = open(src_path).read()
+        assert good_src.count(old) == 1, name
+        good = programs.build("adapter").hex()
+        os.makedirs(os.path.join(work, "programs"))
+        open(os.path.join(work, "programs", "adapter.c"), "w").write(good_src.replace(old, new))
+        shutil.copy(os.path.join(paths.FIRMWARE, "programs", "link.ld"), os.path.join(work, "programs"))
+        saved = programs._HERE
+        programs._HERE = work
+        try:
+            bad = programs.build("adapter").hex()
+        finally:
+            programs._HERE = saved
+        assert good != bad
+        tool = open(os.path.join(paths.ROOT, "maxduo_saves.py")).read()
+        assert tool.count(good) == 1
+        open(os.path.join(work, "maxduo_saves.py"), "w").write(tool.replace(good, bad))
+        env = dict(os.environ, MAXDUO_TOOL_DIR=work)
     else:
         old, new, pick = PC_MUTANTS[name]
         src = open(os.path.join(paths.ROOT, "maxduo_saves.py")).read()
@@ -81,6 +110,6 @@ if __name__ == "__main__":
         ok = run(sys.argv[1], sys.argv[2])
     else:
         ok = all([run("fw", n) for n in FW_MUTANTS] + [run("fw42", n) for n in FW42_MUTANTS]
-                 + [run("pc", n) for n in PC_MUTANTS])
+                 + [run("prog", n) for n in PROG_MUTANTS] + [run("pc", n) for n in PC_MUTANTS])
         print("every planted bug was caught" if ok else "SOME PLANTED BUGS WERE MISSED")
     sys.exit(0 if ok else 1)

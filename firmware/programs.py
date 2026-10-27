@@ -20,7 +20,7 @@ adapter_detect
               complete, 21 game's final ID was 0x8001
     POLL 1 -> the last 32-bit word received from the game
 """
-import struct, zlib
+import os, re, shutil, struct, subprocess, tempfile, zlib
 import build_v42 as V
 import thumbcheck
 from build_patch import assemble
@@ -221,8 +221,59 @@ vars:
 
 PROGRAMS = {"adapter_detect": ADAPTER_DETECT}
 
+# Programs written in C (firmware/programs/<name>.c), built with clang + lld for the
+# ARM7TDMI (ARMv4T, Thumb), linked to run at PROGRAM_AT, variables included in the image.
+C_PROGRAMS = {"adapter": "adapter.c"}
+CLANG_VERSION = "18.1"                       # the version the embedded copies were built with
+_HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _tool(name):
+    for cand in (name, f"{name}-18"):
+        path = shutil.which(cand)
+        if path:
+            return path
+    raise RuntimeError(f"{name} is needed to build the C programs (LLVM {CLANG_VERSION})")
+
+
+def clang_version():
+    out = subprocess.run([_tool("clang"), "--version"], capture_output=True, text=True).stdout
+    m = re.search(r"clang version (\d+\.\d+)", out)
+    return m.group(1) if m else "?"
+
+
+def build_c(name):
+    src = os.path.join(_HERE, "programs", C_PROGRAMS[name])
+    ld = os.path.join(_HERE, "programs", "link.ld")
+    with tempfile.TemporaryDirectory() as work:
+        obj, elf, binf = (os.path.join(work, f) for f in ("p.o", "p.elf", "p.bin"))
+        subprocess.run([_tool("clang"), "--target=armv4t-none-eabi", "-mthumb", "-Os", "-ffreestanding",
+                        "-fno-builtin", "-nostdlib", "-fno-pic", "-Wall", "-Werror", "-c", src, "-o", obj],
+                       check=True)
+        subprocess.run([_tool("ld.lld"), "-T", ld, obj, "-o", elf], check=True)
+        subprocess.run([_tool("llvm-objcopy"), "-O", "binary", elf, binf], check=True)
+        dis = subprocess.run([_tool("llvm-objdump"), "-d", "--triple=thumbv4t-none-eabi", elf],
+                             capture_output=True, text=True, check=True).stdout
+        code = open(binf, "rb").read()
+    bad = []
+    for line in dis.splitlines():
+        m = re.match(r"\s*([0-9a-f]+):\s+((?:[0-9a-f]{4} ?)+)\s+(\S+)", line)
+        if not m or m.group(3).startswith("."):
+            continue                                          # labels, literal pools (.word)
+        mnem = m.group(3).split(".")[0]
+        size = len(m.group(2).replace(" ", "")) // 2
+        if mnem not in thumbcheck.THUMB1 or (size == 4 and mnem != "bl"):
+            bad.append(line.strip())
+    if bad:
+        raise ValueError(f"{name}: not ARM7TDMI-compatible:\n  " + "\n  ".join(bad[:20]))
+    return code
+
 
 def build(name):
+    if name in C_PROGRAMS:
+        code = build_c(name)
+        assert len(code) <= V.MAX_PROGRAM
+        return struct.pack("<IIII", V.RUN_MAGIC, len(code), zlib.crc32(code), 1) + code
     code = thumbcheck.checked_assemble(assemble, PROGRAMS[name], V.PROGRAM_AT, name)
     assert len(code) <= V.MAX_PROGRAM
     entry = 1                                   # Thumb, at the start of the code
@@ -230,7 +281,7 @@ def build(name):
 
 
 if __name__ == "__main__":
-    for n in PROGRAMS:
+    for n in list(PROGRAMS) + list(C_PROGRAMS):
         img = build(n)
         print(f"{n}: {len(img) - 16} bytes, image CRC {zlib.crc32(img):08X}")
         print(img.hex())

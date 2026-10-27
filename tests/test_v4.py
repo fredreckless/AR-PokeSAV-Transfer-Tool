@@ -1006,6 +1006,93 @@ def _():
     assert game.last == 0x8001 and st >> 21 & 1
 
 
+# ---------------------------------------------------------------- the adapter program (C)
+import rfu_game_model as RFU
+
+
+def adapter_session(script, seconds=20, attach=True):
+    hw, duo = run42()
+    game = RFU.Game()
+    if attach:
+        hw.attach_link_game(script(game))
+    entries, st, counters = quiet(M.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds), poll_s=0.2,
+                                  stop_when=(lambda: hw.lg_done) if attach else None)[0]
+    assert duo.hello() == 0x104 and duo.reckless() == "v4"          # back in USB server mode
+    hw.stop(); clean(hw)
+    assert any(l.startswith("Program finished") for l in hw.log)
+    trace = [M.describe_trace_entry(h, d) for _, h, d in entries]
+    return hw, game, trace, st, counters
+
+
+@test("adapter program: the tool's embedded copy is this repository's build (clang 18.1), Thumb-1 only")
+def _():
+    sys.path.insert(0, paths.FIRMWARE)
+    import programs
+    try:
+        version = programs.clang_version()
+    except RuntimeError as e:
+        raise Skip(str(e))
+    if version != programs.CLANG_VERSION:
+        raise Skip(f"clang {version} here; the embedded copy was built with {programs.CLANG_VERSION}")
+    assert programs.build("adapter") == M.PROGRAMS["adapter"]
+
+
+@test("wireless adapter: Emerald's Mystery Gift search, command by command, answered as a real adapter would")
+def _():
+    def script(game):
+        acks = yield from RFU.mystery_gift_search(game, polls=12)
+        yield ("delay", 40 * RFU.MS)
+        acks["sleep"] = yield from RFU.go_to_sleep(game)
+        return acks
+    hw, game, trace, st, counters = adapter_session(script)
+    assert hw.lg_error is None and hw.lg_done, repr(hw.lg_error)
+    acks = hw.lg_result
+    assert acks[0x10] == [0x99660090] and acks[0x17] == [0x99660097] and acks[0x16] == [0x99660096]
+    assert acks[0x1C] == [0x9966009C] and acks[0x1D] == [0x9966009D] and acks[0x1E] == [0x9966009E]
+    assert acks["wait"] == 0x99660027                                  # the adapter's turn: nothing happened
+    assert acks[0x13] == [0x99660193, 0]                               # idle, no ID
+    assert acks[0x99] == "rejected" and acks["sleep"] == [0x996600BD]
+    assert not game.errors, game.errors
+    assert game.retries == 0 and not hw.link_trouble, (game.retries, hw.link_trouble)
+    names = [t for t, _ in trace]
+    expect = ["ID exchange completed", "Hello", "setup (0x17) 003C0420", "broadcast data", "start searching",
+              "search results?", "stop searching", "wait (0x27)", "the adapter's turn", "status (0x13)",
+              "unknown command (0x99)", "ID exchange completed", "sleep (0x3D)"]
+    assert len(names) == len(expect) and all(n.startswith(e) for n, e in zip(names, expect)), names
+    assert trace[5][1] == 12                                          # 12 polls, one line
+    assert counters & 0xFFFF == 2 and counters >> 16 == 0
+
+
+@test("wireless adapter: the game gives up half-way through a command and starts it again; the adapter follows")
+def _():
+    def script(game):
+        yield ("until_ready",)
+        assert (yield from game.check_id()) == 0x8001
+        yield from game.command(0x10)
+        # 0x16 with six data words, abandoned after two, once the adapter is ready for the third;
+        # librfu then starts the whole command again 130 ms later (STWI_restart_Command)
+        got = yield ("xfer", 0x99660616)
+        for w in (1, 2):
+            yield ("wait_si", 1, 80 * RFU.MS); yield ("so", 1); yield ("wait_si", 0, 80 * RFU.MS); yield ("so", 0)
+            got = yield ("xfer", w)
+        yield ("wait_si", 1, 80 * RFU.MS); yield ("so", 1); yield ("wait_si", 0, 80 * RFU.MS); yield ("so", 0)
+        yield ("delay", 130 * RFU.MS)
+        again = yield from game.command(0x16, [1, 2, 3, 4, 5, 6])
+        return again, (yield from game.command(0x13))
+    hw, game, trace, st, counters = adapter_session(script)
+    assert hw.lg_error is None, repr(hw.lg_error)
+    assert hw.lg_result == ([0x99660096], [0x99660193, 0]), hw.lg_result
+    names = [t for t, _ in trace]
+    assert names[2].startswith("the game stopped answering") and names[3].startswith("broadcast data (0x16) 00000001"), names
+    assert counters >> 16 == 1 and game.retries == 0, (counters, game.retries)
+
+
+@test("wireless adapter: with nothing on the cable the trace stays empty and the program stops cleanly")
+def _():
+    hw, game, trace, st, counters = adapter_session(None, seconds=2, attach=False)
+    assert trace == [] and st >> 16 == 0
+
+
 @test("v4.2: everything else still works - fast save, cartridge report, restart; older firmware refuses programs")
 def _():
     hw, duo = run42()
