@@ -1087,7 +1087,8 @@ def _():
     assert hw.lg_error is None, repr(hw.lg_error)
     assert hw.lg_result == ([0x99660096], [0x99660193, 0]), hw.lg_result
     names = [t for t, _ in trace]
-    assert names[2].startswith("the game stopped answering") and names[3].startswith("broadcast data (0x16) 00000001"), names
+    assert any(n.startswith("the game stopped answering") for n in names[2:4]), names
+    assert names[-2].startswith("broadcast data (0x16) 00000001") and names[-1].startswith("status (0x13)"), names
     assert counters >> 16 == 1 and game.retries == 0, (counters, game.retries)
 
 

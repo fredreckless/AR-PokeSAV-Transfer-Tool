@@ -248,6 +248,10 @@ class Hw:
             (old & 0xFF00 | value & 0xFF) if addr == 0x04000128 else (old & 0xFF | (value << 8) & 0xFF00)
         if not v & 0x8:
             self.duo_low_seen = True            # a real GBA polling SI could catch even a brief low
+        if self.lg_first and self.lg_xfer is not None and self.lg_xfer[1] is not None:
+            # touching SIOCNT while the game clocks a word loses that word (lab session 13)
+            self.lg_xfer = (self.lg_xfer[0], self.lg_xfer[1] ^ 0x0000FFFF)
+            self.link_trouble.append("the DUO wrote SIOCNT in the middle of a word")
         if v & 0x80 and v & 0x1 and not (old & 0x80 and old & 0x1):        # the DUO clocks a word
             if self.lg_xfer is not None:
                 self.link_trouble.append("both sides started a transfer as clock master")

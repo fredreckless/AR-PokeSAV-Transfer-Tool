@@ -34,6 +34,7 @@ python lab_runner.py                                                     # run t
 | 27 Oct, 16:45 | session 10 | v4.2: does a real Japanese Emerald accept the DUO as a Wireless Adapter? (MGB-010 cable, small plug to small plug) | **PASS** after 111.8 s: 14 transfers, ID 0x8001 accepted. The game then sent its first adapter command, `9966003D` |
 | 27 Oct, 21:15 | session 11 | First real run of the adapter program: Mystery Gift → じゅしん スポット | The ID exchange works, but the first command stalls: the 2 MHz answer from the DUO doesn't reach the game correctly ([details](sessions/session11/README.md)) |
 | 27 Oct, 21:47 | session 12 | The 2 MHz probe | Only the **first bit** of each answer is late: holding SO at the top bit works 359/359, and the SO flick gets acknowledgements through ([details](sessions/session12/README.md)) |
+| 27 Oct, 22:25 | session 13 | The first-bit fix | Every command's first word is accepted; the acknowledgement's ready flick re-armed the link mid-word ([details](sessions/session13/README.md)) |
 
 Experiments deliberately **not** done:
 - two GBA packets in a row, which would hang the GBA;

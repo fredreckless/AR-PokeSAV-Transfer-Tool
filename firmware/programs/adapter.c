@@ -244,13 +244,15 @@ static void idle_after_command(void)
         arm_idle();
 }
 #else
-/* Real hardware (lab session 12): at 2 MHz the game takes the FIRST bit of each of our words
- * from our SO line's resting level (SIOCNT bit 3), not from the word; the other 31 bits are
- * fine. So every word is loaded with SO already at its top bit.
+/* Real hardware (lab session 12): at 2 MHz the game reads the FIRST bit of each of our words
+ * correctly only if SO is already resting at that bit's level (SIOCNT bit 3) - the other 31
+ * bits are fine. So every word is loaded with SO at its top bit.
  *   - The first word of a command has no handshake: just rest SO at 1 (0x80000000).
  *   - After a handshake SO must go low to say "ready". For a top-bit-1 word we flick it low and
- *     straight back high, until the game shows (its SO going low) that it saw us and is about
- *     to clock - then we leave SIOCNT alone for the whole word. */
+ *     straight back high; the game starts clocking within a microsecond of seeing the low, so
+ *     after each flick we keep our hands off SIOCNT for longer than a whole word takes (16 us at
+ *     2 MHz) - lab session 13 showed that touching SIOCNT around a word loses it.
+ * The end of a command needs a plain low (unarmed) until the game has gone idle. */
 static u32 n_stray, n_flick_timeouts;
 
 static void arm_idle(void)
@@ -258,6 +260,8 @@ static void arm_idle(void)
     SIODATA32 = IDLE_WORD;
     SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;
 }
+
+#define FLICK_QUIET 40          /* polls of SIOCNT, ~1 us each in EWRAM: well over one 16 us word */
 
 static void arm_word(u32 w)
 {
@@ -271,8 +275,9 @@ static void arm_word(u32 w)
     for (;;) {
         SIOCNT = CNT_32BIT | CNT_START;                       /* low: ready */
         SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;         /* high again for the first bit */
-        if (!si() || !(SIOCNT & CNT_START))
-            return;                                           /* the game is clocking: hands off */
+        for (int i = 0; i < FLICK_QUIET; i++)
+            if (!(SIOCNT & CNT_START))
+                return;                                       /* the game clocked the word */
         if (now() - t0 > HANDSHAKE_LINES) {
             n_flick_timeouts++;
             trace(EV_FLICK_TIMEOUT, 0, w);
@@ -281,11 +286,11 @@ static void arm_word(u32 w)
     }
 }
 
-/* End of a command: the game's last handshake wants to see us low, but its next command's
- * first word wants SO resting high - and may follow at once. The same flick does both. */
 static void idle_after_command(void)
 {
-    arm_word(IDLE_WORD);
+    SIOCNT = CNT_32BIT;                                       /* low, unarmed: the game's last check */
+    wait_si(0, HANDSHAKE_LINES);                              /* it has seen us and gone idle */
+    arm_idle();                                               /* rest high for the next command */
 }
 #endif
 

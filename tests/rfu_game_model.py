@@ -112,6 +112,9 @@ class Game:
                 return None
             if state == 3:
                 yield ("so", 0)
+                # the next command can follow within microseconds: link_rfu_2.c does
+                # rfu_REQ_recvData(); rfu_waitREQComplete(); rfu_LMAN_REQ_sendData(...)
+                yield ("delay", 4)
                 if (rx[0] & 0xFF) == 0xEE:
                     self.errors.append(f"command {cmd:#04x} rejected by the adapter: {rx}")
                     raise LinkError(f"command {cmd:#04x} rejected")
