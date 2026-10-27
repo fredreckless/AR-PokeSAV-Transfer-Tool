@@ -6,7 +6,7 @@ Game Boy Advance Wireless Adapter *and* of the distributor on the other side of 
 Pokémon game on a second GBA then receives and saves the gift itself, exactly as it did at the 2005
 events.
 
-**Status:** step 1 (detection) is built and passes in the simulator. It hasn't been tried on hardware yet.
+**Status:** step 1 (detection) passes on real hardware: a Japanese Emerald accepted the DUO as a Wireless Adapter (lab session 10).
 
 ## Why the adapter, and why it can be faked
 
