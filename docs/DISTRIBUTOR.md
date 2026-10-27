@@ -63,3 +63,29 @@ works on real hardware.
 
 Each stage gets a game-side model in the simulator, ported from the decomp, before it runs on
 hardware. That's how the command layer was built.
+
+## Notes for stage C: what goes over the air after connecting
+
+From librfu_rfu.c, so stage C can be built against it:
+
+- **Data commands.** The child sends with `0x24` or `0x25` ("send, then wait"). Its first data
+  word is a header: `bytes << (8 + 5 × slot)`. Hosts use plain `bytes`. After `0x25`/`0x27`, the
+  adapter has the clock. When the host has sent something, it tells the child with `0x99660028`
+  (data ready). The child then reads it with `0x26`. The answer is a header word, whose bits 0–6
+  are the bytes from the host, then the data itself.
+- **LL frames.** The data is a run of *LL sub-frames*. Each starts with a little-endian header:
+  - child frames have 2 header bytes: size (5 bits), phase, n, ack, slot state, "recv first";
+  - host frames have 3: size (7 bits), the same fields wider, and the slot flags of the children
+    it addresses.
+
+  Slot state `LCOM_UNI` carries unreliable per-frame data. The others are the **NI** (reliable)
+  window: four phases, each numbered and acknowledged, with a start frame that says how many
+  bytes follow.
+- **The child's name.** Straight after connecting, the child sends 26 bytes over NI, starting at
+  its own `serialNo`: serial (2), gname (15 with padding), uname (9). That's
+  `rfu_NI_CHILD_setSendGameName(slot, 0x0E)`, so 14-byte sub-frames. The host's link manager
+  must receive it and acknowledge every phase in its own frames, within the name-accept period.
+- **Ground truth.** The adapter program now records the first eight data commands the game
+  sends, word for word, and the PC prints them at the end of a trace. The first real connection
+  will show Emerald's own NI frames for its name. The host's NI receiver can then be checked
+  against real bytes, not just against the model.

@@ -158,6 +158,24 @@ static void build_host(void)
         host_cfg[i] = b[4 * i] | b[4 * i + 1] << 8 | b[4 * i + 2] << 16 | (u32)b[4 * i + 3] << 24;
 }
 
+/* What the game sends us once connected: the first few data commands, word for word. This is
+ * librfu's own framing of the child's first messages (its game name over the NI channel) - the
+ * ground truth the host side will be built against. */
+#define CAP_CMDS 8
+#define CAP_WORDS 24
+static u32 cap_cmd[CAP_CMDS], cap_data[CAP_CMDS][CAP_WORDS], cap_count;
+
+static void capture(void)
+{
+    if (cap_count >= CAP_CMDS)
+        return;
+    u32 n = req_len < CAP_WORDS ? req_len : CAP_WORDS;
+    cap_cmd[cap_count] = req_cmd | req_len << 8 | child_connected << 16;
+    for (u32 i = 0; i < n; i++)
+        cap_data[cap_count][i] = req[i];
+    cap_count++;
+}
+
 static void respond(void)
 {
     u32 cmd = req_cmd;
@@ -201,8 +219,8 @@ static void respond(void)
         }
         ack_len = 1;
         break;
-    case 0x24: break;
-    case 0x25: swap_after = 1; break;
+    case 0x24: capture(); break;
+    case 0x25: capture(); swap_after = 1; break;
     case 0x26: break;                                                  /* no data */
     case 0x27: swap_after = 1; break;
     case 0x30: child_connected = 0; adapter_state = ST_IDLE; break;
@@ -660,6 +678,9 @@ static int pc_service(api_t *api)
     case 5: v = n_id | (n_lost << 16); break;
 #ifndef PROBE
     case 8: v = n_stray | (n_flick_timeouts << 16); break;
+    case 15: v = cap_count; break;
+    case 16: v = (i >> 5) < CAP_CMDS ? ((i & 31) == 31 ? cap_cmd[i >> 5]
+                                      : (i & 31) < CAP_WORDS ? cap_data[i >> 5][i & 31] : 0) : 0; break;
     case 9: v = i <= W_MAX ? (w_pulses[i] & 0xFFFF) | (w_clocked[i] << 16) : 0; break;
     case 10: v = i <= W_MAX ? (w_accepted[i] & 0xFFFF) | (w_rejected[i] << 16) : 0; break;
     case 11: v = flick_w | (scope_count << 8); break;
