@@ -17,6 +17,7 @@ See docs/WIRELESS.md and docs/DISTRIBUTOR.md.
 """
 import argparse
 import os
+import struct
 import sys
 import time
 import zlib
@@ -433,10 +434,46 @@ def adapter_trace(duo, args, poll_s=0.3, stop_when=None, program="adapter"):
     return entries, st, counters
 
 
+SERIAL_PATTERNS = (0x00007F7D,        # 0x7F7D as a code constant (Rfu_GetWonderDistributorPlayerData)
+                   0x7F7D0002,        # sAcceptedSerialNos = {0x0002, 0x7F7D, 0x0000, 0xFFFF}, 4-byte aligned
+                   0x99660000)        # librfu's STWI header constant: shows the search ran over the code
+
+
+def find_serial(duo):
+    """Read-only: search the cartridge in the DUO for the Wonder Card distributor's serial number
+    (0x7F7D in the English decomp) and report where it appears."""
+    M = maxduo_saves
+    lab = Lab(duo)
+    wake = [("w16", M.MAP_REG, 0x0101), ("delay", 0, 0x400), ("r16", 0x08000000, 2)]
+    res = lab.run(wake + [("r8", 0x080000A0, 16)] + M.rom_size_ops() + [("w16", M.MAP_REG, 0x0120)])
+    header = res[1][1]                              # (results: only the reads, in order)
+    size = M.rom_size_from([d for _, d in res[2:]])
+    title = header[:12].split(b"\0")[0].decode("ascii", "replace")
+    print(f"  Cartridge: {title} ({header[12:16].decode('ascii', 'replace')}), {size >> 20} MB")
+    found = lab.run(wake + [("search", 0x08000000, min(size, M.MAX_ROM_READ), SERIAL_PATTERNS),
+                            ("w16", M.MAP_REG, 0x0120)])[1][1]
+    hits = []
+    for i in range(0, 64, 16):
+        addr, w0, w1, w2 = struct.unpack_from("<4I", found, i)
+        if addr != 0xFFFFFFFF:
+            hits.append((addr, w0, w1, w2))
+            print(f"    {addr:08X}: {w0:08X} {w1:08X} {w2:08X}")
+    serial = [h for h in hits if h[1] in (0x00007F7D, 0x7F7D0002)]
+    if serial:
+        print("  0x7F7D is in this game: it uses the same distributor serial as the English decomp.")
+    elif hits:
+        print("  0x7F7D was NOT found (the search did reach librfu's code): this game's distributor serial differs.")
+    else:
+        print("  Nothing found at all - the search may not have covered the game's code.")
+    return hits
+
+
 def run(duo, args):
     version = duo.connect(wait_s=args.wait)
     print(f"Connected to Action Replay MAX DUO (Datel protocol {version >> 8}.{version & 0xFF:02d}"
           + (", Reckless v4.2)" if duo.can_run() else ")"))
+    if args.find_serial:
+        return find_serial(duo)
     if args.test:
         return adapter_test(duo, argparse.Namespace(adapter_test=args.test))
     if args.probe:
@@ -459,12 +496,14 @@ def main():
     ap.add_argument("--check-search", action="store_true",
                     help="with --trace: list the distributor four times in each search answer; the game "
                          "restarts its search at once if the answers arrive intact (a test, not a gift)")
+    ap.add_argument("--find-serial", action="store_true",
+                    help="read-only: search the cartridge in the DUO for the Wonder Card distributor's serial number")
     ap.add_argument("--probe", type=int, nargs="?", const=600, metavar="SECONDS",
                     help="lab: like --trace, but answers each command a different way to see how 2 MHz answers "
                          "reach the game")
     ap.add_argument("--wait", type=int, default=120, help="seconds to wait for the GBA to be switched on (default 120)")
     args = ap.parse_args()
-    if not (args.test or args.trace or args.probe):
+    if not (args.test or args.trace or args.probe or args.find_serial):
         args.trace = 600
     t = UsbTransport()
     try:

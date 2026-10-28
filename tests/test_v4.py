@@ -1119,6 +1119,24 @@ def _():
     assert W.adapter_trace.last_capture == [(0x24, 2, 1, [0x00000400, 0x12345678])], W.adapter_trace.last_capture
 
 
+@test("find serial: read-only ROM search reports 0x7F7D when the game has it, and says so when it doesn't")
+def _():
+    import struct as _s
+    for planted, expect in ((True, "same distributor serial"), (False, "serial differs")):
+        rom = bytearray(hwsim.make_game_rom(title=b"POKEMON EMER", code=b"BPEJ", tag=b"FLASH1M_V103"))
+        for k in range(0, len(rom) - 3, 4):            # no accidental matches in the random data
+            if _s.unpack_from("<I", rom, k)[0] in W.SERIAL_PATTERNS:
+                rom[k] ^= 1
+        _s.pack_into("<I", rom, 0x10000, 0x99660000)
+        if planted:
+            _s.pack_into("<I", rom, 0x20004, 0x00007F7D)
+        hw, duo = run42(game=bytes(rom))
+        hits, text = quiet(W.find_serial, duo)
+        hw.stop(); clean(hw)                           # clean() fails on any save-chip write
+        assert "POKEMON EMER (BPEJ)" in text and expect in text, text
+        assert (0x08020004 in [h[0] for h in hits]) == planted and 0x08010000 in [h[0] for h in hits], hits
+
+
 @test("search check: four entries per answer, all with good checksums, so librfu restarts its search (0x1E, 0x1C)")
 def _():
     def script(game):

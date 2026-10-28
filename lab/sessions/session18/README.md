@@ -32,3 +32,15 @@
   menu.
 
 Nothing was written to either cartridge.
+
+## Follow-up: `--check-search` on hardware (about 20:55)
+
+- The game ended and restarted its search after **every** answer: `0x1D`, `0x1E`, `0x1C`, over
+  and over, more than 400 times in about 13 s. Interrupted commands: 0.
+- So all four entries passed librfu's checksum every time, and **the data words arrive intact**.
+  Neither the cable nor the arming is changing them.
+- In the plain run, the screen never left "searching", and there was no chime. Emerald plays
+  `SE_PC_LOGIN` when a host joins its list, so our entry was read but not taken as a distributor.
+  In the decomp that takes `serialNo == 0x7F7D` exactly.
+- Next: `--find-serial`, a read-only ROM search of the cartridge in the DUO for 0x7F7D, both as a
+  code constant and as the accepted-serials list.
