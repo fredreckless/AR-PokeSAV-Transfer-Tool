@@ -36,6 +36,7 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "parent swaps the bytes in block chunks": ("tx_cmd[1 + j] = lo | hi << 8;", "tx_cmd[1 + j] = hi | lo << 8;", "Mystery Gift delivers"),
     "server's header CRC is off by one bit": ("            crc = ~crc;", "            crc = ~crc ^ 1;", "Mystery Gift delivers"),
     "server tells the game to save the card as Wonder News": ("CLI_SAVE_CARD = 10,", "CLI_SAVE_CARD = 9,", "Mystery Gift delivers"),
+    "host moves on even when the game missed a packet": ("        if (hf_uni && !uni_acked && n_resent < 0xFFFF)", "        if (0)", "packets lost"),
     "adapter has no watchdog mid-command": ("        if (phase != PH_COMMAND && phase != PH_ID && now() - last_word_at > WATCHDOG_LINES) {", "        if (0) {", "wireless adapter: the game gives up"),
 }
 

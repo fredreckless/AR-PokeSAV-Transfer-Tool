@@ -349,7 +349,7 @@ static void nis_ack(u32 st, u32 phase, u32 n)
 #define EV_CLOSE         0x0D    /* the game is ready to close the link: we agree */
 
 static u8 child_uni[16];
-static u32 child_uni_new, link_state, link_timer, n_child_cmds;
+static u32 child_uni_new, link_state, link_timer, n_child_cmds, n_uni, n_resent, uni_acked;
 static u16 rx_cmd[7], tx_cmd[7];
 
 static u16 crc16(const u8 *p, u32 n, u16 crc)    /* util.c CalcCRC16WithTable, before its final ~ */
@@ -655,6 +655,8 @@ static void host_receive(void)
             memcpy(child_uni, d + at + 2, len);                      /* librfu's rfu_STC_UNI_receive */
             if (len < 16) memset(child_uni + len, 0, 16 - len);
             child_uni_new = 1;
+            uni_acked = 1;                                           /* (it only answers new packets) */
+            n_uni++;
         }
         at += 2 + len;
     }
@@ -668,12 +670,13 @@ static void host_receive(void)
 /* The host's frame for the game to read (0x26): the NI acknowledgement while receiving
  * (3-byte header: size 0, phase, n, ack, slot state, addressed slots), else librfu's
  * one-byte "null" frame. Returns the answer length. */
-static u32 hf[32], hf_len;               /* the host's packet for the next 0x26 (0: none) */
+static u32 hf[32], hf_len, hf_uni;               /* the host's packet for the next 0x26 (0: none) */
 
 static u32 host_frame(void)
 {
     u8 *out = (u8 *)&hf[1];
     u32 bytes = 0;
+    hf_uni = 0;
     host_frames++;
     if (ni.state & NI_BUSY) {
         u32 f = (ni.state & 0xF) << 14 | ni.ack << 13 | ni.phase << 9 | ni.n[ni.phase] << 11 | 1u << 18;
@@ -697,6 +700,7 @@ static u32 host_frame(void)
         memcpy(out + bytes + 3, tx_cmd, 14);                         /* row 0: us */
         memcpy(out + bytes + 3 + 14, rx_cmd, 14);                    /* row 1: the game's, echoed */
         bytes += 3 + UNI_BYTES;
+        hf_uni = 1;
     }
     if (!bytes) {
         out[0] = 0xFF;                                               /* librfu's one-byte null frame */
@@ -765,7 +769,7 @@ static void respond(void)
             adapter_state = ST_CONNECTED;
             ni_reset();
             memset(&nis, 0, sizeof nis);
-            link_state = LS_OFF; hf_len = 0; child_uni_new = 0;
+            link_state = LS_OFF; hf_len = 0; child_uni_new = 0; uni_acked = 0;
             memset(&bs, 0, sizeof bs); memset(&rb, 0, sizeof rb);
             mg_step = mg_sub = mg_got = 0;
             if (cmd == 0x21) trace(EV_CONNECTED, 0, CHILD_ID);
@@ -777,7 +781,7 @@ static void respond(void)
         break;
     case 0x24: capture(); if (child_connected) host_receive(); break;
     case 0x25: capture(); if (child_connected) host_receive(); swap_after = 1; break;
-    case 0x26: memcpy(ack, hf, hf_len * 4); ack_len = hf_len; hf_len = 0; break;  /* the host's packet */
+    case 0x26: memcpy(ack, hf, hf_len * 4); ack_len = hf_len; break;  /* the host's packet (again, if retried) */
     case 0x27: swap_after = 1; break;
     case 0x30: child_connected = 0; adapter_state = ST_IDLE; break;
     case 0x32: case 0x34: break;
@@ -1088,8 +1092,16 @@ static void clock_master_turn(api_t *api)
             break;
     }
     cmd = child_connected ? 0x99660028 : 0x99660027;           /* data ready / nothing happened */
-    if (child_connected && !hf_len)
-        hf_len = host_frame();                                 /* this frame's packet from the host */
+    if (child_connected) {                                     /* this frame's packet from the host */
+        /* Once the link is up, the game answers every packet it gets with a UNI sub-frame. No
+         * answer means the packet went astray (a failed transfer): send the same one again rather
+         * than move on, because link_rfu_2 never resends the parent's blocks. Repeats are harmless. */
+        if (hf_uni && !uni_acked && n_resent < 0xFFFF)
+            n_resent++;
+        else
+            hf_len = host_frame();
+        uni_acked = 0;
+    }
     if (!master_word(cmd, &got)) goto failed;
     /* inverted handshake: we stay low, the game goes high, we go high, the game re-arms (low) */
     if (!wait_si(1, HANDSHAKE_LINES)) goto failed;
@@ -1274,6 +1286,7 @@ static int pc_service(api_t *api)
         gift_ready = put_at * 4 >= 4 + CARD_SIZE + 1000 && CARD_SIZE >= 16 && CARD_SIZE <= 0x14C;
         break;
     case 22: v = link_state | mg_step << 4 | mg_errors << 8 | (n_child_cmds & 0xFFFF) << 16; break;
+    case 25: v = (n_uni & 0xFFFF) | n_resent << 16; break;
     case 23: v = (i & 15) < 16 ? game_data[4 * (i & 15)] | game_data[4 * (i & 15) + 1] << 8
                  | game_data[4 * (i & 15) + 2] << 16 | (u32)game_data[4 * (i & 15) + 3] << 24 : 0; break;
     case 24: v = child_player[4 * (i & 15)] | child_player[4 * (i & 15) + 1] << 8

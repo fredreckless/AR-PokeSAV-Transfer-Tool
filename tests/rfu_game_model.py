@@ -888,13 +888,22 @@ class MGClient:
         return self.func == "done"
 
 
-def receive_gift(game, child, max_frames=3000):
+def receive_gift(game, child, max_frames=3000, drop_every=0):
     """After joining: every frame the adapter says 'data ready', the game reads the host's packet,
     runs link_rfu_2 and its tasks (player exchange, standby, the Mystery Gift client), sends its
-    own sub-frame and hands the clock back. Ends after the link is closed (0x30)."""
+    own sub-frame and hands the clock back. Ends after the link is closed (0x30).
+    drop_every=N: every Nth packet is lost on the way (read, then thrown away, and the game hands
+    the clock straight back with nothing to say), as a failed transfer would leave it."""
     client, standby_set, closed = None, False, False
+    child.dropped = 0
     for frame in range(max_frames):
         ack = yield from game.command(0x26)
+        if drop_every and frame % drop_every == drop_every - 1:
+            child.dropped += 1
+            ready = yield from game.change(0x27)
+            if ready != 0x99660028:
+                raise LinkError(f"expected 'data ready', got {ready:#010x}")
+            continue
         child.msc(ack)
         child.main()
         if child.received_remote_link_players and client is None:

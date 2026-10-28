@@ -1187,6 +1187,25 @@ def _():
     assert "Wonder Card loaded" in hw.text and game.retries == 0, (hw.text[:400], game.retries)
 
 
+@test("distributor: packets lost on the way (every 7th) are sent again until the game shows it got them; the card still arrives intact")
+def _():
+    path, card, script = test_wc3()
+    def script_(game):
+        found = yield from RFU.find_distributor(game)
+        yield from RFU.connect_to(game, found["id"])
+        yield from RFU.send_child_name(game, RFU.child_name_bytes())
+        yield from RFU.wait_join_status(game)
+        child = RFU.ChildLink()
+        client = yield from RFU.receive_gift(game, child, drop_every=7)
+        return child, client
+    hw, game, trace, st, counters = adapter_session(script_, first_bit=True, seconds=150, wonder_card=path)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors, [t for t, _ in trace][-10:])
+    child, client = hw.lg_result
+    assert child.dropped > 20 and client.result == RFU.CLI_MSG_CARD_RECEIVED, (child.dropped, client.result)
+    assert client.saved_card == card and client.saved_ram_script == script
+    assert M.adapter_trace.last_link["resent"] >= child.dropped - 1, (M.adapter_trace.last_link, child.dropped)
+
+
 @test("distributor: without a Wonder Card the game is told there is nothing to send, and the link closes tidily")
 def _():
     hw, game, trace, st, counters = adapter_session(gift_script, first_bit=True, seconds=120)

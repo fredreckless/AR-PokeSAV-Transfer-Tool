@@ -144,6 +144,10 @@ the program does, and what the game model in `tests/rfu_game_model.py` checks it
 - **No card loaded.** The server sends `sClientScript_NothingSent` instead. The game then says
   there was nothing to receive. This is the safe first hardware run.
 - **Closing.** The game sends `0x5F00`; the host sends its own; the game disconnects (`0x30`).
+- **Lost packets.** Once the link is up, the game answers every packet it gets with a UNI
+  sub-frame. If no answer comes, the host sends the same packet again instead of moving on;
+  link_rfu_2 never resends the parent's blocks. Repeats are harmless. The PC reports how many
+  were resent.
 - **Pacing.** The host sends each block start (`0x8800`) 8 times rather than 4. It leaves 8
   frames between blocks, so the game always has time to take one block before the next starts.
   The game ignores repeats.

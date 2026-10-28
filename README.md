@@ -81,7 +81,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 - **Your game's save is only ever read.** The tool can only send USB commands on an allow-list. The GBA-side code refuses the commands that start an erase or a write on a save chip, and the PC tool checks the same rules before sending anything.
 - **Datel's own delete and overwrite commands are blocked outright,** including DeleteFile (0x1C). Another GBA Action Replay tool sends that command at start-up, and on a MAX DUO it would delete a stored file. More on that in [the protocol notes](docs/PROTOCOL.md#a-warning-about-other-tools).
 - **The firmware update is the one step that writes,** and only to the DUO itself, never to your games. It asks you to type `UPDATE` first, and it uses Datel's own update process. You can go back to Datel's official firmware the same way.
-- **Every change is tested before real hardware.** That means about 60 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
+- **Every change is tested before real hardware.** That means about 83 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
 
 ## Other things it can do
 
@@ -127,7 +127,7 @@ This repository holds the whole project, not just the finished tool.
 ```
 pip install -r requirements.txt
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE --all
-python tests/run_each.py      # about 80 tests, each in its own process; around 15 minutes
+python tests/run_each.py      # about 83 tests, each in its own process; around 15 minutes
 python tests/mutate4.py       # plants 31 known bugs; each must be caught
 ```
 
