@@ -487,12 +487,75 @@ def find_serial(duo):
     return hits
 
 
+def serial_candidates(rom, base=0x08000000):
+    """Look in a ROM image (in memory only) for librfu's accepted-serials list: u16s {0x0002, X,
+    [0x0000,] 0xFFFF} (link_rfu_2.c: sAcceptedSerialNos). Each candidate is scored by whether code
+    points at it (a literal-pool word holding its address) and whether X itself appears as a code
+    constant (Rfu_GetWonderDistributorPlayerData compares against it)."""
+    import array
+    lists = []
+    i = rom.find(b"\x02\x00")
+    while 0 <= i <= len(rom) - 8:
+        if not i & 1:
+            x, a, b = struct.unpack_from("<3H", rom, i + 2)
+            if 3 <= x <= 0x7FFF and (a == 0xFFFF or (a == 0 and b == 0xFFFF)):
+                lists.append((x, base + i))
+        i = rom.find(b"\x02\x00", i + 1)
+    targets = {addr for _, addr in lists} | {x for x, _ in lists}
+    words = array.array("I", bytes(rom[:len(rom) & ~3]))     # every aligned word, for the cross-checks
+    if sys.byteorder != "little":
+        words.byteswap()
+    present = {w for w in words if w in targets}
+    found = []
+    for x, addr in lists:
+        pointed, constant = addr in present, x in present
+        if pointed or constant:
+            found.append((pointed + constant, x, addr, pointed, constant))
+    found.sort(key=lambda f: (-f[0], f[2]))
+    return found
+
+
+def find_serial_deep(duo, chunk=0x1FFF0):
+    """Read-only: read the cartridge in the DUO into memory (never to disk) and look for the
+    accepted-serials list and the distributor constant. Prints only what it finds."""
+    M = maxduo_saves
+    lab = Lab(duo)
+    wake = [("w16", M.MAP_REG, 0x0101), ("delay", 0, 0x400), ("r16", 0x08000000, 2)]
+    res = lab.run(wake + [("r8", 0x080000A0, 16)] + M.rom_size_ops() + [("w16", M.MAP_REG, 0x0120)])
+    header, size = res[1][1], M.rom_size_from([d for _, d in res[2:]])
+    size = min(size, M.MAX_ROM_READ)
+    title = header[:12].split(b"\0")[0].decode("ascii", "replace")
+    print(f"  Cartridge: {title} ({header[12:16].decode('ascii', 'replace')}), "
+          f"reading {size >> 20} MB into memory (read-only)...")
+    rom, t0 = bytearray(), time.time()
+    for at in range(0, size, chunk):
+        n = min(chunk, size - at)
+        rom += lab.run(wake + [("r8", 0x08000000 + at, n), ("w16", M.MAP_REG, 0x0120)])[1][1]
+        done = len(rom) / size
+        print(f"\r    {done:4.0%}  ({time.time() - t0:.0f} s)", end="", flush=True)
+    print()
+    found = serial_candidates(bytes(rom))
+    del rom
+    if not found:
+        print("  No accepted-serials list found.")
+        return []
+    print("  Candidates for the distributor serial (best first):")
+    for score, x, addr, pointed, constant in found[:6]:
+        why = " and ".join(w for w, f in (("code points at the list", pointed),
+                                          (f"{x:#06x} is a code constant", constant)) if f)
+        print(f"    serial {x:#06x}  (list at {addr:08X}: {why})")
+    best = found[0]
+    if best[0] == 2:
+        print(f"  Most likely: {best[1]:#06x}.")
+    return found
+
+
 def run(duo, args):
     version = duo.connect(wait_s=args.wait)
     print(f"Connected to Action Replay MAX DUO (Datel protocol {version >> 8}.{version & 0xFF:02d}"
           + (", Reckless v4.2)" if duo.can_run() else ")"))
     if args.find_serial:
-        return find_serial(duo)
+        return find_serial_deep(duo) if args.deep else find_serial(duo)
     if args.test:
         return adapter_test(duo, argparse.Namespace(adapter_test=args.test))
     if args.probe:
@@ -521,6 +584,9 @@ def main():
                          "to one (about 6 minutes; a test, not a gift)")
     ap.add_argument("--find-serial", action="store_true",
                     help="read-only: search the cartridge in the DUO for the Wonder Card distributor's serial number")
+    ap.add_argument("--deep", action="store_true",
+                    help="with --find-serial: read the cartridge into memory (not to disk) and find the "
+                         "accepted-serials list itself (a few minutes)")
     ap.add_argument("--probe", type=int, nargs="?", const=600, metavar="SECONDS",
                     help="lab: like --trace, but answers each command a different way to see how 2 MHz answers "
                          "reach the game")

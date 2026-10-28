@@ -1166,6 +1166,22 @@ def _():
     assert "the game connected to serial 0x0151" in hw.text, hw.text
 
 
+@test("find serial --deep: reads the ROM into memory, finds the accepted-serials list code points at, and writes nothing")
+def _():
+    import struct as _s
+    rom = bytearray(hwsim.make_game_rom(title=b"POKEMON EMER", code=b"BPEJ", tag=b"FLASH1M_V103", size=0x60000))
+    rom[0x40000:0x40010] = _s.pack("<4H", 0x0002, 0x1234, 0x0000, 0xFFFF) + bytes(8)   # the real list
+    _s.pack_into("<I", rom, 0x20100, 0x08040000)                                       # code points at it
+    _s.pack_into("<I", rom, 0x20200, 0x00001234)                                       # and compares with it
+    rom[0x50002:0x50008] = _s.pack("<3H", 0x0002, 0x0777, 0xFFFF)                       # a decoy, unreferenced
+    hw, duo = run42(game=bytes(rom))
+    found, text = quiet(W.find_serial_deep, duo)
+    hw.stop(); clean(hw)
+    assert found and found[0][1:3] == (0x1234, 0x08040000) and found[0][0] == 2, found
+    assert 0x0777 not in [f[1] for f in found], found
+    assert "Most likely: 0x1234" in text and "BPEJ" in text, text
+
+
 @test("search check: four entries per answer, all with good checksums, so librfu restarts its search (0x1E, 0x1C)")
 def _():
     def script(game):
