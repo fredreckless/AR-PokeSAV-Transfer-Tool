@@ -87,7 +87,7 @@ static int wait_si(int level, u32 lines)
 }
 
 /* ------------------------------------------------------------------ trace */
-#define TRACE_N 64
+#define TRACE_N 32
 #define EV_ID_EXCHANGE   0x01    /* pseudo-commands, so the trace reads as a story */
 #define EV_WAIT_TIMEOUT  0x02
 #define EV_LOST          0x03
@@ -143,6 +143,17 @@ static int swap_after;                 /* the game hands us the clock after this
 #define HOST_TRAINER 0x5678           /* with the name below, the checksum byte is 0x2C */
 #define SERIAL_WONDER_DISTRIBUTOR 0x7F7D
 static u32 host_cfg[6], host_on = 1, n_hosts = 1, connect_polls, child_connected;
+/* --sweep-serial: the Japanese Emerald doesn't contain 0x7F7D (session 18), so offer every serial
+ * number in turn, three per answer, each host's ID being its serial. Each block of serials is shown
+ * twice, each time in less than the 240 frames Emerald then spends looking for the host it
+ * accepted - so it finds it again and connects (0x1F) to that ID. */
+static u32 sweep, sweep_n, found_serial;
+/* 512 serials a block, each block offered twice (a cycle is ~171 answers, ~2.8 s); then the next */
+__attribute__((noinline)) static u32 next_sweep_serial(void)
+{
+    u32 n = sweep_n++, id = ((n >> 10) << 9 | (n & 511)) & 0x7FFF;
+    return id < 3 ? 3 : id;                                    /* 0 and 2 are other serials */
+}
 
 static void build_host(void)
 {
@@ -763,8 +774,13 @@ static void respond(void)
              * soon as one answer holds four entries whose checksums are good - proof on real
              * hardware that our answer's data words arrive intact. */
             for (u32 k = 0; k < n_hosts; k++) {
-                ack[7 * k] = HOST_ID + k;                              /* id, next free slot 0 */
+                u32 id = HOST_ID + k;
                 memcpy(ack + 7 * k + 1, host_cfg, sizeof host_cfg);
+                if (sweep) {
+                    id = next_sweep_serial();
+                    ack[7 * k + 1] = (host_cfg[0] & 0xFFFF0000) | id;  /* (not in the checksum) */
+                }
+                ack[7 * k] = id;                                       /* id, next free slot 0 */
             }
             ack_len = 7 * n_hosts;
         }
@@ -772,7 +788,8 @@ static void respond(void)
         break;
     case 0x1F:
         adapter_state = ST_CONNECTING;
-        connect_polls = host_on && (req[0] & 0xFFFF) - HOST_ID < n_hosts ? 1 : 0;
+        connect_polls = host_on && (sweep || (req[0] & 0xFFFF) - HOST_ID < n_hosts) ? 1 : 0;
+        if (sweep) found_serial = req[0] & 0xFFFF;
         break;
     case 0x20: case 0x21:                                              /* connected yet? */
         if (connect_polls && (cmd == 0x21 || ++connect_polls > 2)) {
@@ -914,7 +931,7 @@ static u32 n_stray, n_flick_timeouts;
 
 #define W_MAX 15
 volatile u32 flick_w = 1;                /* spin-loop iterations the flick stays low (tuned) */
-static u32 w_pulses[W_MAX + 1], w_clocked[W_MAX + 1], w_accepted[W_MAX + 1], w_rejected[W_MAX + 1];
+static u16 w_pulses[W_MAX + 1], w_clocked[W_MAX + 1], w_accepted[W_MAX + 1], w_rejected[W_MAX + 1];
 static int last_flick = -1;              /* width of the flick that started the last word, or -1 */
 static int flick_good = -1;              /* the last width the game accepted, or -1 */
 static u32 spin_per_8_lines, polls_per_8_lines;
@@ -1320,7 +1337,11 @@ static int pc_service(api_t *api)
         break;
     case 22: v = link_state | mg_step << 4 | mg_errors << 8 | (n_child_cmds & 0xFFFF) << 16; break;
     case 25: v = (n_uni & 0xFFFF) | n_resent << 16; break;
-    case 26: n_hosts = idx >= 1 && idx <= 4 ? idx : 1; v = n_hosts; break;      /* --check-search */
+    case 26:                                                   /* --check-search, --sweep-serial */
+        if (idx & 0x10) { sweep = 1; n_hosts = 3; }
+        else if (idx >= 1 && idx <= 4) n_hosts = idx;
+        v = ((sweep_n >> 10) << 9 & 0x7FFF) | found_serial << 16;
+        break;
     case 23: v = (i & 15) < 16 ? game_data[4 * (i & 15)] | game_data[4 * (i & 15) + 1] << 8
                  | game_data[4 * (i & 15) + 2] << 16 | (u32)game_data[4 * (i & 15) + 3] << 24 : 0; break;
     case 24: v = child_player[4 * (i & 15)] | child_player[4 * (i & 15) + 1] << 8

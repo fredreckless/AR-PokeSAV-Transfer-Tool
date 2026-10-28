@@ -44,3 +44,33 @@ Nothing was written to either cartridge.
   In the decomp that takes `serialNo == 0x7F7D` exactly.
 - Next: `--find-serial`, a read-only ROM search of the cartridge in the DUO for 0x7F7D, both as a
   code constant and as the accepted-serials list.
+
+## Follow-up: `--find-serial` on hardware (about 21:00)
+
+```
+Cartridge: POKEMON EMER (BPEJ), 16 MB
+  08291A0C: 99660000 04000120 04000208
+0x7F7D was NOT found (the search did reach librfu's code)
+```
+
+- The Japanese Emerald doesn't contain 0x7F7D in either form: not as a code constant, and not
+  in an accepted-serials list, whichever way it's aligned. librfu's STWI constant was found, so
+  the search did cover the code.
+- **So the Japanese game uses a different distributor serial.** That explains session 18
+  exactly: every entry read cleanly, and none was accepted.
+
+**Next: `--sweep-serial`.**
+- The adapter offers every serial (15 bits) in turn, three per answer, each host's ID being its
+  serial.
+- Blocks of 512 are each offered twice, about 2.8 s per pass. That's inside the 240 frames
+  Emerald spends finding the host it accepted again, so the game connects (`0x1F`) to it, and
+  the ID is the serial.
+- About 6 minutes for the lot.
+
+**Memory limit.**
+- The program had to shrink for this. The trace ring is 32 entries, and the flick counters are
+  16-bit.
+- `programs.py` now enforces the real limit: code, data and variables must end below 0x0203AE00.
+  Above that are the firmware's log messages, and from 0x0203AF00 its transfer state.
+- The `--check-search` build (11,880 bytes) had reached 0x0203AE78, into the message area. It
+  was harmless on hardware, but it's no longer allowed.

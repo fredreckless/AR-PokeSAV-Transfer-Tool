@@ -1037,14 +1037,16 @@ def adapter_symbol(name):
 
 
 def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits=0, first_bit=False,
-                    flick_window=None, wonder_card=None, check_search=False):
+                    flick_window=None, wonder_card=None, check_search=False,
+                    sweep_serial=False):
     hw, duo = run42()
     game = RFU.Game()
     if attach:
         flick = (adapter_symbol("flick_w"),) + tuple(flick_window) if flick_window else None
         hw.attach_link_game(script(game), lag_bits=lag_bits, first_bit=first_bit, flick=flick)
     r = quiet(W.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds, adapter_probe=seconds,
-                                                          wonder_card=wonder_card, check_search=check_search),
+                                                          wonder_card=wonder_card, check_search=check_search,
+                                                          sweep_serial=sweep_serial),
               poll_s=0.2,
               stop_when=(lambda: hw.lg_done) if attach else None, program=program)
     entries, st, counters = r[0][:3]
@@ -1135,6 +1137,33 @@ def _():
         hw.stop(); clean(hw)                           # clean() fails on any save-chip write
         assert "POKEMON EMER (BPEJ)" in text and expect in text, text
         assert (0x08020004 in [h[0] for h in hits]) == planted and 0x08010000 in [h[0] for h in hits], hits
+
+
+@test("serial sweep: a game that only takes serial 0x0151 is offered it, finds it again, and connects to it")
+def _():
+    JP = 0x0151
+    def script(game):
+        yield ("until_ready",)
+        assert (yield from game.check_id()) == 0x8001
+        for cmd, data in ((0x10, []), (0x17, [0x003C0420]), (0x16, [2, 0, 0, 0, 0, 0xFFFFFFFF]), (0x1C, [])):
+            yield from game.command(cmd, data)
+        seen = None
+        for n in range(900):                        # Emerald: Task_CardOrNewsOverWireless
+            hosts = RFU.parse_candidates((yield from game.command(0x1D)))
+            assert len(hosts) == 3 and all(h["checksum_ok"] for h in hosts), hosts
+            match = [h for h in hosts if h["serial"] == JP and h["gname"]["hasCard"]]
+            if seen is None and match:
+                seen = n                            # the chime; 120+ frames on, it looks for it again
+            elif seen is not None and n - seen > 120 and match:
+                yield from game.command(0x1E)
+                yield from game.command(0x1F, [match[0]["id"]])
+                return n - seen
+        raise RFU.LinkError(f"serial {JP:#x} " + ("never offered" if seen is None else "not offered again"))
+    hw, game, trace, st, counters = adapter_session(script, seconds=60, first_bit=True, sweep_serial=True)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors)
+    assert hw.lg_result < 120 + 240, hw.lg_result     # within the 240 frames Emerald allows
+    assert W.adapter_trace.last_sweep >> 16 == JP, hex(W.adapter_trace.last_sweep)
+    assert "the game connected to serial 0x0151" in hw.text, hw.text
 
 
 @test("search check: four entries per answer, all with good checksums, so librfu restarts its search (0x1E, 0x1C)")

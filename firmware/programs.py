@@ -288,6 +288,10 @@ def build_c(name):
 def build(name):
     if name in C_PROGRAMS:
         code = build_c(name)
+        # Code, data AND variables must end below 0x0203AE00: above it are the firmware's
+        # log messages and, from 0x0203AF00, its transfer state (build_v4: MSG_AT, VARS) -
+        # V.MAX_PROGRAM (to 0x0203B000) is only what the firmware's own length check allows.
+        assert V.PROGRAM_AT + len(code) <= 0x0203AE00, f"{name}: {len(code)} bytes, ends past 0x0203AE00"
         assert len(code) <= V.MAX_PROGRAM
         return struct.pack("<IIII", V.RUN_MAGIC, len(code), zlib.crc32(code), 1) + code
     code = thumbcheck.checked_assemble(assemble, PROGRAMS[name], V.PROGRAM_AT, name)
