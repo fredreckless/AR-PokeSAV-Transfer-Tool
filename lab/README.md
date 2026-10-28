@@ -36,6 +36,7 @@ python lab_runner.py                                                     # run t
 | 27 Oct, 21:47 | session 12 | The 2 MHz probe | Only the **first bit** of each answer is late: holding SO at the top bit works 359/359, and the SO flick gets acknowledgements through ([details](sessions/session12/README.md)) |
 | 27 Oct, 22:25 | session 13 | The first-bit fix | Every command's first word is accepted; the acknowledgement's ready flick re-armed the link mid-word ([details](sessions/session13/README.md)) |
 | 28 Oct, 08:40 | session 15 | Overnight build (distributor) | 29,562 ready flicks up to 12 µs, none seen: armed, SO shows the word's first bit, not SIOCNT bit 3. The flick now disarms briefly ([details](sessions/session15/README.md)) |
+| 28 Oct, 16:20 | session 16 | Disarming flick | Hello, setup, broadcast and start-search complete for the first time; stops at 0x1D (7-word answer) ([details](sessions/session16/README.md)) |
 
 Experiments deliberately **not** done:
 - two GBA packets in a row, which would hang the GBA;

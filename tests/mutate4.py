@@ -103,13 +103,14 @@ def run(kind, name):
             finally:
                 programs._HERE = saved
         assert good != bad
-        tool = open(os.path.join(paths.ROOT, "maxduo_saves.py")).read()
+        tool = open(os.path.join(paths.ROOT, "duo_wireless.py")).read()
         assert tool.count(good) == 1
-        open(os.path.join(work, "maxduo_saves.py"), "w").write(tool.replace(good, bad))
+        open(os.path.join(work, "duo_wireless.py"), "w").write(tool.replace(good, bad))
+        shutil.copy(os.path.join(paths.ROOT, "maxduo_saves.py"), work)
         env = dict(os.environ, MAXDUO_TOOL_DIR=work)
     else:
         old, new, pick = PC_MUTANTS[name]
-        src = open(os.path.join(paths.ROOT, "maxduo_saves.py")).read()
+        tools = {f: open(os.path.join(paths.ROOT, f)).read() for f in ("maxduo_saves.py", "duo_wireless.py")}
         if old == "ADAPTER_IMAGE":                     # rebuild the embedded program with a wrong ID (valid CRC)
             sys.path.insert(0, paths.FIRMWARE)
             import programs
@@ -122,11 +123,14 @@ def run(kind, name):
                     programs.PROGRAMS["adapter_detect"] = programs.ADAPTER_DETECT
             assert good != bad
             old, new = good, bad
+        target = next(f for f, t in tools.items() if old in t)       # the save tool, or the wireless one
+        src = tools[target]
         assert src.count(old) == 1, name
         mutated = src.replace(old, new)
         if "crct" in new:   # let the bug through the tool's own guard too, so only the tests can catch it
             mutated = mutated.replace('if name == "crct" and 0x0E000000 <= addr < 0x0F000000:', 'if False:')
-        open(os.path.join(work, "maxduo_saves.py"), "w").write(mutated)
+        for f, t in tools.items():
+            open(os.path.join(work, f), "w").write(mutated if f == target else t)
         env = dict(os.environ, MAXDUO_TOOL_DIR=work)
     for attempt in range(3):               # the emulator itself can segfault under load: run again
         r = subprocess.run([sys.executable, "test_v4.py", pick], cwd=paths.HERE, capture_output=True, text=True, env=env, timeout=1800)

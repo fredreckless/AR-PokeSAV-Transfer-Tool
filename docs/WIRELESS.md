@@ -45,7 +45,7 @@ captured from a real adapter:
 | `B0BB8001` | `8001B0BB` |
 
 ```
-python maxduo_saves.py --adapter-test        # needs firmware v4.2
+python duo_wireless.py --test               # needs firmware v4.2
 ```
 
 The tool uploads the program, reports what the game is doing as it happens, and prints PASS when the game
@@ -84,7 +84,7 @@ things:
 Every command the game sends is kept in a trace. The PC reads it and prints it as it happens:
 
 ```
-python maxduo_saves.py --adapter-trace        # needs firmware v4.2; Ctrl+C or 10 minutes to stop
+python duo_wireless.py --trace              # needs firmware v4.2; Ctrl+C or 10 minutes to stop
 ```
 
 **Testing in the simulator.** `tests/rfu_game_model.py` is the game's side of the link, ported from
@@ -112,7 +112,7 @@ All three pass with no retries. Four planted bugs are each caught:
    source (WikiDex) gives the Japanese phrase as **ともだち いっぱい ふしぎ つうしん**; English games use
    LINK TOGETHER WITH ALL. Then save the game. That's the game's own save, done by the player; the
    tool never writes saves.
-2. Run `--adapter-trace`, then choose **Mystery Gift → Wonder Cards → Wireless Communication**.
+2. Run `python duo_wireless.py --trace`, then choose **Mystery Gift → Wonder Cards → Wireless Communication**.
 3. A healthy trace is:
    1. "ID exchange completed";
    2. Hello, setup and broadcast data;
@@ -136,10 +136,10 @@ DUO's 2 MHz answers, it reproduces the session exactly.
 ### The 2 MHz probe
 
 ```
-python maxduo_saves.py --adapter-probe
+python duo_wireless.py --probe
 ```
 
-This works like `--adapter-trace`, but it answers each attempt of a command a different way:
+This works like `--trace`, but it answers each attempt of a command a different way:
 - **a one-bit lag:** load `W << 1`, with SO at W's top bit;
 - **only the first bit late:** load `W`, with SO at its top bit;
 - **as designed.**
@@ -205,7 +205,7 @@ DISTRIBUTOR.md.
 
 ## Next steps
 
-1. **Run `--adapter-trace` again on real hardware.** Look at the flick table and the scope,
+1. **Run `python duo_wireless.py --trace` again on real hardware.** Look at the flick table and the scope,
    whether the game finds and connects to "DUO", and the game's own data frames printed at the
    end.
 2. **A distributor in range.** Answer "search results?" with one host whose broadcast data matches

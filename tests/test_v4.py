@@ -11,6 +11,7 @@ Needs the firmware built first: python firmware/build_firmware.py PATH_TO_DATEL_
 import gc, io, contextlib, glob, json, os, random, struct, subprocess, sys, tempfile, threading, time, traceback, types, zlib
 import paths
 import hwsim, thumbcheck, maxduo_saves as M
+import duo_wireless as W
 
 FW = open(os.environ.get("V3_FW") or paths.build_file("fw_v4.bin"), "rb").read()
 OFFICIAL = paths.read_build("fw.bin")
@@ -947,17 +948,26 @@ def _():
     assert open(os.path.join(work, "fw_v42.bin"), "rb").read() == FW42
 
 
+@test("two tools: the save tool has no wireless options; duo_wireless.py has them and needs the save tool beside it")
+def _():
+    saves = subprocess.run([sys.executable, os.path.join(paths.ROOT, "maxduo_saves.py"), "--help"], capture_output=True, text=True)
+    wireless = subprocess.run([sys.executable, os.path.join(paths.ROOT, "duo_wireless.py"), "--help"], capture_output=True, text=True)
+    assert saves.returncode == 0 and "adapter" not in saves.stdout.lower() and "wonder" not in saves.stdout.lower(), saves.stdout
+    assert wireless.returncode == 0 and all(f in wireless.stdout for f in ("--test", "--trace", "--wonder-card", "--probe"))
+    assert W.SAFE_COMMANDS is M.SAFE_COMMANDS and W.PROG_PUT in M.SAFE_COMMANDS   # one shared allow-list
+
+
 @test("v4.2 programs: the tool's embedded programs are exactly this repository's build, Thumb-1 only")
 def _():
     out = subprocess.run([sys.executable, "-c", "import programs, sys; sys.stdout.write(programs.build('adapter_detect').hex())"],
                          cwd=paths.FIRMWARE, capture_output=True, text=True, env=dict(os.environ, PYTHONPATH=paths.FIRMWARE))
     assert out.returncode == 0, out.stderr[-800:]
-    assert bytes.fromhex(out.stdout) == M.PROGRAMS["adapter_detect"]
+    assert bytes.fromhex(out.stdout) == W.PROGRAMS["adapter_detect"]
 
 
 @test("v4.2 run: a staged program with a bad magic, length, entry or CRC is refused and never runs")
 def _():
-    good = bytearray(M.PROGRAMS["adapter_detect"])
+    good = bytearray(W.PROGRAMS["adapter_detect"])
     bad_images = []
     b = bytearray(good); b[0] ^= 1; bad_images.append(b)                         # magic
     b = bytearray(good); struct.pack_into("<I", b, 4, 0x4000); bad_images.append(b)  # length too big
@@ -966,7 +976,7 @@ def _():
     for img in bad_images:
         hw, duo = run42()
         M.Lab(duo)._upload_fast(M.LAB_STAGE, bytes(img))
-        code, val = duo.ask(M.CMD_RUN)
+        code, val = duo.ask(W.CMD_RUN)
         assert code == 0x3F, hex(code)
         assert duo.hello() == 0x104
         hw.stop(); clean(hw)
@@ -978,7 +988,7 @@ def _():
     hw, duo = run42()
     game = sio32id_model.Side(1)                      # the game's half: librfu's own code, clock master
     hw.attach_link_partner(game)
-    st = quiet(M.adapter_test, duo, types.SimpleNamespace(adapter_test=30), poll_s=0.1, after_s=0.5)[0]
+    st = quiet(W.adapter_test, duo, types.SimpleNamespace(adapter_test=30), poll_s=0.1, after_s=0.5)[0]
     assert game.last == 0x8001 and st >> 21 & 1, (hex(game.last), hex(st))
     words = hw.link_words
     assert words[1] == (0x494EFFFF, 0xFFFF494E) and (0x8001B0BB, 0xB0BB8001) in words   # matches the real adapter
@@ -990,7 +1000,7 @@ def _():
 @test("v4.2 adapter test: with nothing on the cable it reports 'nothing from the game' and stops cleanly")
 def _():
     hw, duo = run42()
-    st, text = quiet(M.adapter_test, duo, types.SimpleNamespace(adapter_test=1), poll_s=0.2, after_s=0.5)
+    st, text = quiet(W.adapter_test, duo, types.SimpleNamespace(adapter_test=1), poll_s=0.2, after_s=0.5)
     assert st & 0xFFFF == 0 and "nothing from the game yet" in text and "not detected" in text
     assert duo.hello() == 0x104
     hw.stop(); clean(hw)
@@ -1001,7 +1011,7 @@ def _():
     hw, duo = run42()
     game = sio32id_model.Side(1); game.out = 0x12345678; game.count = 2; game.recv_id = 0xBEEF
     hw.attach_link_partner(game)
-    st = quiet(M.adapter_test, duo, types.SimpleNamespace(adapter_test=30), poll_s=0.1, after_s=0.5)[0]
+    st = quiet(W.adapter_test, duo, types.SimpleNamespace(adapter_test=30), poll_s=0.1, after_s=0.5)[0]
     hw.stop(); clean(hw)
     assert game.last == 0x8001 and st >> 21 & 1
 
@@ -1033,7 +1043,7 @@ def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits
     if attach:
         flick = (adapter_symbol("flick_w"),) + tuple(flick_window) if flick_window else None
         hw.attach_link_game(script(game), lag_bits=lag_bits, first_bit=first_bit, flick=flick)
-    r = quiet(M.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds, adapter_probe=seconds,
+    r = quiet(W.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds, adapter_probe=seconds,
                                                           wonder_card=wonder_card), poll_s=0.2,
               stop_when=(lambda: hw.lg_done) if attach else None, program=program)
     entries, st, counters = r[0][:3]
@@ -1042,7 +1052,7 @@ def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits
     assert duo.hello() == 0x104 and duo.reckless() == "v4"          # back in USB server mode
     hw.stop(); clean(hw)
     assert any(l.startswith("Program finished") for l in hw.log)
-    trace = [M.describe_trace_entry(h, d) for _, h, d in entries]
+    trace = [W.describe_trace_entry(h, d) for _, h, d in entries]
     return hw, game, trace, st, counters
 
 
@@ -1056,8 +1066,8 @@ def _():
         raise Skip(str(e))
     if version != programs.CLANG_VERSION:
         raise Skip(f"clang {version} here; the embedded copy was built with {programs.CLANG_VERSION}")
-    assert programs.build("adapter") == M.PROGRAMS["adapter"]
-    assert programs.build("adapter_probe") == M.PROGRAMS["adapter_probe"]
+    assert programs.build("adapter") == W.PROGRAMS["adapter"]
+    assert programs.build("adapter_probe") == W.PROGRAMS["adapter_probe"]
 
 
 @test("wireless adapter: Emerald's Mystery Gift search, command by command, answered as a real adapter would")
@@ -1102,7 +1112,7 @@ def _():
     names = [t for t, _ in trace]
     assert any(n.startswith("the game connected to the distributor") for n in names), names
     assert game.retries == 0, game.retries
-    assert M.adapter_trace.last_capture == [(0x24, 2, 1, [0x00000400, 0x12345678])], M.adapter_trace.last_capture
+    assert W.adapter_trace.last_capture == [(0x24, 2, 1, [0x00000400, 0x12345678])], W.adapter_trace.last_capture
 
 
 @test("distributor: after connecting, the game's name arrives over librfu's NI channel, every chunk acknowledged")
@@ -1117,7 +1127,7 @@ def _():
     assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors, [t for t, _ in trace][-8:])
     conn, sender = hw.lg_result
     assert sender.state == RFU.SEND_SUCCESS and sender.frames_sent <= 12, (hex(sender.state), sender.frames_sent)
-    child = M.adapter_trace.last_child
+    child = W.adapter_trace.last_child
     assert child["received"] and child["raw"] == name, (child, name.hex())
     names = [t for t, _ in trace]
     assert any(n.startswith("the distributor received the game's name") for n in names), names[-6:]
@@ -1178,7 +1188,7 @@ def _():
     assert child.link_players[0][8:11] == bytes([0xBE, 0xCF, 0xC9]), child.link_players[0]
     assert client.result == RFU.CLI_MSG_CARD_RECEIVED, (client.result, client.history)
     assert client.saved_card == card and client.saved_ram_script == script
-    link = M.adapter_trace.last_link
+    link = W.adapter_trace.last_link
     assert link["player_ok"] and link["trainer_id"] == 0x0003D4C1 and link["mg_step"] == 6 and not link["mg_errors"], link
     assert link["game_data"] == bytes(range(0x40)), link["game_data"].hex()
     names = [t for t, _ in trace]
@@ -1203,7 +1213,7 @@ def _():
     child, client = hw.lg_result
     assert child.dropped > 20 and client.result == RFU.CLI_MSG_CARD_RECEIVED, (child.dropped, client.result)
     assert client.saved_card == card and client.saved_ram_script == script
-    assert M.adapter_trace.last_link["resent"] >= child.dropped - 1, (M.adapter_trace.last_link, child.dropped)
+    assert W.adapter_trace.last_link["resent"] >= child.dropped - 1, (W.adapter_trace.last_link, child.dropped)
 
 
 @test("distributor: without a Wonder Card the game is told there is nothing to send, and the link closes tidily")
@@ -1212,7 +1222,7 @@ def _():
     assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors, [t for t, _ in trace][-10:])
     child, client = hw.lg_result
     assert client.result == RFU.CLI_MSG_NOTHING_SENT and client.saved_card is None, (client.result, client.history)
-    assert M.adapter_trace.last_link["mg_step"] == 4, M.adapter_trace.last_link
+    assert W.adapter_trace.last_link["mg_step"] == 4, W.adapter_trace.last_link
 
 
 @test("wireless adapter: the game gives up half-way through a command and starts it again; the adapter follows")
@@ -1265,7 +1275,7 @@ def _():
     for window in ((6, 9), (11, 12), (0, 0)):       # climb, climb to a narrow window, back off
         hw, game, trace, st, counters = adapter_session(script, first_bit=True, flick_window=window, seconds=60)
         assert hw.lg_error is None and hw.lg_done, (window, repr(hw.lg_error), game.errors)
-        tuning = M.adapter_trace.last_tuning
+        tuning = W.adapter_trace.last_tuning
         lo, hi = window
         assert lo <= tuning["width"] <= hi, (window, tuning["width"], tuning["rows"])
         assert any(r[2] for r in tuning["rows"]) and tuning["scope"], tuning
@@ -1334,7 +1344,7 @@ def _():
     assert data == RUBY and hw.restarts == 1
     hw, duo = device()                                 # v4.1
     try:
-        M.run_program(duo, "adapter_detect"); raise AssertionError("v4.1 ran a program")
+        W.run_program(duo, "adapter_detect"); raise AssertionError("v4.1 ran a program")
     except M.DuoError as e:
         assert "v4.2" in str(e)
     hw.stop(); clean(hw)

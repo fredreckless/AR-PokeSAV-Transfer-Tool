@@ -151,7 +151,7 @@ the program does, and what the game model in `tests/rfu_game_model.py` checks it
 - **Pacing.** The host sends each block start (`0x8800`) 8 times rather than 4. It leaves 8
   frames between blocks, so the game always has time to take one block before the next starts.
   The game ignores repeats.
-- **The card** comes from the user's own `.wc3` file: `--wonder-card FILE.wc3`. The PC checks the
+- **The card** comes from the user's own `.wc3` file: `python duo_wireless.py --trace --wonder-card FILE.wc3`. The PC checks the
   size (1252 bytes Japanese, 1420 others) and that the card has an event flag. It uploads card
   size + card + RAM script (`0x2C` PUT, one word a packet, then a CRC-32 check). Nothing from the
   file goes into the repository.

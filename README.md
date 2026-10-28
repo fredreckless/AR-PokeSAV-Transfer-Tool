@@ -42,7 +42,7 @@ Build the firmware from Datel's file:
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE
 ```
 
-It should say `matches the released v4.1`. It also builds `duo_1.06_reckless_v4.2.bin`, which is v4.1 plus the ability to run this project's programs from the GBA's RAM. You only need v4.2 for the experimental `--adapter-test`. Then put the DUO in **USB SERVER MODE** from its menu and install the firmware:
+It should say `matches the released v4.1`. It also builds `duo_1.06_reckless_v4.2.bin`, which is v4.1 plus the ability to run this project's programs from the GBA's RAM. You only need v4.2 for the separate, experimental wireless tool (`duo_wireless.py`, below). Then put the DUO in **USB SERVER MODE** from its menu and install the firmware:
 
 ```
 python maxduo_saves.py --update firmware/build/duo_1.06_reckless_v4.1.bin
@@ -92,10 +92,21 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 | `--restart` | Restart the DUO from the PC, straight back into USB server mode |
 | `--list`, no options | List or export the **DS** saves stored on the DUO, as Datel's software did |
 | `--lab script FILE.json` | Run a small read-only experiment on the GBA (see [lab/](lab/)) |
-| `--adapter-test` | *Experimental, firmware v4.2:* the DUO's GBA answers a Pokémon game's Wireless Adapter check on a second GBA, over a GBC link cable. It's the first step towards recreating Mystery Gift events; see [docs/WIRELESS.md](docs/WIRELESS.md) |
-| `--adapter-trace` | *Experimental, firmware v4.2:* the DUO's GBA plays a whole Wireless Adapter, with a Wonder Card distributor in range, and lists what the game does |
-| `--adapter-trace --wonder-card FILE.wc3` | *Experimental:* the distributor offers the Wonder Card from your own `.wc3` file over Mystery Gift (see [docs/DISTRIBUTOR.md](docs/DISTRIBUTOR.md)); nothing from the file is kept |
 | `--help` | Everything else |
+
+
+## The wireless experiment (separate tool)
+
+Saving is finished, and `maxduo_saves.py` is only the save tool. The experimental work on Mystery Gift lives in
+**`duo_wireless.py`**. It needs firmware v4.2 and `maxduo_saves.py` in the same folder (it shares the USB code),
+and reads and writes nothing on either cartridge.
+
+| Command | What it does |
+|---|---|
+| `python duo_wireless.py --test` | The DUO's GBA answers a Pokémon game's Wireless Adapter check on a second GBA, over a GBC link cable ([docs/WIRELESS.md](docs/WIRELESS.md)) |
+| `python duo_wireless.py --trace` | Plays a whole Wireless Adapter, with a Wonder Card distributor in range, and lists what the game does. Ctrl+C stops it and prints the report |
+| `python duo_wireless.py --trace --wonder-card FILE.wc3` | The distributor offers the Wonder Card from your own `.wc3` file over Mystery Gift ([docs/DISTRIBUTOR.md](docs/DISTRIBUTOR.md)); nothing from the file is kept |
+| `python duo_wireless.py --probe` | Lab: the 2 MHz answer-encoding probe |
 
 ## If something goes wrong
 
@@ -131,7 +142,7 @@ python tests/run_each.py      # about 83 tests, each in its own process; around 
 python tests/mutate4.py       # plants 31 known bugs; each must be caught
 ```
 
-The adapter program (`firmware/programs/adapter.c`) is built with clang and lld (LLVM 18). You only need them to rebuild it: the tool carries a copy, which a test checks against a fresh build.
+The adapter program (`firmware/programs/adapter.c`) is built with clang and lld (LLVM 18). You only need them to rebuild it: `duo_wireless.py` carries a copy (refresh it with `python firmware/embed_programs.py`), which a test checks against a fresh build.
 
 The firmware build is reproducible: the same input always gives the same v4.1, update CRC `A5303402`, and v4.2, update CRC `DD59ED8A`. The tests use synthetic saves and ROMs, so they need no game data.
 
