@@ -1,10 +1,11 @@
-# AR-PokeSAV-Transfer-Tool
+# ActionReplayMaxDuo-Pokemon-Toolkit
 
-**Back up your Game Boy Advance Pokémon saves to a Windows 10/11 PC, using a Datel Action Replay MAX DUO.**
+**Back up your Game Boy Advance Pokémon saves to a Windows 10/11 PC, and receive Mystery Gift Wonder Cards, using a Datel Action Replay MAX DUO.**
 
-The MAX DUO was only ever able to back up DS saves, and Datel's drivers stopped working long ago. This project adds the missing piece. It's a small, read-only firmware update for the DUO, plus a Python tool, that together copy a GBA cartridge's save to your PC as a normal `.sav` file. You can open it in PKHeX or an emulator.
+The MAX DUO was only ever able to back up DS saves, and Datel's drivers stopped working long ago. This project gives it a second life. One small firmware update for the DUO works with two Python tools:
 
-Tested on Pokémon Ruby, Sapphire, FireRed and LeafGreen. A full 128 KB save takes about 50 seconds and is double-checked: the GBA and the PC each compute a checksum, and they must agree.
+- **`maxduo_saves.py`** copies a GBA cartridge's save to your PC as a normal `.sav` file, which you can open in PKHeX or an emulator. It's tested on Pokémon Ruby, Sapphire, FireRed and LeafGreen. A full 128 KB save takes about 50 seconds and is double-checked: the GBA and the PC each compute a checksum, and they must agree.
+- **`duo_wireless.py`** turns the DUO's GBA into a **GBA Wireless Adapter with a Wonder Card distributor in range**, so a Pokémon game on a second GBA can receive a Mystery Gift Wonder Card from your own `.wc3` file. It has delivered the 2005 Old Sea Map card to a Japanese Pokémon Emerald on real hardware ([below](#mystery-gift-wonder-cards)).
 
 > Not affiliated with or endorsed by Datel or Nintendo. "Action Replay" is a trademark of Datel. Use at your own risk; see [Is it safe?](#is-it-safe)
 
@@ -42,11 +43,13 @@ Build the firmware from Datel's file:
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE
 ```
 
-It should say `matches the released v4.1`. It also builds `duo_1.06_reckless_v4.2.bin`, which is v4.1 plus the ability to run this project's programs from the GBA's RAM. You only need v4.2 for the separate, experimental wireless tool (`duo_wireless.py`, below). Then put the DUO in **USB SERVER MODE** from its menu and install the firmware:
+It should say `matches the released v4.1`. It also builds **`duo_1.06_reckless_v4.2.bin`**, update CRC `DD59ED8A`. That's v4.1 plus the ability to run this project's programs from the GBA's RAM, and it's the one firmware for both tools. Then put the DUO in **USB SERVER MODE** from its menu and install it:
 
 ```
-python maxduo_saves.py --update firmware/build/duo_1.06_reckless_v4.1.bin
+python maxduo_saves.py --update firmware/build/duo_1.06_reckless_v4.2.bin
 ```
+
+(If you only ever want save backups, v4.1 works too. Everything in this README also works on v4.2.)
 
 Type `UPDATE` when asked, then wait about 30 seconds for it to finish. **Don't unplug anything while it's writing.** Finally, switch the GBA off and on again.
 
@@ -80,8 +83,9 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 
 - **Your game's save is only ever read.** The tool can only send USB commands on an allow-list. The GBA-side code refuses the commands that start an erase or a write on a save chip, and the PC tool checks the same rules before sending anything.
 - **Datel's own delete and overwrite commands are blocked outright,** including DeleteFile (0x1C). Another GBA Action Replay tool sends that command at start-up, and on a MAX DUO it would delete a stored file. More on that in [the protocol notes](docs/PROTOCOL.md#a-warning-about-other-tools).
+- **The wireless tool reads and writes nothing on either cartridge.** When you receive a Wonder Card, the game saves it itself, as at a real distribution. That's why backing up first is worth it.
 - **The firmware update is the one step that writes,** and only to the DUO itself, never to your games. It asks you to type `UPDATE` first, and it uses Datel's own update process. You can go back to Datel's official firmware the same way.
-- **Every change is tested before real hardware.** That means about 83 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
+- **Every change is tested before real hardware.** That means about 88 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
 
 ## Other things it can do
 
@@ -95,18 +99,38 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 | `--help` | Everything else |
 
 
-## The wireless experiment (separate tool)
+## Mystery Gift: Wonder Cards
 
-Saving is finished, and `maxduo_saves.py` is only the save tool. The experimental work on Mystery Gift lives in
-**`duo_wireless.py`**. It needs firmware v4.2 and `maxduo_saves.py` in the same folder (it shares the USB code),
-and reads and writes nothing on either cartridge.
+`duo_wireless.py` is the second tool. It needs firmware v4.2, and `maxduo_saves.py` in the same folder (it shares the USB code). The DUO's GBA plays a GBA Wireless Adapter over a link cable, with a Wonder Card distributor "in range". The game on the second GBA goes through Nintendo's real Mystery Gift exchange and saves the card itself.
+
+**What works so far.**
+- **Japanese Pokémon Emerald (BPEJ), on real hardware.** The game finds the distributor, connects, receives the Wonder Card and its script, saves them and disconnects cleanly. For example, the Old Sea Map card has been delivered, and the item collected from the Pokémon Center.
+- **The Japanese game's distributor serial is 0x7F7F**, not the 0x7F7D in the English decomp. `--sweep-serial` found it.
+- **Other games and languages** (English and European Emerald, FireRed and LeafGreen) use the same Mystery Gift protocol. They haven't been tried yet. Each probably needs only its own serial (`--sweep-serial` finds it in about six minutes) and a matching `.wc3`.
+
+**You will need:**
+- Two GBAs: the DUO's, and one for the game.
+- A cross-wired Game Boy / Game Boy Color link cable. A Nintendo MGB-010 has been used. GBA link cables aren't cross-wired, so they won't work here.
+- Your own `.wc3` file for your game and language. None is included.
+
+**Receiving a card:**
+1. **Back up your save first** with `maxduo_saves.py`. The game keeps one Wonder Card, and a new one replaces the old one, together with its script. Collect any item from the old card first.
+2. Put the game in the second GBA, connect the cable, and switch the DUO's GBA on to USB SERVER MODE.
+3. Run `python duo_wireless.py --trace --wonder-card "YOUR CARD.wc3"`. It should report "Wonder Card loaded".
+4. On the game, choose **Mystery Gift → Wonder Cards → Wireless** (ふしぎな おくりもの → ふしぎな カード → じゅしん スポット). Japanese Emerald also has a separate Mystery Event (ふしぎな できごと) menu, which waits for an e-Reader; it isn't this one.
+5. When the game says the card has been saved and the link has ended, press Ctrl+C on the PC. Then collect the item, as the card describes: in Emerald, upstairs in any Pokémon Center.
 
 | Command | What it does |
 |---|---|
-| `python duo_wireless.py --test` | The DUO's GBA answers a Pokémon game's Wireless Adapter check on a second GBA, over a GBC link cable ([docs/WIRELESS.md](docs/WIRELESS.md)) |
-| `python duo_wireless.py --trace` | Plays a whole Wireless Adapter, with a Wonder Card distributor in range, and lists what the game does. Ctrl+C stops it and prints the report |
-| `python duo_wireless.py --trace --wonder-card FILE.wc3` | The distributor offers the Wonder Card from your own `.wc3` file over Mystery Gift ([docs/DISTRIBUTOR.md](docs/DISTRIBUTOR.md)); nothing from the file is kept |
+| `python duo_wireless.py --trace --wonder-card FILE.wc3` | Offers the Wonder Card from your `.wc3` file over Mystery Gift, and lists every adapter command the game sends ([docs/DISTRIBUTOR.md](docs/DISTRIBUTOR.md)). Nothing from the file is kept |
+| `python duo_wireless.py --trace` | The same, with no card: the distributor tells the game it has nothing to send |
+| `python duo_wireless.py --trace --sweep-serial` | Offers every distributor serial number in turn until the game connects to one (about 6 minutes). Use it for a game or language not tried yet |
+| `python duo_wireless.py --trace --check-search` | Link check: the game restarts its search after every answer only if our answers arrive intact |
+| `python duo_wireless.py --find-serial [--deep]` | Read-only search of the cartridge in the DUO for the distributor serial. `--deep` reads the ROM into memory (never to disk) |
+| `python duo_wireless.py --test` | Detection only: answers a Pokémon game's Wireless Adapter check ([docs/WIRELESS.md](docs/WIRELESS.md)) |
 | `python duo_wireless.py --probe` | Lab: the 2 MHz answer-encoding probe |
+
+The DUO writes nothing to either cartridge. The only write is the game saving the card it received, as it would at a real distribution.
 
 ## If something goes wrong
 
@@ -126,8 +150,8 @@ This repository holds the whole project, not just the finished tool.
 
 | Folder | What's inside |
 |---|---|
-| `maxduo_saves.py`, `lab_runner.py` | The PC tool, and a runner for queued read-only lab jobs (handy from Thonny) |
-| [`firmware/`](firmware/) | The build scripts that patch Datel's firmware, step by step from v1 to v4.1. They contain all the GBA (ARM7 Thumb) assembly we wrote. `history/` has the original v3, whose transfers stalled on real hardware |
+| `maxduo_saves.py`, `duo_wireless.py`, `lab_runner.py` | The save tool, the Mystery Gift tool, and a runner for queued read-only lab jobs (handy from Thonny) |
+| [`firmware/`](firmware/) | The build scripts that patch Datel's firmware, step by step from v1 to v4.2. They contain all the GBA (ARM7 Thumb) assembly we wrote. `programs/adapter.c` is the Wireless Adapter and distributor, in C. `history/` has the original v3, whose transfers stalled on real hardware |
 | [`tests/`](tests/) | The simulator (Datel's real firmware running in an ARM emulator, wrapped in a model of the DUO's hardware), the test suite, and the planted-bug checker. `history/` holds the v3 and v3.1 suites |
 | [`lab/`](lab/) | Every experiment run on the real DUO, session by session, with the scripts, the complete output log and the conclusions |
 | [`docs/`](docs/) | How it works, the hardware (with board photos), the USB protocol, the findings and the project history |
@@ -138,8 +162,8 @@ This repository holds the whole project, not just the finished tool.
 ```
 pip install -r requirements.txt
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE --all
-python tests/run_each.py      # about 83 tests, each in its own process; around 15 minutes
-python tests/mutate4.py       # plants 31 known bugs; each must be caught
+python tests/run_each.py      # about 88 tests, each in its own process; around 15 minutes
+python tests/mutate4.py       # plants 47 known bugs; each must be caught
 ```
 
 The adapter program (`firmware/programs/adapter.c`) is built with clang and lld (LLVM 18). You only need them to rebuild it: `duo_wireless.py` carries a copy (refresh it with `python firmware/embed_programs.py`), which a test checks against a fresh build.
@@ -153,7 +177,9 @@ The firmware build is reproducible: the same input always gives the same v4.1, u
 - [USB protocol](docs/PROTOCOL.md): Datel's commands, our additions, and a comparison with other Action Replay tools
 - [Findings](docs/FINDINGS.md): what the lab measured
 - [History](docs/HISTORY.md): how it got here, including what went wrong
-- [Wireless](docs/WIRELESS.md): work in progress on recreating Mystery Gift distributions
+- [Wireless](docs/WIRELESS.md): the Wireless Adapter protocol, as recreated here
+- [Distributor](docs/DISTRIBUTOR.md): the Wonder Card distributor, stage by stage
+- [Lab sessions 16–20](lab/README.md): from the first wireless answers to the Old Sea Map arriving
 
 ## Credits
 

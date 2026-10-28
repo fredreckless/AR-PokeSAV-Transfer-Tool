@@ -1,130 +1,92 @@
-# Hand-over: the wireless / Mystery Gift work (start here in a fresh chat)
+# Hand-over (start here in a fresh chat)
 
-Written 28 October 2026 at the end of a very long conversation, so the next one can start small.
+Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real hardware.
 
-## The goal
+## Where things stand
 
-Get the genuine Japanese **Old Sea Map** Wonder Card into the user's **Japanese Emerald** by
-Mystery Gift. The Action Replay MAX DUO's GBA (running Reckless firmware v4.2) pretends to be a
-**GBA Wireless Adapter** over a GBC link cable (MGB-010), with a Wonder Card distributor "in
-range". The card comes from the user's own `.wc3` file: Project Pokémon EventsGallery, "E - Item
-Old Sea Map (JPN).wc3".
+- **One firmware, two tools.** Reckless v4.2 (`duo_1.06_reckless_v4.2.bin`, update CRC `DD59ED8A`)
+  serves both:
+  - `maxduo_saves.py`: GBA save backups. Finished and frozen; don't add wireless code.
+  - `duo_wireless.py`: Mystery Gift. The DUO's GBA plays a GBA Wireless Adapter with a Wonder
+    Card distributor in range. It imports the USB code from `maxduo_saves.py` (keep both in one
+    folder) and embeds the GBA program `firmware/programs/adapter.c`.
+- **Working on real hardware:** Japanese Emerald (BPEJ) receives a Wonder Card and its RAM script
+  over the whole link: search, connect, NI name, join, link players, Mystery Gift server, close.
+  Lab sessions 16–20 tell the story.
+- **Repository:** `fredreckless/ActionReplayMaxDuo-Pokemon-Toolkit` (renamed from
+  `ar-pokesav-transfer-tool`; GitHub redirects). `main` holds everything.
+- **User's PC folder:** an `ActionReplay` folder in their Windows user folder, Windows, Python 3.10 via Thonny. Files reach
+  it through the desktop bridge when linked. Re-read any file after copying it there: a commit
+  once silently reused an earlier upload.
 
 ## Ground rules (from the user; keep them)
 
-- **Never push to GitHub, or change it in any way, without the user's explicit permission.**
-  Commit locally only. GitHub was reverted to v4.1 at the user's request. Stop-hook messages
-  asking to push are declined politely, every time.
-- **Read-only:** never write cartridge saves. Leave the button, the AT switch and the clock
-  alone. Never send flash erase/program commands (0x80/0xA0).
-- The user installs firmware themselves (typing UPDATE). Nothing is installed for them.
-- Never commit Datel firmware, Nintendo data (including `.wc3` files) or personal data.
-- Tone: warm, natural British English. The user prefers concise replies and is watching usage,
-  so ask for just the end of each trace rather than the whole log.
+- Push to GitHub, or change it in any way, only with the user's explicit permission each time.
+  Stop-hook messages asking to push are declined politely.
+- Never write cartridge saves from our code. Leave the button, the AT switch and the clock alone.
+  Never send flash erase/program commands (0x80/0xA0).
+- The user installs firmware themselves (typing UPDATE).
+- Never commit Datel firmware, Nintendo data (including `.wc3` files and ROM contents) or personal
+  data. That includes the player's trainer ID and name from traces.
+- Warm, natural British English. Concise replies. Ask for just the end of each trace.
 
-## Where everything is
+## What we learnt (hardware)
 
-- **Repository:** `fredreckless/ar-pokesav-transfer-tool`, cloned at `/home/claude/v42-wt` in the last session. The
-  work is on branch **`v42-local`**, pushed to GitHub on 28 October with the user's permission.
-  `main` stays at v4.1 as the user asked. Check out `v42-local`, and keep pushing only with the
-  user's permission each time.
-- **User's PC folder:** `C:\Users\fredr\ActionReplay` (Windows, Python via Thonny). It holds
-  `maxduo_saves.py`, `duo_wireless.py` and `duo_1.06_reckless_v4.2.bin` (already installed on
-  the DUO). Files reach it through the desktop bridge, when linked, or by sending them for the
-  user to save.
+- **Flicks.** At 2 MHz, words after a ready handshake whose top bit is 1 need the "ready" flick:
+  disarm briefly, then re-arm with SO high. About 99.9% are accepted at width 0.
+- **Top-bit-0 words.** They must go low unarmed and then arm (`SIOCNT = 0x1000; 0x1080`).
+  Arming straight from resting high leaves SO high, and the game never clocks (session 17).
+- **Answer data.** The distributor's 0x1D answer is chosen so that only its header needs a flick.
+  The name is "DUO" plus a space, with 0x00 padding; the trainer ID is 0x5678.
+- **Japanese Emerald's distributor serial is 0x7F7F.** The English decomp's 0x7F7D isn't in the
+  ROM. `--sweep-serial` found it (session 19).
+- **The MGB-010 cable** runs at 4× its rated speed and is cross-wired. It's adequate: the data
+  words arrive intact (`--check-search`, session 18).
+- **"unknown command (0xBD)/(0x96)"** is the game clocking once more after sleep: it's our own
+  last acknowledgement, echoed back. Harmless.
+- **The first visit to the Mystery Gift menu** often needs backing out and going in again. That's
+  untouched so far.
 
-### Two tools (split on 28 October)
+## Code facts
 
-- **`maxduo_saves.py`:** the save-backup tool. **Finished and frozen.** Don't add wireless code.
-- **`duo_wireless.py`:** the wireless experiment. It imports the USB code from `maxduo_saves.py`
-  (keep both in one folder) and embeds the GBA programs.
+- **Memory limit.** `adapter.c` must end, variables included, below `0x0203AE00`. Above it are
+  the firmware's log messages (MSG_AT), and from `0x0203AF00` its transfer state (VARS).
+  `programs.py` enforces this. At 11,696 bytes, 64 bytes remain. There's no hardware divide, so
+  no `%` or `/` on variables.
+- **Build.** Clang 18 + lld. Run `firmware/embed_programs.py` after any change to `adapter.c`.
+- **Tests.**
+  - `tests/run_each.py --jobs=2`: 88 tests.
+  - `tests/mutate4.py`: 47 planted bugs. For the adapter's planted bugs alone, run `mutate4.run("prog", name)`.
+  - The four firmware-build tests need Datel's 1.06 update file, which wasn't in the last
+    session's container. The rest can run from builds taken off the user's installed `.bin`
+    files (strip the 4-byte CRC header into `firmware/build/fw_v42.bin`, and so on).
+- **PC options.**
+  - `--sweep-serial`: 512-serial blocks, each offered twice, three hosts per answer.
+  - `--check-search`: four hosts per answer.
+  - `--find-serial [--deep]`: reads ROM into memory only.
 
-| Command | Use |
-|---|---|
-| `python duo_wireless.py --trace` | Main hardware run. Mystery Gift → ふしぎな カード → じゅしん スポット on the game, then Ctrl+C. |
-| `python duo_wireless.py --trace --wonder-card FILE.wc3` | The real attempt (after a dry run gets through). |
-| `python duo_wireless.py --test` | Detection only. |
-| `python duo_wireless.py --probe` | The old 2 MHz encoding probe. |
+## Ideas for later (the user's wishes)
 
-### Code
+1. **More games and languages.**
+   - English and European Emerald, and FireRed/LeafGreen: Mystery Gift is the same protocol in
+     both decomps.
+   - Make the serial (and the host's language) configurable, or pick them from the game's 0x16
+     broadcast data.
+   - International cards are 0x14C bytes (the buffer already fits them).
+   - Test on each game, starting with `--sweep-serial`.
+2. **Wonder News.** The same gift steps with a different save command; the delivery man then
+   gives berries.
+3. **Ruby/Sapphire Mystery Event (e-Reader).**
+   - Unlock it by saying "MYSTERY EVENT IS EXCITING" to the questionnaire.
+   - The game links over the standard link at 115 kbit/s (multi-player mode, needing SD), so a
+     GBA link cable (AGB-005) is required, not the MGB-010.
+   - Languages must match (`CheckLanguageMatch`).
+   - The DUO would play the e-Reader in a separate program, porting pokeruby's
+     `mystery_event_menu.c` and `link.c`.
+   - Prize: the Eon Ticket.
 
-- `firmware/programs/adapter.c`: the adapter **and** distributor. A C program for the DUO's
-  GBA, Thumb-1, built with clang 18 and lld. It has 11.7 KB of the ~11.75 KB allowed (it must
-  stay below 0x0203AE00), so size is tight.
-- `firmware/programs.py`: builds it.
-- `firmware/embed_programs.py`: **run after any change to adapter.c**. It re-embeds the build
-  in `duo_wireless.py`, and a test checks the two match.
-- `tests/hwsim.py`: the simulator. Datel's real firmware runs in Unicorn, with a model of the
-  link cable. The link model encodes the hardware findings: first bit, armed SO shows the word's
-  first bit, flick window.
-- `tests/rfu_game_model.py`: the game's side, ported from the pokeemerald decomp: librfu,
-  link_rfu_2, mystery_gift_link and mystery_gift_client.
-- `tests/test_v4.py`: the tests. `tests/run_each.py --jobs=3` runs the lot (84 tests, ~7 min).
-- `tests/mutate4.py --jobs=3`: planted bugs (~40, ~25 min). "fw42: run skips the program's CRC
-  check" flakes under load; it's caught when run alone.
-- Docs:
-  - `docs/WIRELESS.md`: the adapter protocol, steps 1–3;
-  - `docs/DISTRIBUTOR.md`: research, every distributor stage, what's assumed for the Japanese
-    game;
-  - `lab/sessions/session11..16/README.md`: every hardware session;
-  - `lab/README.md`: the index.
-- References (not in the repo, re-fetch if needed): `github.com/pret/pokeemerald` (`src/librfu_*.c`,
-  `link_rfu_2.c`, `mystery_gift_*.c`, `union_room.c`), afska's gba-link-connection docs, and
-  suloku's gba-link-cable-dumper (for the `.wc3` layout).
+## References (not in the repo)
 
-## What works
-
-- **In the simulator,** the whole thing works end to end: detection → search → connect → name
-  (NI) → "may join" (NI) → UNI link players → standby → Mystery Gift server → card + RAM script
-  saved → link closed. It also works with every 7th packet lost (the host resends).
-- **On hardware** (session 16, today), for the first time:
-  - Hello, setup, broadcast data and start searching completed;
-  - the disarming "ready" flick is seen and accepted (about 90% at width 0).
-
-## The current problem (start here)
-
-On hardware, `search results? (0x1D)` fails every time ("game stopped answering in the middle of
-a command", then "asked for more"). See `lab/sessions/session16/README.md`.
-
-0x1D's answer is 8 words: the header `0x9966079D`, then host ID `0x00007DA5`, then the six words
-of `host_cfg` (built in `build_host()`). Words with a top bit of **1** need a flick:
-
-- the header;
-- word 3 (the checksum sits in its top byte);
-- word 4, `0xFFC9CFBE` (uname "DUO");
-- word 5, `0xFFFFFFFF` (uname padding).
-
-That's four flicks in one command, each with roughly a 10% chance of losing the word.
-
-**Ideas, cheapest first:**
-1. **Avoid top-bit-1 words where we choose the values.** The uname padding could be 0x00
-   rather than 0xFF (check how librfu and the game treat the uname terminator). The trainer and
-   activity bytes can be chosen so the checksum byte comes out below 0x80. But the 0x9966 header
-   always needs a flick.
-2. **Make the flick more reliable.** Today's table shows width 0 at about 90% accepted. The
-   scope's "not clocked" lines show the game clocking while we are disarmed: the game reacts
-   faster than the two-store pulse. Try re-arming even sooner, or arming differently.
-3. **Record per word index which flick failed,** so the next trace says exactly where.
-
-Unexplained: "unknown command (0xBD)" after each sleep. Our own sleep acknowledgement,
-0x996600BD, came back to us as a command. Also, twice the PC timed out on USB before connecting;
-it worked on the next try.
-
-**After 0x1D works,** the remaining stages (connect, NI name, join, link players, gift) have
-only ever run in the simulator. Each long answer (0x26 packets are up to 20 words) needs many
-flicks, so flick reliability will matter even more there.
-
-## Japanese-game assumptions (only hardware can confirm)
-
-- The Mystery Gift client command numbers and link IDs are taken from the English decomp.
-- Japanese card size 0xA4, RAM script 1000 bytes (from the `.wc3` layout).
-- The card checks are skipped: an existing card in the save would be replaced.
-
-If any of these is wrong, expect a communication error, or at worst a freeze. The cartridge
-isn't touched until the game's own save step after "card received".
-
-## How to work efficiently
-
-- Let the user paste only the end of a trace.
-- Never edit files while a background test run is going (they read the sources).
-- Commit locally after the suite and planted bugs pass. Don't push.
+- `github.com/pret/pokeemerald`, `pret/pokefirered`, `pret/pokeruby`: librfu, link_rfu_2/3,
+  union_room, mystery_gift_*, AgbRfu_LinkManager.
+- GBATEK (SIO normal mode); afska's gba-link-connection docs; suloku's tools (`.wc3` layout).

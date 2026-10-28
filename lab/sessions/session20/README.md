@@ -3,7 +3,7 @@
 **Set-up.**
 - `--trace --wonder-card "E - Item Old Sea Map (JPN).wc3"`, distributor serial 0x7F7F.
 - Japanese Emerald, MGB-010 cable, Mystery Gift → じゅしん スポット.
-- The save was backed up first.
+- (A save backup beforehand was recommended; not recorded here.)
 
 **What the trace showed.**
 - "Wonder Card loaded: … (Japanese, event flag 0x03ea, 164 + 1000 bytes)".
