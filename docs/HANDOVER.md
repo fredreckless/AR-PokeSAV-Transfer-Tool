@@ -25,8 +25,9 @@ Old Sea Map (JPN).wc3".
 ## Where everything is
 
 - **Repository:** `fredreckless/ar-pokesav-transfer-tool`, cloned at `/home/claude/v42-wt` in the last session. The
-  work is on local branch **`v42-local`** (not on GitHub). If a new session can't see that
-  clone, ask the user how they want to get the branch across. Don't push it without asking.
+  work is on branch **`v42-local`**, pushed to GitHub on 28 October with the user's permission.
+  `main` stays at v4.1 as the user asked. Check out `v42-local`, and keep pushing only with the
+  user's permission each time.
 - **User's PC folder:** `C:\Users\fredr\ActionReplay` (Windows, Python via Thonny). It holds
   `maxduo_saves.py`, `duo_wireless.py` and `duo_1.06_reckless_v4.2.bin` (already installed on
   the DUO). Files reach it through the desktop bridge, when linked, or by sending them for the
