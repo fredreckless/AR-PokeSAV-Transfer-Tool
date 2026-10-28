@@ -968,6 +968,10 @@ static void arm_word(u32 w)
     SIODATA32 = w;
     last_flick = -1;
     if (!(w >> 31)) {
+        /* Lab session 17: arming straight from "resting high" leaves SO high, so the game never
+         * saw us ready and never clocked the word. Go low unarmed first, then arm at once -
+         * two stores, as narrow as a width-0 flick - so SO is low both before and after. */
+        SIOCNT = CNT_32BIT;
         SIOCNT = CNT_32BIT | CNT_START;
         return;
     }

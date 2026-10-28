@@ -241,7 +241,10 @@ class Hw:
     def lg_duo_so(self):
         cnt = self.lg_cnt()
         if self.lg_first and cnt & 0x80 and not cnt & 0x1 and cnt & 0x1000:
-            # lab session 15: while armed, SO shows the loaded word's first bit, not SIOCNT bit 3
+            # lab session 15: while armed, SO shows the loaded word's first bit, not SIOCNT bit 3;
+            # lab session 17: but armed straight from resting high, it stays high
+            if getattr(self, "armed_from_high", False):
+                return 1
             return struct.unpack("<I", self.mu.mem_read(0x04000120, 4))[0] >> 31
         return (cnt >> 3) & 1
 
@@ -253,17 +256,21 @@ class Hw:
             mu.mem_write(0x04000128, struct.pack("<H", c))
 
     def lg_pin_model(self, mu, old, v):
-        """Lab session 15's reading of the hardware. Armed, SO follows the word's first bit, so a
-        low written to bit 3 while armed shows nothing. Disarmed, SO is bit 3: a 'ready' flick
+        """Lab sessions 15 and 17's reading of the hardware. Armed, a low written to bit 3 shows
+        nothing: arming while SO rests high keeps it high, even for a top-bit-0 word. Disarmed, SO is bit 3: a 'ready' flick
         must disarm for a moment. If the game's clock starts before the DUO re-arms, the word is
         lost."""
         armed_now = v & 0x80 and not v & 0x1 and v & 0x1000
         was_armed = old & 0x80 and not old & 0x1 and old & 0x1000
+        if armed_now and not was_armed:
+            self.armed_from_high = bool(old & 0x8)
         if armed_now:
             msb = struct.unpack("<I", mu.mem_read(0x04000120, 4))[0] >> 31
-            if not msb and not was_armed:
+            if not msb and not was_armed and not old & 0x8:
                 self.duo_low_seen = True              # a plain armed low (top bit 0): ready
                 self.armed_low_since = self.blocks
+            # Lab session 17: arming from "resting high" with bit 3 low leaves SO high - the game
+            # never sees 'ready' (it took the 0x1D header, then never clocked answer word 1)
             return
         if v & 0x8:
             return
@@ -280,7 +287,10 @@ class Hw:
             else:
                 self.duo_low_seen = True
         else:
-            self.duo_low_seen = True                  # a steady low (end of a command)
+            self.duo_low_seen = True                  # a steady low (end of a command, or the low
+            if self.armed_low_since is None or self.blocks - self.armed_low_since >= 60:
+                self.armed_low_since = self.blocks    # before arming a top-bit-0 word): the game's
+                                                      # clock follows a little after, as for a flick
 
     def lg_on_siocnt(self, mu, access, addr, size, value, _):
         old = self.lg_cnt()
@@ -302,8 +312,8 @@ class Hw:
                 self.duo_low_seen = True        # a real GBA polling SI could catch even a brief low
             if v & 0x80 and not (old & 0x80 and not old & 0x8):
                 self.armed_low_since = self.blocks
-            elif not v & 0x80 and old & 0x80:           # disarmed and low: a flick starts
-                self.armed_low_since = self.blocks
+            elif not v & 0x80 and old & 0x88:           # disarmed and low: a flick (or the low
+                self.armed_low_since = self.blocks      # before arming a top-bit-0 word) starts
         if self.lg_first and self.lg_xfer is not None and isinstance(self.lg_xfer[1], int):
             # touching SIOCNT while the game clocks a word loses that word (lab session 13)
             self.lg_xfer = (self.lg_xfer[0], self.lg_xfer[1] ^ 0x0000FFFF)
