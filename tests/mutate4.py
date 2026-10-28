@@ -26,6 +26,8 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "distributor doesn't say it has a card": ("               | 1 << 5                  /* hasCard */", "               | 0 << 5                  /* hasCard */", "distributor"),
     "host never acknowledges the game's chunks": ("    if (ni.state & NI_BUSY) {\n        u32 f", "    if (0) {\n        u32 f", "NI channel"),
     "host acknowledges with the wrong window number": ("ni.n[ni.phase] << 11 | 1u << 18", "((ni.n[ni.phase] + 1) & 3) << 11 | 1u << 18", "NI channel"),
+    "host never moves on after the game acknowledges": ("        nis.acked[phase] = 1;", "        ;", "may join"),
+    "host sends the wrong join status": ("static const u8 join_group_ok = 5;", "static const u8 join_group_ok = 6;", "may join"),
     "adapter has no watchdog mid-command": ("        if (phase != PH_COMMAND && phase != PH_ID && now() - last_word_at > WATCHDOG_LINES) {", "        if (0) {", "wireless adapter: the game gives up"),
 }
 
@@ -117,8 +119,9 @@ def run(kind, name):
         env = dict(os.environ, MAXDUO_TOOL_DIR=work)
     for attempt in range(3):               # the emulator itself can segfault under load: run again
         r = subprocess.run([sys.executable, "test_v4.py", pick], cwd=paths.HERE, capture_output=True, text=True, env=env, timeout=1800)
-        if r.returncode >= 0:
-            break
+        finished = any(" passed, " in l and " failed" in l for l in r.stdout.splitlines())
+        if r.returncode >= 0 and finished:
+            break                          # (no summary line means the run died part-way: try again)
     summary = [l for l in r.stdout.splitlines() if l.startswith("[") or "passed" in l]
     caught = any(l.startswith("[FAIL]") for l in summary)
     print(f"{'CAUGHT' if caught else 'MISSED'}  {kind}: {name}  ->  {summary[-1] if summary else r.stderr[-200:]}", flush=True)

@@ -56,9 +56,10 @@ works on real hardware.
 | Stage | The trace should show | Emerald should show |
 |---|---|---|
 | A. Command layer (now) | Hello, setup, broadcast, search polls | "Searching…", then a clean cancel |
-| B. **A distributor in range** | Search results with one host; after about 2 s, `connect (0x1F)` and polls | The game finds a distributor and tries to connect |
-| C. Connected | `0x21` success, clock swap, child name accepted | "Awaiting response…" |
-| D. Link players exchanged | Data commands both ways | "Wireless link established" |
+| B. **A distributor in range** *(simulator: done)* | Search results with one host; after about 2 s, `connect (0x1F)` and polls | The game finds a distributor and tries to connect |
+| C. Connected *(simulator: done)* | `0x21` success, clock swap, child name received | "Awaiting response…" |
+| D1. Join accepted *(simulator: done)* | "told the game it may join" | "Wireless link established" |
+| D2. Link players exchanged | link_rfu_2 per-frame packets both ways | (behind the scenes) |
 | E. Card delivered | Server script runs to the end | The Old Sea Map Wonder Card is received |
 
 Each stage gets a game-side model in the simulator, ported from the decomp, before it runs on
@@ -89,3 +90,38 @@ From librfu_rfu.c, so stage C can be built against it:
   sends, word for word, and the PC prints them at the end of a trace. The first real connection
   will show Emerald's own NI frames for its name. The host's NI receiver can then be checked
   against real bytes, not just against the model.
+
+## Progress in the simulator (night of 27–28 October)
+
+- **Stage B.** One host in range: serial 0x7F7D, RfuGameData (Japanese, Emerald, hasCard), user
+  name "DUO", librfu's checksum. Connecting works.
+- **Stage C.** The adapter speaks for the host once a frame (`0x28`) and serves the host's frames
+  on `0x26`. The host receives the game's 26-byte name over NI and acknowledges every chunk.
+- **Stage D1.** Once it has the name, the host sends link_rfu_2's status byte
+  `RFU_STATUS_JOIN_GROUP_OK` (5) over NI, with sub-frame size 8 as in `link_rfu_2.c`. The game
+  receives it.
+
+The game's side of each stage is a port of librfu's own NI sender and receiver, in
+`tests/rfu_game_model.py`. Both sides are written from the same reading of the decomp, so the real
+check is hardware. The first connection will print the game's actual frames, word for word.
+
+## Stage D2 onwards (next)
+
+After joining, link_rfu_2 switches both sides to **UNI** (unreliable, every frame) packets of
+`COMM_SLOT_LENGTH` bytes:
+- The child sends `gSendCmd`: 8 u16s, the first carrying the command and a 3-bit sequence
+  number in its top bits.
+- The host sends `gRfu.recvCmds`: every player's commands.
+
+The commands that matter for Mystery Gift:
+- `RFUCMD_SEND_PLAYER_IDS(_NEW)` (0x7700/0x7800): who is who.
+- `RFUCMD_SEND_BLOCK_INIT/BLOCK/BLOCK_REQ` (0x8800/0x8900/0xA100): link.c's block transfers. The
+  link player records go this way, then everything `mystery_gift_link.c` sends.
+- `RFUCMD_READY_CLOSE_LINK` (0x5F00) at the end.
+
+Then `mystery_gift_server.c`'s script for a Wonder Card sends the card, its script and the RAM
+script, and waits for the client's replies. The host side needs:
+1. a UNI sender and receiver for slot 0, much simpler than NI;
+2. a small link_rfu_2 parent: player ids, block send and receive, sequence numbers;
+3. the server script with the user's `.wc3` (uploaded by the PC into a second memory area if the
+   12 KB program area is too small).

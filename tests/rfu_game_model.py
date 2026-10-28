@@ -384,3 +384,84 @@ def send_child_name(game, name, max_frames=120):
         if ready != 0x99660028:
             raise LinkError(f"expected 'data ready', got {ready:#010x}")
     raise LinkError(f"name not delivered (sender state {s.state:#06x})")
+
+
+# ---------------------------------------------------------------------- stage D1: "you may join" over NI
+RECV = 0x40
+RECV_START, RECEIVING, RECV_LAST, RECV_SUCCESS = BUSY | RECV | 1, BUSY | RECV | 2, BUSY | RECV | 3, RECV | 6
+
+
+class NIReceiver:
+    """librfu's NI receiving half on the child (rfu_STC_NI_receive_Receiver and the two
+    initSlot functions), with a user receive buffer (link_rfu_2: childRecvStatus, 1 byte)."""
+    def __init__(self, buf_size=1):
+        self.buf_size = buf_size
+        self.state, self.ack, self.phase, self.n = 0, 0, 0, [0, 0, 0, 0]
+        self.remain, self.ctrl, self.buf, self.off = 0, bytearray(7), bytearray(buf_size), [0, 0, 0, 0]
+        self.payload = self.size = self.type = 0
+
+    def _store(self, phase, data):
+        tgt = self.buf if self.state == RECEIVING else self.ctrl
+        for b in data:
+            if self.off[phase] < len(tgt):
+                tgt[self.off[phase]] = b
+            self.off[phase] += 1
+
+    def receive(self, slot_state, phase, n, data):
+        check = False
+        if slot_state == LCOM_NI_END:
+            self.end_seen = True
+            if self.state == RECEIVING:
+                self.phase, self.n[0], self.state = 0, 0, RECV_LAST
+        elif slot_state == LCOM_NI:
+            if self.state == RECV_START and self.remain == 0:
+                self.type = self.ctrl[0]
+                self.payload = int.from_bytes(self.ctrl[1:3], "little")
+                self.size = int.from_bytes(self.ctrl[3:7], "little")
+                if self.size > self.buf_size:
+                    raise LinkError("NI receive buffer overflow")
+                self.n = [0, 0, 0, 0]
+                self.off = [self.payload * w for w in range(4)]
+                self.remain, self.state = self.size, RECEIVING
+            check = self.state == RECEIVING
+        elif slot_state == LCOM_NI_START:
+            if self.state != RECV_START:
+                self.state, self.remain, self.ack, self.payload, self.off = RECV_START, 7, 1, 0, [0, 0, 0, 0]
+            check = True
+        if check and n == ((self.n[phase] + 1) & 3):
+            self._store(phase, data)
+            if self.state == RECEIVING:
+                self.off[phase] += 3 * self.payload
+            self.remain -= len(data)
+            self.n[phase] = n
+        self.phase = phase
+
+    def ack_frame(self):
+        h = (self.state & 0xF) << 10 | self.ack << 9 | self.phase << 5 | self.n[self.phase] << 7
+        return h.to_bytes(2, "little")
+
+
+def wait_join_status(game, max_frames=120):
+    """RFUSTATE_CHILD_TRY_JOIN: read the host's frames each time it says 'data ready', receive
+    its NI status byte, acknowledging every chunk; done when librfu would mark it received."""
+    r = NIReceiver(1)
+    for _ in range(max_frames):
+        ack = yield from game.command(0x26)
+        frames = parse_host_frames(ack)
+        r.end_seen = (ack[1] & 0x7F) == 0 if len(ack) > 1 else True
+        for f in frames:
+            if f["recv_first"] == 0 and f["slots"] & 1 and f["state"] != LCOM_UNI and not f["ack"]:
+                r.receive(f["state"], f["phase"], f["n"], f["data"])
+        if r.state == RECV_LAST and not r.end_seen:
+            r.state = RECV_SUCCESS
+            return r
+        if r.state & BUSY:
+            sub = r.ack_frame()
+            pad = sub + bytes(-len(sub) % 4)
+            words = [len(sub) << 8] + [int.from_bytes(pad[i:i + 4], "little") for i in range(0, len(pad), 4)]
+            ready = yield from game.change(0x25, words)
+        else:
+            ready = yield from game.change(0x27)                 # nothing to send: just hand over the clock
+        if ready != 0x99660028:
+            raise LinkError(f"expected 'data ready', got {ready:#010x}")
+    raise LinkError(f"join status not received (receiver state {r.state:#06x})")

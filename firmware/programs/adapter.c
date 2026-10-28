@@ -96,6 +96,7 @@ static int wait_si(int level, u32 lines)
 #define EV_FLICK_TIMEOUT 0x06    /* the game never noticed we were ready */
 #define EV_CONNECTED     0x07    /* the game has connected to our distributor */
 #define EV_CHILD_NAME    0x08    /* the host side has received the game's name (NI) */
+#define EV_JOIN_SENT     0x09    /* the host has told the game it may join (NI, acknowledged) */
 
 static u32 trace_head[TRACE_N], trace_data[TRACE_N], trace_count;
 static u32 n_commands, n_id, n_lost, last_word;
@@ -241,6 +242,90 @@ static void ni_receive(u32 state, u32 phase, u32 n, u32 len, const u8 *data)
     ni.phase = phase;
 }
 
+/* The sending half (librfu's rfu_STC_setSendData_org / NI_constructLLSF / NI_receive_Sender,
+ * host side: 3-byte sub-frame headers addressed to slot 0). First use: link_rfu_2's
+ * "you may join" status byte, RFU_STATUS_JOIN_GROUP_OK, sent with a sub-frame size of 8. */
+#define NI_SEND       0x0020
+#define NI_SEND_START (NI_BUSY | NI_SEND | LCOM_NI_START)
+#define NI_SENDING    (NI_BUSY | NI_SEND | LCOM_NI)
+#define NI_SEND_LAST  (NI_BUSY | NI_SEND | LCOM_NI_END)
+#define NI_SEND_NULL  (NI_BUSY | NI_SEND)
+#define NI_SEND_OK    (NI_SEND | 6)
+
+static struct {
+    u32 state, phase, n[4], acked[4], payload, size, now[4];
+    int remain;
+    const u8 *src;
+    u8 ctrl[8];
+} nis;
+static const u8 join_group_ok = 5;                /* RFU_STATUS_JOIN_GROUP_OK */
+
+static void nis_start(const u8 *src, u32 size, u32 type, u32 sub_frame)
+{
+    memset(&nis, 0, sizeof nis);
+    nis.payload = sub_frame - 3;
+    nis.size = size;
+    nis.src = src;
+    nis.ctrl[0] = type;
+    nis.ctrl[1] = nis.payload; nis.ctrl[2] = nis.payload >> 8;
+    nis.ctrl[3] = size; nis.ctrl[4] = size >> 8; nis.ctrl[5] = size >> 16; nis.ctrl[6] = size >> 24;
+    nis.remain = 7;
+    for (int i = 0; i < 4; i++) nis.n[i] = 1;
+    nis.state = NI_SEND_START;
+}
+
+static u32 nis_frame(u8 *out)
+{
+    const u8 *buf = nis.state == NI_SEND_START ? nis.ctrl : nis.src;
+    u32 len = nis.state == NI_SEND_START ? 7 : nis.size, size, h;
+    if (nis.state == NI_SENDING)
+        for (int i = 0; i < 4 && nis.now[nis.phase] >= len; i++)
+            nis.phase = (nis.phase + 1) & 3;
+    if (nis.state == NI_SENDING)
+        size = len - nis.now[nis.phase] < nis.payload ? len - nis.now[nis.phase] : nis.payload;
+    else
+        size = nis.remain >= (int)nis.payload ? nis.payload : nis.remain > 0 ? (u32)nis.remain : 0;
+    h = (nis.state & 0xF) << 14 | nis.phase << 9 | nis.n[nis.phase] << 11 | size | 1u << 18;
+    out[0] = h; out[1] = h >> 8; out[2] = h >> 16;
+    for (u32 i = 0; i < size; i++)
+        out[3 + i] = buf[nis.now[nis.phase] + i];
+    if (nis.state == NI_SENDING)
+        nis.phase = (nis.phase + 1) & 3;
+    return 3 + size;
+}
+
+static void nis_ack(u32 st, u32 phase, u32 n)
+{
+    if (((st == LCOM_NI && nis.state == NI_SENDING) || (st == LCOM_NI_START && nis.state == NI_SEND_START)
+            || (st == LCOM_NI_END && nis.state == NI_SEND_LAST)) && nis.n[phase] == n)
+        nis.acked[phase] = 1;
+    if (!nis.acked[phase])
+        return;
+    nis.n[phase] = (nis.n[phase] + 1) & 3;
+    nis.acked[phase] = 0;
+    if (nis.state == NI_SEND_START || nis.state == NI_SENDING) {
+        nis.now[phase] += nis.state == NI_SEND_START ? nis.payload : nis.payload << 2;
+        nis.remain -= nis.payload;
+        if (nis.remain <= 0) {
+            nis.phase = 0;
+            if (nis.state == NI_SEND_START) {
+                for (int i = 0; i < 4; i++) {
+                    nis.n[i] = 1;
+                    nis.now[i] = nis.payload * i;
+                }
+                nis.remain = nis.size;
+                nis.state = NI_SENDING;
+            } else {
+                nis.n[0] = 0;
+                nis.remain = 0;
+                nis.state = NI_SEND_LAST;
+            }
+        }
+    } else if (nis.state == NI_SEND_LAST) {
+        nis.state = NI_SEND_NULL;
+    }
+}
+
 /* A data command from the connected game: librfu's child packet, header word first
  * (bytes << 8 for slot 0), then 2-byte-headed sub-frames. */
 static void host_receive(void)
@@ -254,10 +339,13 @@ static void host_receive(void)
         u32 recv_first = (h >> 14) & 2, st = (h >> 10) & 0xF, ack = (h >> 9) & 1;
         if (!recv_first && st != LCOM_UNI && !ack)
             ni_receive(st, (h >> 5) & 3, (h >> 7) & 3, len, d + at + 2);
+        else if (!recv_first && st != LCOM_UNI && (nis.state & NI_BUSY))
+            nis_ack(st, (h >> 5) & 3, (h >> 7) & 3);                 /* the game acknowledging us */
         at += 2 + len;
     }
     if (ni.state == NI_RECV_LAST && !ni_end_seen) {         /* librfu's rfu_CB_recvData */
         ni.state = NI_RECV_OK;
+        nis_start(&join_group_ok, 1, 0, 8);                          /* link_rfu_2: "you may join" */
         trace(EV_CHILD_NAME, 0, child_name[0] | child_name[1] << 8 | child_name[17] << 16 | child_name[18] << 24);
     }
 }
@@ -267,16 +355,31 @@ static void host_receive(void)
  * one-byte "null" frame. Returns the answer length. */
 static u32 host_frame(void)
 {
+    u8 *out = (u8 *)&ack[1];
+    u32 bytes = 0;
     host_frames++;
     if (ni.state & NI_BUSY) {
         u32 f = (ni.state & 0xF) << 14 | ni.ack << 13 | ni.phase << 9 | ni.n[ni.phase] << 11 | 1u << 18;
-        ack[0] = 3;
-        ack[1] = f;
-        return 2;
+        out[0] = f; out[1] = f >> 8; out[2] = f >> 16;
+        bytes = 3;
     }
-    ack[0] = 1;
-    ack[1] = 0xFF;
-    return 2;
+    if (nis.state & NI_BUSY) {
+        u32 was_null = nis.state == NI_SEND_NULL;
+        bytes += nis_frame(out + bytes);
+        if (was_null) {                                              /* librfu's rfu_CB_sendData */
+            nis.state = NI_SEND_OK;
+            trace(EV_JOIN_SENT, 0, join_group_ok);
+        }
+    }
+    if (!bytes) {
+        out[0] = 0xFF;                                               /* librfu's one-byte null frame */
+        bytes = 1;
+    }
+    u32 total = bytes;
+    while (bytes & 3)
+        out[bytes++] = 0;
+    ack[0] = total;                                                  /* bytes from the host */
+    return 1 + bytes / 4;
 }
 
 /* What the game sends us once connected: the first few data commands, word for word. This is
@@ -334,6 +437,7 @@ static void respond(void)
             child_connected = 1;
             adapter_state = ST_CONNECTED;
             ni_reset();
+            memset(&nis, 0, sizeof nis);
             if (cmd == 0x21) trace(EV_CONNECTED, 0, CHILD_ID);
         } else {
             ack[0] = connect_polls ? 0x01000000 : 0x04000000;          /* trying / failed */
@@ -805,6 +909,7 @@ static int pc_service(api_t *api)
     case 17: v = (i & 7) < 8 ? child_name[4 * (i & 7)] | child_name[4 * (i & 7) + 1] << 8
                  | child_name[4 * (i & 7) + 2] << 16 | (u32)child_name[4 * (i & 7) + 3] << 24 : 0; break;
     case 18: v = (ni.state & 0xFFFF) | (child_frames & 0xFF) << 16 | (host_frames & 0xFF) << 24; break;
+    case 19: v = nis.state; break;
     case 16: v = (i >> 5) < CAP_CMDS ? ((i & 31) == 31 ? cap_cmd[i >> 5]
                                       : (i & 31) < CAP_WORDS ? cap_data[i >> 5][i & 31] : 0) : 0; break;
     case 9: v = i <= W_MAX ? (w_pulses[i] & 0xFFFF) | (w_clocked[i] << 16) : 0; break;

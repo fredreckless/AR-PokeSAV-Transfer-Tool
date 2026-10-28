@@ -199,10 +199,15 @@ connected to the distributor". In the simulator, a model of Emerald's search fil
 connection sequence finds the host and connects. See [DISTRIBUTOR.md](DISTRIBUTOR.md) for the
 whole plan.
 
+Stages C and D1 also pass in the simulator: after connecting, the game's name arrives over
+librfu's reliable NI channel, and the host tells the game it may join. The details are in
+DISTRIBUTOR.md.
+
 ## Next steps
 
-1. **Run `--adapter-trace` again on real hardware.** Look at the flick table and the scope, and
-   whether the game finds and connects to "DUO".
+1. **Run `--adapter-trace` again on real hardware.** Look at the flick table and the scope,
+   whether the game finds and connects to "DUO", and the game's own data frames printed at the
+   end.
 2. **A distributor in range.** Answer "search results?" with one host whose broadcast data matches
    what Emerald's Mystery Gift looks for. Then handle Connect, and the data commands with real clock
    swaps ("data ready"), carrying librfu's own packet framing.

@@ -127,7 +127,7 @@ This repository holds the whole project, not just the finished tool.
 pip install -r requirements.txt
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE --all
 python tests/run_each.py      # about 80 tests, each in its own process; around 15 minutes
-python tests/mutate4.py       # plants 29 known bugs; each must be caught
+python tests/mutate4.py       # plants 31 known bugs; each must be caught
 ```
 
 The adapter program (`firmware/programs/adapter.c`) is built with clang and lld (LLVM 18). You only need them to rebuild it: the tool carries a copy, which a test checks against a fresh build.

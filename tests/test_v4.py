@@ -1123,6 +1123,23 @@ def _():
     assert game.retries == 0, game.retries
 
 
+@test("distributor: then the host tells the game it may join (RFU_STATUS_JOIN_GROUP_OK over NI) and the game receives it")
+def _():
+    def script(game):
+        found = yield from RFU.find_distributor(game)
+        conn = yield from RFU.connect_to(game, found["id"])
+        yield from RFU.send_child_name(game, RFU.child_name_bytes())
+        r = yield from RFU.wait_join_status(game)
+        return r
+    hw, game, trace, st, counters = adapter_session(script, first_bit=True, seconds=40)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors, [t for t, _ in trace][-8:])
+    r = hw.lg_result
+    assert r.state == RFU.RECV_SUCCESS and bytes(r.buf) == b"\x05" and r.type == 0 and r.payload == 5, (hex(r.state), r.buf)
+    names = [t for t, _ in trace]
+    assert any(n.startswith("the distributor told the game it may join") for n in names), names[-6:]
+    assert game.retries == 0, game.retries
+
+
 @test("wireless adapter: the game gives up half-way through a command and starts it again; the adapter follows")
 def _():
     def script(game):
