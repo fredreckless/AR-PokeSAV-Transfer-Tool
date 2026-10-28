@@ -95,6 +95,7 @@ static int wait_si(int level, u32 lines)
 #define EV_STRAY         0x05    /* the game wanted more of an answer than we sent */
 #define EV_FLICK_TIMEOUT 0x06    /* the game never noticed we were ready */
 #define EV_CONNECTED     0x07    /* the game has connected to our distributor */
+#define EV_CHILD_NAME    0x08    /* the host side has received the game's name (NI) */
 
 static u32 trace_head[TRACE_N], trace_data[TRACE_N], trace_count;
 static u32 n_commands, n_id, n_lost, last_word;
@@ -158,6 +159,126 @@ static void build_host(void)
         host_cfg[i] = b[4 * i] | b[4 * i + 1] << 8 | b[4 * i + 2] << 16 | (u32)b[4 * i + 3] << 24;
 }
 
+/* ------------------------------------------------------------------ the host's link layer (librfu NI)
+ * Once connected, the "host" (our distributor) and the game talk in librfu link-layer frames
+ * (see docs/DISTRIBUTOR.md). The host speaks once a frame: we tell the waiting game "data
+ * ready" (0x28), it reads the host's frames (0x26) and answers with its own (0x24/0x25).
+ * First the game sends its name over NI, librfu's reliable channel: a 7-byte control block
+ * (data type, payload size, data size), then the data in four interleaved windows, each chunk
+ * numbered and acknowledged by the host. This is the receiving half, as librfu's
+ * rfu_STC_NI_receive_Receiver does it; the host's frames carry the acknowledgements. */
+#define LCOM_NI_START 1
+#define LCOM_NI       2
+#define LCOM_NI_END   3
+#define LCOM_UNI      4
+#define NI_BUSY       0x8000
+#define NI_RECV       0x0040
+#define NI_RECV_START (NI_BUSY | NI_RECV | LCOM_NI_START)
+#define NI_RECEIVING  (NI_BUSY | NI_RECV | LCOM_NI)
+#define NI_RECV_LAST  (NI_BUSY | NI_RECV | LCOM_NI_END)
+#define NI_RECV_OK    (NI_RECV | 6)
+
+static struct {
+    u32 state, ack, phase, n[4], remain, payload, size, type, off[4];
+    u8 ctrl[8];                      /* dataType, payloadSize (2), dataSize (4) */
+} ni;
+static u8 child_name[32];            /* the game's serialNo, gname, uname: 26 bytes */
+static u32 ni_end_seen, child_frames, host_frames;
+
+static void ni_reset(void) { memset(&ni, 0, sizeof ni); }
+
+static void ni_copy(u32 phase, const u8 *src, u32 len)
+{
+    u8 *base = ni.state == NI_RECEIVING ? child_name : ni.ctrl;
+    u32 lim = ni.state == NI_RECEIVING ? sizeof child_name : sizeof ni.ctrl;
+    for (u32 i = 0; i < len; i++, ni.off[phase]++)
+        if (ni.off[phase] < lim)
+            base[ni.off[phase]] = src[i];
+}
+
+static void ni_receive(u32 state, u32 phase, u32 n, u32 len, const u8 *data)
+{
+    int check = 0;
+    if (state == LCOM_NI_END) {
+        ni_end_seen = 1;
+        if (ni.state == NI_RECEIVING) {
+            ni.phase = 0;
+            ni.n[0] = 0;
+            ni.state = NI_RECV_LAST;
+        }
+    } else if (state == LCOM_NI) {
+        if (ni.state == NI_RECV_START && !ni.remain) {       /* control block complete: data next */
+            ni.type = ni.ctrl[0];
+            ni.payload = ni.ctrl[1] | ni.ctrl[2] << 8;
+            ni.size = ni.ctrl[3] | ni.ctrl[4] << 8 | ni.ctrl[5] << 16 | (u32)ni.ctrl[6] << 24;
+            for (int w = 0; w < 4; w++) {
+                ni.n[w] = 0;
+                ni.off[w] = ni.payload * w;
+            }
+            ni.remain = ni.size;
+            ni.state = NI_RECEIVING;
+        }
+        if (ni.state == NI_RECEIVING)
+            check = 1;
+    } else if (state == LCOM_NI_START) {
+        if (ni.state != NI_RECV_START) {                     /* a new transfer */
+            if (ni.state != 0 && ni.state != NI_RECV_OK)
+                ;                                            /* (librfu only starts from idle) */
+            ni_reset();
+            ni.remain = 7;
+            ni.ack = 1;
+            ni.state = NI_RECV_START;
+        }
+        check = 1;
+    }
+    if (check && n == ((ni.n[phase] + 1) & 3)) {
+        ni_copy(phase, data, len);
+        if (ni.state == NI_RECEIVING)
+            ni.off[phase] += 3 * ni.payload;
+        ni.remain -= len;
+        ni.n[phase] = n;
+    }
+    ni.phase = phase;
+}
+
+/* A data command from the connected game: librfu's child packet, header word first
+ * (bytes << 8 for slot 0), then 2-byte-headed sub-frames. */
+static void host_receive(void)
+{
+    u32 bytes = (req[0] >> 8) & 0x1F, at = 0;
+    const u8 *d = (const u8 *)&req[1];
+    child_frames++;
+    ni_end_seen = bytes == 0;
+    while (bytes - at >= 2 && at < 4 * 31) {
+        u32 h = d[at] | d[at + 1] << 8, len = h & 0x1F;
+        u32 recv_first = (h >> 14) & 2, st = (h >> 10) & 0xF, ack = (h >> 9) & 1;
+        if (!recv_first && st != LCOM_UNI && !ack)
+            ni_receive(st, (h >> 5) & 3, (h >> 7) & 3, len, d + at + 2);
+        at += 2 + len;
+    }
+    if (ni.state == NI_RECV_LAST && !ni_end_seen) {         /* librfu's rfu_CB_recvData */
+        ni.state = NI_RECV_OK;
+        trace(EV_CHILD_NAME, 0, child_name[0] | child_name[1] << 8 | child_name[17] << 16 | child_name[18] << 24);
+    }
+}
+
+/* The host's frame for the game to read (0x26): the NI acknowledgement while receiving
+ * (3-byte header: size 0, phase, n, ack, slot state, addressed slots), else librfu's
+ * one-byte "null" frame. Returns the answer length. */
+static u32 host_frame(void)
+{
+    host_frames++;
+    if (ni.state & NI_BUSY) {
+        u32 f = (ni.state & 0xF) << 14 | ni.ack << 13 | ni.phase << 9 | ni.n[ni.phase] << 11 | 1u << 18;
+        ack[0] = 3;
+        ack[1] = f;
+        return 2;
+    }
+    ack[0] = 1;
+    ack[1] = 0xFF;
+    return 2;
+}
+
 /* What the game sends us once connected: the first few data commands, word for word. This is
  * librfu's own framing of the child's first messages (its game name over the NI channel) - the
  * ground truth the host side will be built against. */
@@ -212,6 +333,7 @@ static void respond(void)
             ack[0] = CHILD_ID;                                         /* slot 0, status 0: done */
             child_connected = 1;
             adapter_state = ST_CONNECTED;
+            ni_reset();
             if (cmd == 0x21) trace(EV_CONNECTED, 0, CHILD_ID);
         } else {
             ack[0] = connect_polls ? 0x01000000 : 0x04000000;          /* trying / failed */
@@ -219,9 +341,9 @@ static void respond(void)
         }
         ack_len = 1;
         break;
-    case 0x24: capture(); break;
-    case 0x25: capture(); swap_after = 1; break;
-    case 0x26: break;                                                  /* no data */
+    case 0x24: capture(); if (child_connected) host_receive(); break;
+    case 0x25: capture(); if (child_connected) host_receive(); swap_after = 1; break;
+    case 0x26: if (child_connected) ack_len = host_frame(); break;    /* the host's frame */
     case 0x27: swap_after = 1; break;
     case 0x30: child_connected = 0; adapter_state = ST_IDLE; break;
     case 0x32: case 0x34: break;
@@ -519,7 +641,7 @@ static int stop_requested;
 
 static void clock_master_turn(api_t *api)
 {
-    u32 frames = system_config & 0xFF, t0 = now(), got = 0, cmd;
+    u32 frames = child_connected ? 1 : system_config & 0xFF, t0 = now(), got = 0, cmd;
     SIOCNT = CNT_32BIT | CNT_2MHZ | CNT_INTERNAL;           /* SO low */
     for (;;) {
         if (pc_service(api) || stop_requested)
@@ -527,19 +649,20 @@ static void clock_master_turn(api_t *api)
         if (frames && now() - t0 >= frames * LINES_PER_FRAME)
             break;
     }
-    cmd = 0x99660027;                                          /* nothing happened */
+    cmd = child_connected ? 0x99660028 : 0x99660027;           /* data ready / nothing happened */
     if (!master_word(cmd, &got)) goto failed;
     /* inverted handshake: we stay low, the game goes high, we go high, the game re-arms (low) */
     if (!wait_si(1, HANDSHAKE_LINES)) goto failed;
     SIOCNT = CNT_32BIT | CNT_2MHZ | CNT_INTERNAL | CNT_SO_HIGH;
     for (volatile int i = 0; i < 40; i++) ;                    /* the game wants >= 40 us */
     if (!master_word(IDLE_WORD, &got)) goto failed;
-    if ((got & 0x7FFFFFFF) != (0x996600A7 & 0x7FFFFFFF)) goto failed;   /* its first bit is late too */
+    if ((got & 0x7FFFFFFF) != ((cmd + 0x80) & 0x7FFFFFFF)) goto failed;  /* its first bit is late too */
     /* final handshake, then the game is clock master again */
     if (!wait_si(1, HANDSHAKE_LINES)) goto failed;
     SIOCNT = CNT_32BIT | CNT_2MHZ | CNT_INTERNAL | CNT_SO_HIGH;
     wait_si(0, HANDSHAKE_LINES);
-    trace(EV_WAIT_TIMEOUT, 0, frames);
+    if (!child_connected)
+        trace(EV_WAIT_TIMEOUT, 0, frames);
     back_to_idle();
     return;
 failed:
@@ -679,6 +802,9 @@ static int pc_service(api_t *api)
 #ifndef PROBE
     case 8: v = n_stray | (n_flick_timeouts << 16); break;
     case 15: v = cap_count; break;
+    case 17: v = (i & 7) < 8 ? child_name[4 * (i & 7)] | child_name[4 * (i & 7) + 1] << 8
+                 | child_name[4 * (i & 7) + 2] << 16 | (u32)child_name[4 * (i & 7) + 3] << 24 : 0; break;
+    case 18: v = (ni.state & 0xFFFF) | (child_frames & 0xFF) << 16 | (host_frames & 0xFF) << 24; break;
     case 16: v = (i >> 5) < CAP_CMDS ? ((i & 31) == 31 ? cap_cmd[i >> 5]
                                       : (i & 31) < CAP_WORDS ? cap_data[i >> 5][i & 31] : 0) : 0; break;
     case 9: v = i <= W_MAX ? (w_pulses[i] & 0xFFFF) | (w_clocked[i] << 16) : 0; break;

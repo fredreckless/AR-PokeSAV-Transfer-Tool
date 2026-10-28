@@ -24,6 +24,8 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "adapter's flick never gets narrower": ("            flick_w = last_flick ? last_flick - 1 : 0;       /* clocked but refused: narrower */", "            ;", "tunes its own width"),
     "distributor's broadcast checksum is wrong": ("    b[15] = ~sum;", "    b[15] = sum;", "distributor"),
     "distributor doesn't say it has a card": ("               | 1 << 5                  /* hasCard */", "               | 0 << 5                  /* hasCard */", "distributor"),
+    "host never acknowledges the game's chunks": ("    if (ni.state & NI_BUSY) {\n        u32 f", "    if (0) {\n        u32 f", "NI channel"),
+    "host acknowledges with the wrong window number": ("ni.n[ni.phase] << 11 | 1u << 18", "((ni.n[ni.phase] + 1) & 3) << 11 | 1u << 18", "NI channel"),
     "adapter has no watchdog mid-command": ("        if (phase != PH_COMMAND && phase != PH_ID && now() - last_word_at > WATCHDOG_LINES) {", "        if (0) {", "wireless adapter: the game gives up"),
 }
 

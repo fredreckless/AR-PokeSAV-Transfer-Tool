@@ -1097,11 +1097,30 @@ def _():
     found, conn = hw.lg_result
     assert found["serial"] == 0x7F7D and found["checksum_ok"] and found["gname"]["hasCard"], found
     assert found["gname"]["language"] == 1 and found["gname"]["version"] == 3 and found["uname"][:3] == bytes([0xBE, 0xCF, 0xC9])
-    assert conn["status"] == 0 and conn["child_id"] == 0x2C41 and conn["swap"] == 0x99660027, conn
+    assert conn["status"] == 0 and conn["child_id"] == 0x2C41 and conn["swap"] == 0x99660028, conn
     names = [t for t, _ in trace]
     assert any(n.startswith("the game connected to the distributor") for n in names), names
     assert game.retries == 0, game.retries
     assert M.adapter_trace.last_capture == [(0x24, 2, 1, [0x00000400, 0x12345678])], M.adapter_trace.last_capture
+
+
+@test("distributor: after connecting, the game's name arrives over librfu's NI channel, every chunk acknowledged")
+def _():
+    name = RFU.child_name_bytes()
+    def script(game):
+        found = yield from RFU.find_distributor(game)
+        conn = yield from RFU.connect_to(game, found["id"])
+        sender = yield from RFU.send_child_name(game, name)
+        return conn, sender
+    hw, game, trace, st, counters = adapter_session(script, first_bit=True, seconds=40)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors, [t for t, _ in trace][-8:])
+    conn, sender = hw.lg_result
+    assert sender.state == RFU.SEND_SUCCESS and sender.frames_sent <= 12, (hex(sender.state), sender.frames_sent)
+    child = M.adapter_trace.last_child
+    assert child["received"] and child["raw"] == name, (child, name.hex())
+    names = [t for t, _ in trace]
+    assert any(n.startswith("the distributor received the game's name") for n in names), names[-6:]
+    assert game.retries == 0, game.retries
 
 
 @test("wireless adapter: the game gives up half-way through a command and starts it again; the adapter follows")

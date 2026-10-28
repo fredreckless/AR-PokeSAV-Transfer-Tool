@@ -257,3 +257,130 @@ def connect_to(game, host_id, polls=60):
     if res["status"] == 0:
         res["swap"] = yield from game.change(0x27)
     return res
+
+
+# ---------------------------------------------------------------------- stage C: the child's name over NI
+# A port of librfu's NI sender (rfu_STC_setSendData_org, rfu_STC_NI_constructLLSF,
+# rfu_STC_NI_receive_Sender, rfu_CB_sendData) and of the child's frame parsing
+# (rfu_STC_CHILD_analyzeRecvPacket / rfu_STC_analyzeLLSF), for the child in slot 0.
+LCOM_NULL, LCOM_NI_START, LCOM_NI, LCOM_NI_END, LCOM_UNI = 0, 1, 2, 3, 4
+BUSY, SEND = 0x8000, 0x20
+SEND_START, SENDING, SEND_LAST, SEND_NULL = BUSY | SEND | 1, BUSY | SEND | 2, BUSY | SEND | 3, BUSY | SEND | 0
+SEND_SUCCESS = SEND | 6
+
+
+class NISender:
+    def __init__(self, data, sub_frame=0x0E, data_type=1):
+        self.data = bytes(data)
+        self.payload = sub_frame - 2                 # child sub-frame header: 2 bytes
+        self.dataType, self.dataSize = data_type, len(self.data)
+        ctrl = bytes([data_type]) + self.payload.to_bytes(2, "little") + self.dataSize.to_bytes(4, "little")
+        self.ctrl = ctrl                              # the 7 bytes from &dataType
+        self.src = ctrl                               # during SEND_START, now_p points into the control block
+        self.now = [0, 0, 0, 0]
+        self.remain = 7
+        self.ack, self.phase = 0, 0
+        self.n = [1, 1, 1, 1]
+        self.recvAck = [0, 0, 0, 0]
+        self.state = SEND_START
+        self.frames_sent = 0
+
+    def _buf(self):
+        return self.ctrl if self.state == SEND_START else self.data
+
+    def construct(self):
+        """One child sub-frame (2-byte header + payload)."""
+        buf = self._buf()
+        if self.state == SENDING:
+            for _ in range(4):
+                if self.now[self.phase] < len(buf):
+                    break
+                self.phase = (self.phase + 1) & 3
+        if self.state == SENDING:
+            size = min(self.payload, len(buf) - self.now[self.phase])
+        else:
+            size = self.payload if self.remain >= self.payload else max(0, self.remain)
+        h = (self.state & 0xF) << 10 | self.ack << 9 | self.phase << 5 | self.n[self.phase] << 7 | size
+        out = h.to_bytes(2, "little") + buf[self.now[self.phase]:self.now[self.phase] + size]
+        if self.state == SENDING:
+            self.phase = (self.phase + 1) & 3
+        self.frames_sent += 1
+        return out
+
+    def on_ack(self, slot_state, phase, n):
+        """rfu_STC_NI_receive_Sender, for the host's acknowledgement frames."""
+        if ((slot_state == LCOM_NI and self.state == SENDING) or (slot_state == LCOM_NI_START and self.state == SEND_START)
+                or (slot_state == LCOM_NI_END and self.state == SEND_LAST)):
+            if self.n[phase] == n:
+                self.recvAck[phase] |= 1
+        if self.recvAck[phase] & 1:
+            self.n[phase] = (self.n[phase] + 1) & 3
+            self.recvAck[phase] = 0
+            if self.state in (SEND_START, SENDING):
+                self.now[phase] += self.payload if self.state == SEND_START else self.payload << 2
+                self.remain -= self.payload
+                if self.remain <= 0:
+                    self.phase = 0
+                    if self.state == SEND_START:
+                        self.n = [1, 1, 1, 1]
+                        self.now = [self.payload * i for i in range(4)]
+                        self.remain = self.dataSize
+                        self.state = SENDING
+                    else:
+                        self.n[0] = 0
+                        self.remain = 0
+                        self.state = SEND_LAST
+            elif self.state == SEND_LAST:
+                self.state = SEND_NULL
+
+    def after_send(self):
+        """rfu_CB_sendData: a NULL frame having gone out ends the transfer."""
+        if self.state == SEND_NULL:
+            self.state = SEND_SUCCESS
+
+
+def parse_host_frames(ack):
+    """rfu_STC_CHILD_analyzeRecvPacket: the host's 3-byte-headed sub-frames from a 0x26 answer."""
+    if len(ack) < 2:
+        return []
+    count = ack[1] & 0x7F
+    raw = b"".join(w.to_bytes(4, "little") for w in ack[2:])
+    out, at = [], 0
+    while count - at >= 3:
+        h = raw[at] | raw[at + 1] << 8 | raw[at + 2] << 16
+        size = h & 0x7F
+        out.append(dict(size=size, phase=h >> 9 & 3, n=h >> 11 & 3, ack=h >> 13 & 1, state=h >> 14 & 0xF,
+                        slots=h >> 18 & 0xF, recv_first=h >> 22 & 3, data=raw[at + 3:at + 3 + size]))
+        at += 3 + size
+    return out
+
+
+def child_name_bytes(serial=0x0002, trainer=0x4C1D, uname=b"\x60\x61\x62\xFF\xFF\xFF\xFF\xFF\x00"):
+    """The child's RfuTgtData from serialNo on: serial (2), gname (13 + 2 padding), uname (9)."""
+    gname = bytes([0x01 | 1 << 7, 0x0F]) + trainer.to_bytes(2, "little") + bytes(9)
+    return serial.to_bytes(2, "little") + gname + bytes(2) + uname
+
+
+def send_child_name(game, name, max_frames=120):
+    """After connecting: each frame the adapter says 'data ready' (0x28), the child reads the
+    host's frames (0x26), handles any acknowledgements, and answers with its own frame using
+    'send, then wait' (0x25) - until librfu's NI sender reports success."""
+    s = NISender(name)
+    ready = None
+    for _ in range(max_frames):
+        ack = yield from game.command(0x26)
+        for f in parse_host_frames(ack):
+            if f["recv_first"] == 0 and f["slots"] & 1 and f["state"] != LCOM_UNI and f["ack"]:
+                s.on_ack(f["state"], f["phase"], f["n"])
+        if s.state == SEND_SUCCESS:
+            return s
+        sub = s.construct()
+        pad = sub + bytes(-len(sub) % 4)
+        words = [len(sub) << 8] + [int.from_bytes(pad[i:i + 4], "little") for i in range(0, len(pad), 4)]
+        ready = yield from game.change(0x25, words)
+        s.after_send()
+        if s.state == SEND_SUCCESS:
+            return s
+        if ready != 0x99660028:
+            raise LinkError(f"expected 'data ready', got {ready:#010x}")
+    raise LinkError(f"name not delivered (sender state {s.state:#06x})")
