@@ -1027,13 +1027,14 @@ def adapter_symbol(name):
 
 
 def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits=0, first_bit=False,
-                    flick_window=None):
+                    flick_window=None, wonder_card=None):
     hw, duo = run42()
     game = RFU.Game()
     if attach:
         flick = (adapter_symbol("flick_w"),) + tuple(flick_window) if flick_window else None
         hw.attach_link_game(script(game), lag_bits=lag_bits, first_bit=first_bit, flick=flick)
-    r = quiet(M.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds, adapter_probe=seconds), poll_s=0.2,
+    r = quiet(M.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds, adapter_probe=seconds,
+                                                          wonder_card=wonder_card), poll_s=0.2,
               stop_when=(lambda: hw.lg_done) if attach else None, program=program)
     entries, st, counters = r[0][:3]
     hw.probe = r[0][3] if len(r[0]) > 3 else None
@@ -1138,6 +1139,61 @@ def _():
     names = [t for t, _ in trace]
     assert any(n.startswith("the distributor told the game it may join") for n in names), names[-6:]
     assert game.retries == 0, game.retries
+
+
+def test_wc3(language="Japanese"):
+    """A made-up Wonder Card in .wc3 layout (test data only - not any real event)."""
+    size = 0xA4 if language == "Japanese" else 0x14C
+    card = bytearray(size)
+    card[0:2] = (0x0123).to_bytes(2, "little")             # flagId
+    card[2:4] = (0x0019).to_bytes(2, "little")             # iconSpecies
+    card[4:8] = (0x00C0FFEE).to_bytes(4, "little")         # idNumber
+    card[8] = 0 | 1 << 2 | 1 << 6                          # type 0, bgType 1, sendType 1
+    for i in range(10, size):
+        card[i] = (i * 7) & 0xFF
+    script = bytes([0x33, 0x05, 0x0A, 0x01]) + bytes((i * 13 + 5) & 0xFF for i in range(996))
+    wc3 = bytes(4) + bytes(card) + bytes(0x50) + bytes(4) + script
+    path = os.path.join(tempfile.gettempdir(), f"test_card_{language[:2]}.wc3")
+    open(path, "wb").write(wc3)
+    return path, bytes(card), script
+
+
+def gift_script(game):
+    found = yield from RFU.find_distributor(game)
+    conn = yield from RFU.connect_to(game, found["id"])
+    yield from RFU.send_child_name(game, RFU.child_name_bytes())
+    yield from RFU.wait_join_status(game)
+    child = RFU.ChildLink()
+    client = yield from RFU.receive_gift(game, child)
+    return child, client
+
+
+@test("distributor: link players exchanged, then Mystery Gift delivers the Wonder Card and RAM script; the link closes")
+def _():
+    path, card, script = test_wc3()
+    hw, game, trace, st, counters = adapter_session(gift_script, first_bit=True, seconds=120, wonder_card=path)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors, [t for t, _ in trace][-10:])
+    child, client = hw.lg_result
+    assert child.player_count == 2 and child.multiplayer_id == 1, (child.player_count, child.multiplayer_id)
+    assert child.link_players[0][8:11] == bytes([0xBE, 0xCF, 0xC9]), child.link_players[0]
+    assert client.result == RFU.CLI_MSG_CARD_RECEIVED, (client.result, client.history)
+    assert client.saved_card == card and client.saved_ram_script == script
+    link = M.adapter_trace.last_link
+    assert link["player_ok"] and link["trainer_id"] == 0x0003D4C1 and link["mg_step"] == 6 and not link["mg_errors"], link
+    assert link["game_data"] == bytes(range(0x40)), link["game_data"].hex()
+    names = [t for t, _ in trace]
+    assert any(n.startswith("link players exchanged") for n in names), names
+    assert any(n.startswith("the game is ready to close the link") for n in names), names
+    assert "Wonder Card loaded" in hw.text and game.retries == 0, (hw.text[:400], game.retries)
+
+
+@test("distributor: without a Wonder Card the game is told there is nothing to send, and the link closes tidily")
+def _():
+    hw, game, trace, st, counters = adapter_session(gift_script, first_bit=True, seconds=120)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors, [t for t, _ in trace][-10:])
+    child, client = hw.lg_result
+    assert client.result == RFU.CLI_MSG_NOTHING_SENT and client.saved_card is None, (client.result, client.history)
+    assert M.adapter_trace.last_link["mg_step"] == 4, M.adapter_trace.last_link
 
 
 @test("wireless adapter: the game gives up half-way through a command and starts it again; the adapter follows")

@@ -93,7 +93,8 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 | `--list`, no options | List or export the **DS** saves stored on the DUO, as Datel's software did |
 | `--lab script FILE.json` | Run a small read-only experiment on the GBA (see [lab/](lab/)) |
 | `--adapter-test` | *Experimental, firmware v4.2:* the DUO's GBA answers a Pokémon game's Wireless Adapter check on a second GBA, over a GBC link cable. It's the first step towards recreating Mystery Gift events; see [docs/WIRELESS.md](docs/WIRELESS.md) |
-| `--adapter-trace` | *Experimental, firmware v4.2:* the DUO's GBA plays a whole Wireless Adapter (with nobody in range) and lists every command the game sends it |
+| `--adapter-trace` | *Experimental, firmware v4.2:* the DUO's GBA plays a whole Wireless Adapter, with a Wonder Card distributor in range, and lists what the game does |
+| `--adapter-trace --wonder-card FILE.wc3` | *Experimental:* the distributor offers the Wonder Card from your own `.wc3` file over Mystery Gift (see [docs/DISTRIBUTOR.md](docs/DISTRIBUTOR.md)); nothing from the file is kept |
 | `--help` | Everything else |
 
 ## If something goes wrong

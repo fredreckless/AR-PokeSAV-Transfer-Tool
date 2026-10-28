@@ -87,7 +87,7 @@ static int wait_si(int level, u32 lines)
 }
 
 /* ------------------------------------------------------------------ trace */
-#define TRACE_N 128
+#define TRACE_N 64
 #define EV_ID_EXCHANGE   0x01    /* pseudo-commands, so the trace reads as a story */
 #define EV_WAIT_TIMEOUT  0x02
 #define EV_LOST          0x03
@@ -326,6 +326,316 @@ static void nis_ack(u32 st, u32 phase, u32 n)
     }
 }
 
+/* ------------------------------------------------------------------ stage D2: link_rfu_2's parent
+ * Once the game has been told it may join, librfu's UNI channel takes over: every frame the
+ * host sends one unreliable sub-frame holding link_rfu_2's command table, gRfu.recvCmds: seven
+ * u16s for each of five players (70 bytes) - our own command in row 0 and, echoed back, the
+ * game's last command in row 1 (the game, player 1, checks its own echoes). The game answers
+ * each new table with one 14-byte sub-frame: its command, a sequence number in bits 5-7.
+ * On top of that, link_rfu_2's blocks (0x8800 init, then 0x8900|n chunks of 12 bytes) carry
+ * first the link-player exchange, then Mystery Gift's own conversation (mystery_gift_link.c):
+ * a 6-byte header (ident, CRC-16, size), then the data in blocks of up to 252 bytes. */
+#define CMD_READY_CLOSE 0x5F00
+#define CMD_READY_EXIT  0x6600
+#define CMD_PLAYER_IDS  0x7700
+#define CMD_BLOCK_INIT  0x8800
+#define CMD_BLOCK       0x8900
+#define CMD_BLOCK_REQ   0xA100
+#define UNI_BYTES       70
+
+#define EV_LINK_PLAYERS  0x0A    /* the game's link-player block has arrived (data: trainer ID) */
+#define EV_MG_STEP       0x0B    /* the Mystery Gift server moved on (data: step << 16 | ident) */
+#define EV_MG_ERROR      0x0C    /* something the game sent was not what the server expected */
+#define EV_CLOSE         0x0D    /* the game is ready to close the link: we agree */
+
+static u8 child_uni[16];
+static u32 child_uni_new, link_state, link_timer, n_child_cmds;
+static u16 rx_cmd[7], tx_cmd[7];
+
+static u16 crc16(const u8 *p, u32 n, u16 crc)    /* util.c CalcCRC16WithTable, before its final ~ */
+{
+    while (n--) {
+        crc ^= *p++;
+        for (int b = 0; b < 8; b++)
+            crc = crc & 1 ? (crc >> 1) ^ 0x8408 : crc >> 1;
+    }
+    return crc;
+}
+
+/* What the PC loads (0x2C PUT): the Wonder Card's size, the card, then the 1000-byte RAM
+ * script (struct RamScriptData), all from the user's own .wc3 file. Nothing is sent without it
+ * except "nothing to send" (the game then says so - a safe dry run). */
+#define GIFT_MAX (4 + 0x14C + 1000)
+static u32 gift_words[(GIFT_MAX + 3) / 4], put_at, gift_ready;
+#define GIFT ((const u8 *)gift_words)
+#define CARD_SIZE (gift_words[0] & 0xFFFF)
+
+/* Our outgoing block: one link_rfu_2 block. Bytes come from a source that is zero past its
+ * end (the RAM script is sent as 1024 bytes, MG_LINK_BUFFER_SIZE, as Emerald's server does). */
+static struct {
+    const u8 *src;
+    u32 len, size, count, next, inits, gap, active;
+} bs;
+#define BS_INITS 8              /* real parents send 4: the game ignores repeats */
+#define BS_GAP   8              /* frames between blocks, so the game can take each one in */
+
+static void bs_start(const u8 *src, u32 len, u32 size)
+{
+    bs.src = src; bs.len = len; bs.size = size;
+    bs.count = (size + 11) / 12;
+    bs.next = 0; bs.inits = 0; bs.gap = 0; bs.active = 1;
+}
+
+static int bs_step(void)                 /* fills tx_cmd; returns 1 while the block is going */
+{
+    if (!bs.active)
+        return 0;
+    if (bs.inits < BS_INITS) {
+        tx_cmd[0] = CMD_BLOCK_INIT; tx_cmd[1] = bs.count; tx_cmd[2] = 0x80;   /* owner 0 + 0x80 */
+        bs.inits++;
+        return 1;
+    }
+    if (bs.next < bs.count) {
+        tx_cmd[0] = CMD_BLOCK | bs.next;
+        for (u32 j = 0; j < 6; j++) {
+            u32 at = bs.next * 12 + 2 * j, lo = at < bs.len ? bs.src[at] : 0, hi = at + 1 < bs.len ? bs.src[at + 1] : 0;
+            tx_cmd[1 + j] = lo | hi << 8;
+        }
+        bs.next++;
+        return 1;
+    }
+    if (++bs.gap < BS_GAP)
+        return 1;
+    bs.active = 0;
+    return 0;
+}
+
+/* The game's incoming blocks (row 1). */
+static struct {
+    u32 state, count, flags, done;       /* state: 0 ready, 1 receiving */
+    u8 head[64];                         /* the first 64 bytes of the block */
+} rb;
+static u8 child_player[64];              /* the game's LinkPlayerBlock (magic, LinkPlayer, magic) */
+static u8 game_data[64];                 /* the start of the game's MysteryGiftLinkGameData */
+
+static void rb_chunk(u32 n)
+{
+    if (rb.state != 1 || n >= 24)
+        return;
+    for (u32 j = 0; j < 6; j++) {
+        u32 at = n * 12 + 2 * j;
+        if (at + 1 < sizeof rb.head) {
+            rb.head[at] = rx_cmd[1 + j];
+            rb.head[at + 1] = rx_cmd[1 + j] >> 8;
+        }
+    }
+    rb.flags |= 1u << n;
+    if (rb.flags == (1u << rb.count) - 1) {
+        rb.state = 0;                    /* ready for the next one at once */
+        rb.done++;
+    }
+}
+
+/* The Mystery Gift server: Emerald's gMysteryGiftServerScript_SendWonderCard, reduced to what a
+ * distributor needs. Client scripts are struct MysteryGiftClientCmd {u32 instr, parameter}. */
+enum { CLI_RETURN = 1, CLI_RECV = 2, CLI_SEND_LOADED = 3, CLI_COPY_RECV = 4, CLI_LOAD_GAME_DATA = 8,
+       CLI_SAVE_CARD = 10, CLI_SAVE_RAM_SCRIPT = 17, CLI_SEND_READY_END = 20 };
+enum { ID_CLIENT_SCRIPT = 16, ID_GAME_DATA = 17, ID_READY_END = 20, ID_CARD = 22, ID_RAM_SCRIPT = 25 };
+enum { MSG_NOTHING_SENT = 0, MSG_CARD_RECEIVED = 2 };
+static const u32 script_send_game_data[] = { CLI_LOAD_GAME_DATA, 0, CLI_SEND_LOADED, 0,
+                                             CLI_RECV, ID_CLIENT_SCRIPT, CLI_COPY_RECV, 0 };
+static const u32 script_save_card[] = { CLI_RECV, ID_CARD, CLI_SAVE_CARD, 0, CLI_RECV, ID_RAM_SCRIPT,
+                                        CLI_SAVE_RAM_SCRIPT, 0, CLI_SEND_READY_END, 0, CLI_RETURN, MSG_CARD_RECEIVED };
+static const u32 script_nothing_sent[] = { CLI_SEND_READY_END, 0, CLI_RETURN, MSG_NOTHING_SENT };
+
+enum { MG_SEND, MG_RECV, MG_END };
+static u32 mg_step, mg_sub, mg_off, mg_ident, mg_size, mg_errors, mg_got;
+static u8 mg_head[8];
+
+/* step table: what the server does, in order */
+static void mg_item(u32 step, u32 *op, u32 *ident, const u8 **src, u32 *len, u32 *size)
+{
+    *src = 0; *len = *size = 0;
+    switch (step) {
+    case 0: *op = MG_SEND; *ident = ID_CLIENT_SCRIPT; *src = (const u8 *)script_send_game_data;
+            *len = *size = sizeof script_send_game_data; break;
+    case 1: *op = MG_RECV; *ident = ID_GAME_DATA; break;
+    case 2: *op = MG_SEND; *ident = ID_CLIENT_SCRIPT;
+            if (gift_ready) { *src = (const u8 *)script_save_card; *len = *size = sizeof script_save_card; }
+            else { *src = (const u8 *)script_nothing_sent; *len = *size = sizeof script_nothing_sent; }
+            break;
+    case 3: *op = gift_ready ? MG_SEND : MG_RECV; *ident = gift_ready ? ID_CARD : ID_READY_END;
+            *src = GIFT + 4; *len = *size = CARD_SIZE; break;
+    case 4: *op = gift_ready ? MG_SEND : MG_END; *ident = ID_RAM_SCRIPT;
+            *src = GIFT + 4 + CARD_SIZE; *len = 1000; *size = 0x400; break;
+    case 5: *op = gift_ready ? MG_RECV : MG_END; *ident = ID_READY_END; break;
+    default: *op = MG_END; *ident = 0; break;
+    }
+}
+
+static void mg_next(void)
+{
+    mg_step++;
+    mg_sub = 0;
+    u32 op, ident, len, size; const u8 *src;
+    mg_item(mg_step, &op, &ident, &src, &len, &size);
+    trace(EV_MG_STEP, 0, mg_step << 16 | (op == MG_END ? 0xFFFF : ident));
+}
+
+/* One frame of the server; may start a block (bs) or consume the game's (rb). */
+static void mg_frame(void)
+{
+    u32 op, ident, len, size; const u8 *src;
+    mg_item(mg_step, &op, &ident, &src, &len, &size);
+    if (op == MG_END || bs.active)
+        return;
+    if (op == MG_SEND) {
+        if (mg_sub == 0) {                                       /* header: ident, CRC, size */
+            u16 crc = crc16(src, len, 0x1121);
+            u8 zero = 0;
+            for (u32 i = len; i < size; i++) crc = crc16(&zero, 1, crc);
+            crc = ~crc;
+            mg_head[0] = ident; mg_head[1] = 0; mg_head[2] = crc; mg_head[3] = crc >> 8;
+            mg_head[4] = size; mg_head[5] = size >> 8;
+            bs_start(mg_head, 6, 6);
+            mg_off = 0;
+            mg_sub = 1;
+        } else if (mg_off < size) {                              /* data, 252 bytes a block */
+            u32 n = size - mg_off < 252 ? size - mg_off : 252;
+            bs_start(src + mg_off, mg_off < len ? (len - mg_off < n ? len - mg_off : n) : 0, n);
+            mg_off += n;
+        } else {
+            mg_next();
+        }
+        return;
+    }
+    /* MG_RECV: header, then blocks until size bytes */
+    if (rb.done == mg_got)
+        return;
+    mg_got = rb.done;
+    if (mg_sub == 0) {
+        mg_ident = rb.head[0] | rb.head[1] << 8;
+        mg_size = rb.head[4] | rb.head[5] << 8;
+        if (mg_ident != ident || mg_size > 0x400) {
+            mg_errors++;
+            trace(EV_MG_ERROR, 0, mg_ident << 16 | mg_size);
+        }
+        mg_off = 0;
+        mg_sub = 1;
+        if (mg_size == 0)
+            mg_next();
+        return;
+    }
+    {
+        u32 n = mg_size - mg_off < 252 ? mg_size - mg_off : 252;
+        if (ident == ID_GAME_DATA && mg_off == 0)
+            memcpy(game_data, rb.head, sizeof game_data);
+        mg_off += n;
+        if (mg_off >= mg_size)
+            mg_next();
+    }
+}
+
+static void rb_init(void)
+{
+    if (rb.state == 0) {
+        rb.state = 1;
+        rb.count = rx_cmd[1] < 24 ? rx_cmd[1] : 24;
+        rb.flags = 0;
+        memset(rb.head, 0, sizeof rb.head);
+    }
+}
+
+static u32 standby_reply, standby_num, close_reply;
+
+static void handle_child_cmd(void)
+{
+    switch (rx_cmd[0] & 0xFF00) {
+    case CMD_BLOCK_INIT: rb_init(); break;
+    case CMD_BLOCK:      rb_chunk(rx_cmd[0] & 0xFF); break;
+    case CMD_READY_EXIT: standby_reply = 1; standby_num = rx_cmd[1]; break;
+    case CMD_READY_CLOSE: close_reply = 1; break;
+    }
+}
+
+/* Our link-player block: "GameFreak inc." magic, a struct LinkPlayer, the magic again. */
+static u8 player_block[60];
+static void build_player_block(void)
+{
+    static const char magic[] = "GameFreak inc.";
+    memset(player_block, 0, sizeof player_block);
+    memcpy(player_block, magic, 14);
+    memcpy(player_block + 44, magic, 14);
+    u8 *lp = player_block + 16;
+    lp[0] = 3; lp[1] = 0x40;                       /* version: Emerald + 0x4000 */
+    lp[3] = 0x80;                                  /* lp_field_2 = 0x8000 */
+    lp[4] = 0x34; lp[5] = 0x12;                    /* trainerId */
+    lp[8] = 0xBE; lp[9] = 0xCF; lp[10] = 0xC9;     /* name "DUO" */
+    memset(lp + 11, 0xFF, 5);
+    lp[26] = 1;                                    /* language: Japanese */
+}
+
+enum { LS_OFF, LS_IDS, LS_REQ, LS_EXCHANGE, LS_SERVE, LS_DONE };
+
+static void link_frame(void)
+{
+    memset(rx_cmd, 0, sizeof rx_cmd);
+    memset(tx_cmd, 0, sizeof tx_cmd);
+    if (child_uni_new) {
+        child_uni_new = 0;
+        if (child_uni[1]) {                                      /* a command (its high byte) */
+            child_uni[0] &= 0x1F;                                /* drop the sequence number */
+            for (u32 j = 0; j < 7; j++)
+                rx_cmd[j] = child_uni[2 * j] | child_uni[2 * j + 1] << 8;
+            n_child_cmds++;
+            handle_child_cmd();
+        }
+    }
+    link_timer++;
+    if (link_state == LS_EXCHANGE && rb.done) {                  /* the game's link player arrived */
+        memcpy(child_player, rb.head, sizeof child_player);
+        trace(EV_LINK_PLAYERS, 0, child_player[20] | child_player[21] << 8 | child_player[22] << 16
+              | (u32)child_player[23] << 24);
+        link_state = LS_SERVE;
+        mg_got = rb.done;
+        link_timer = 0;
+    }
+    if (standby_reply) {                                         /* Rfu_LinkStandby, as the leader */
+        standby_reply = 0;
+        tx_cmd[0] = CMD_READY_EXIT; tx_cmd[1] = standby_num;
+        return;
+    }
+    if (close_reply) {
+        close_reply = 0;
+        tx_cmd[0] = CMD_READY_CLOSE;
+        trace(EV_CLOSE, 0, mg_step);
+        return;
+    }
+    if (bs_step())
+        return;
+    switch (link_state) {
+    case LS_IDS:                                                 /* two players; slot 0 is player 1 */
+        tx_cmd[0] = CMD_PLAYER_IDS; tx_cmd[1] = 2; tx_cmd[2] = 0x0001;
+        link_state = LS_REQ;
+        break;
+    case LS_REQ:                                                 /* everyone sends their link player */
+        tx_cmd[0] = CMD_BLOCK_REQ; tx_cmd[1] = 0;                /* BLOCK_REQ_SIZE_NONE: 200 bytes */
+        build_player_block();
+        bs_start(player_block, sizeof player_block, 200);
+        link_state = LS_EXCHANGE;
+        link_timer = 0;
+        break;
+    case LS_EXCHANGE:
+        if (link_timer > 240 && rb.state == 0)                   /* nothing in 4 s: ask again */
+            link_state = LS_IDS;
+        break;
+    case LS_SERVE:
+        if (link_timer > 10)
+            mg_frame();
+        break;
+    }
+}
+
 /* A data command from the connected game: librfu's child packet, header word first
  * (bytes << 8 for slot 0), then 2-byte-headed sub-frames. */
 static void host_receive(void)
@@ -341,6 +651,11 @@ static void host_receive(void)
             ni_receive(st, (h >> 5) & 3, (h >> 7) & 3, len, d + at + 2);
         else if (!recv_first && st != LCOM_UNI && (nis.state & NI_BUSY))
             nis_ack(st, (h >> 5) & 3, (h >> 7) & 3);                 /* the game acknowledging us */
+        else if (!recv_first && st == LCOM_UNI && len <= 16) {
+            memcpy(child_uni, d + at + 2, len);                      /* librfu's rfu_STC_UNI_receive */
+            if (len < 16) memset(child_uni + len, 0, 16 - len);
+            child_uni_new = 1;
+        }
         at += 2 + len;
     }
     if (ni.state == NI_RECV_LAST && !ni_end_seen) {         /* librfu's rfu_CB_recvData */
@@ -353,9 +668,11 @@ static void host_receive(void)
 /* The host's frame for the game to read (0x26): the NI acknowledgement while receiving
  * (3-byte header: size 0, phase, n, ack, slot state, addressed slots), else librfu's
  * one-byte "null" frame. Returns the answer length. */
+static u32 hf[32], hf_len;               /* the host's packet for the next 0x26 (0: none) */
+
 static u32 host_frame(void)
 {
-    u8 *out = (u8 *)&ack[1];
+    u8 *out = (u8 *)&hf[1];
     u32 bytes = 0;
     host_frames++;
     if (ni.state & NI_BUSY) {
@@ -369,7 +686,17 @@ static u32 host_frame(void)
         if (was_null) {                                              /* librfu's rfu_CB_sendData */
             nis.state = NI_SEND_OK;
             trace(EV_JOIN_SENT, 0, join_group_ok);
+            link_state = LS_IDS;                                     /* stage D2 starts next frame */
+            link_timer = 0;
         }
+    } else if (link_state != LS_OFF) {
+        link_frame();                                                /* UNI: gRfu.recvCmds */
+        u32 h = LCOM_UNI << 14 | UNI_BYTES | 1u << 18;
+        out[bytes] = h; out[bytes + 1] = h >> 8; out[bytes + 2] = h >> 16;
+        memset(out + bytes + 3, 0, UNI_BYTES);
+        memcpy(out + bytes + 3, tx_cmd, 14);                         /* row 0: us */
+        memcpy(out + bytes + 3 + 14, rx_cmd, 14);                    /* row 1: the game's, echoed */
+        bytes += 3 + UNI_BYTES;
     }
     if (!bytes) {
         out[0] = 0xFF;                                               /* librfu's one-byte null frame */
@@ -378,15 +705,15 @@ static u32 host_frame(void)
     u32 total = bytes;
     while (bytes & 3)
         out[bytes++] = 0;
-    ack[0] = total;                                                  /* bytes from the host */
+    hf[0] = total;                                                   /* bytes from the host */
     return 1 + bytes / 4;
 }
 
 /* What the game sends us once connected: the first few data commands, word for word. This is
  * librfu's own framing of the child's first messages (its game name over the NI channel) - the
  * ground truth the host side will be built against. */
-#define CAP_CMDS 8
-#define CAP_WORDS 24
+#define CAP_CMDS 4
+#define CAP_WORDS 8
 static u32 cap_cmd[CAP_CMDS], cap_data[CAP_CMDS][CAP_WORDS], cap_count;
 
 static void capture(void)
@@ -438,6 +765,9 @@ static void respond(void)
             adapter_state = ST_CONNECTED;
             ni_reset();
             memset(&nis, 0, sizeof nis);
+            link_state = LS_OFF; hf_len = 0; child_uni_new = 0;
+            memset(&bs, 0, sizeof bs); memset(&rb, 0, sizeof rb);
+            mg_step = mg_sub = mg_got = 0;
             if (cmd == 0x21) trace(EV_CONNECTED, 0, CHILD_ID);
         } else {
             ack[0] = connect_polls ? 0x01000000 : 0x04000000;          /* trying / failed */
@@ -447,7 +777,7 @@ static void respond(void)
         break;
     case 0x24: capture(); if (child_connected) host_receive(); break;
     case 0x25: capture(); if (child_connected) host_receive(); swap_after = 1; break;
-    case 0x26: if (child_connected) ack_len = host_frame(); break;    /* the host's frame */
+    case 0x26: memcpy(ack, hf, hf_len * 4); ack_len = hf_len; hf_len = 0; break;  /* the host's packet */
     case 0x27: swap_after = 1; break;
     case 0x30: child_connected = 0; adapter_state = ST_IDLE; break;
     case 0x32: case 0x34: break;
@@ -679,7 +1009,11 @@ static void judge_flick(int accepted)
 static void idle_after_command(void)
 {
     SIOCNT = CNT_32BIT;                                       /* low, unarmed: the game's last check */
-    wait_si(0, HANDSHAKE_LINES);                              /* it has seen us and gone idle */
+    /* It has seen us once it goes idle (low), and may start its next command microseconds later
+     * (link_rfu_2 sends straight after receiving), so watch for that in a tight loop - no clock
+     * reads - and re-arm at once. 200000 polls is well over the 10 ms handshake allowance. */
+    for (u32 n = 0; n < 200000 && si(); n++)
+        ;
     arm_idle();                                               /* rest high for the next command */
 }
 #endif
@@ -754,6 +1088,8 @@ static void clock_master_turn(api_t *api)
             break;
     }
     cmd = child_connected ? 0x99660028 : 0x99660027;           /* data ready / nothing happened */
+    if (child_connected && !hf_len)
+        hf_len = host_frame();                                 /* this frame's packet from the host */
     if (!master_word(cmd, &got)) goto failed;
     /* inverted handshake: we stay low, the game goes high, we go high, the game re-arms (low) */
     if (!wait_si(1, HANDSHAKE_LINES)) goto failed;
@@ -845,7 +1181,8 @@ static void link_word(api_t *api, u32 in)
         }
     request_done:
         n_commands++;
-        trace(req_cmd, req_len, req_len ? req[0] : 0);
+        if (link_state == LS_OFF || req_cmd < 0x24 || req_cmd > 0x27)  /* (once the link is up, the */
+            trace(req_cmd, req_len, req_len ? req[0] : 0);             /*  per-frame traffic is not) */
         respond();
         phase = PH_ACK_HEADER;
         handshake_then_arm(ack[31]);
@@ -895,7 +1232,13 @@ static int pc_service(api_t *api)
         stop_requested = 1;
         return 1;
     }
-    u32 v, i = (arg >> 8) % TRACE_N;
+    if (pkt[3] == 0x2C) {                                      /* PUT: the next word of the gift */
+        if (put_at < sizeof gift_words / 4)
+            gift_words[put_at++] = arg;
+        api->reply(0x2C, put_at);
+        return 0;
+    }
+    u32 v, idx = arg >> 8, i = idx % TRACE_N;
     switch (arg & 0xFF) {
     case 0: v = status_word(); break;
     case 1: v = last_word; break;
@@ -910,8 +1253,8 @@ static int pc_service(api_t *api)
                  | child_name[4 * (i & 7) + 2] << 16 | (u32)child_name[4 * (i & 7) + 3] << 24 : 0; break;
     case 18: v = (ni.state & 0xFFFF) | (child_frames & 0xFF) << 16 | (host_frames & 0xFF) << 24; break;
     case 19: v = nis.state; break;
-    case 16: v = (i >> 5) < CAP_CMDS ? ((i & 31) == 31 ? cap_cmd[i >> 5]
-                                      : (i & 31) < CAP_WORDS ? cap_data[i >> 5][i & 31] : 0) : 0; break;
+    case 16: v = (idx >> 5) < CAP_CMDS ? ((idx & 31) == 31 ? cap_cmd[idx >> 5]
+                                        : (idx & 31) < CAP_WORDS ? cap_data[idx >> 5][idx & 31] : 0) : 0; break;
     case 9: v = i <= W_MAX ? (w_pulses[i] & 0xFFFF) | (w_clocked[i] << 16) : 0; break;
     case 10: v = i <= W_MAX ? (w_accepted[i] & 0xFFFF) | (w_rejected[i] << 16) : 0; break;
     case 11: v = flick_w | (scope_count << 8); break;
@@ -923,6 +1266,18 @@ static int pc_service(api_t *api)
 #ifdef PROBE
     case 6: v = i < N_ENC ? (tries[i] | accepts[i] << 16) : 0; break;
     case 7: v = i < N_ENC ? acks_ok[i] : 0; break;
+#endif
+#ifndef PROBE
+    case 20: put_at = 0; gift_ready = 0; v = sizeof gift_words; break;   /* start loading a gift */
+    case 21:                                                   /* loaded: check it, then use it */
+        v = api->crc32(gift_words, put_at * 4);
+        gift_ready = put_at * 4 >= 4 + CARD_SIZE + 1000 && CARD_SIZE >= 16 && CARD_SIZE <= 0x14C;
+        break;
+    case 22: v = link_state | mg_step << 4 | mg_errors << 8 | (n_child_cmds & 0xFFFF) << 16; break;
+    case 23: v = (i & 15) < 16 ? game_data[4 * (i & 15)] | game_data[4 * (i & 15) + 1] << 8
+                 | game_data[4 * (i & 15) + 2] << 16 | (u32)game_data[4 * (i & 15) + 3] << 24 : 0; break;
+    case 24: v = child_player[4 * (i & 15)] | child_player[4 * (i & 15) + 1] << 8
+                 | child_player[4 * (i & 15) + 2] << 16 | (u32)child_player[4 * (i & 15) + 3] << 24; break;
 #endif
     default: v = 0xFFFFFFFF; break;
     }

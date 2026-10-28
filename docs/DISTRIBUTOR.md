@@ -59,8 +59,8 @@ works on real hardware.
 | B. **A distributor in range** *(simulator: done)* | Search results with one host; after about 2 s, `connect (0x1F)` and polls | The game finds a distributor and tries to connect |
 | C. Connected *(simulator: done)* | `0x21` success, clock swap, child name received | "Awaiting response…" |
 | D1. Join accepted *(simulator: done)* | "told the game it may join" | "Wireless link established" |
-| D2. Link players exchanged | link_rfu_2 per-frame packets both ways | (behind the scenes) |
-| E. Card delivered | Server script runs to the end | The Old Sea Map Wonder Card is received |
+| D2. Link players exchanged *(simulator: done)* | "link players exchanged", the game's trainer ID | "Communicating…" |
+| E. Card delivered *(simulator: done)* | Server steps 1–6, "ready to close" | The Old Sea Map Wonder Card is received |
 
 Each stage gets a game-side model in the simulator, ported from the decomp, before it runs on
 hardware. That's how the command layer was built.
@@ -105,23 +105,79 @@ The game's side of each stage is a port of librfu's own NI sender and receiver, 
 `tests/rfu_game_model.py`. Both sides are written from the same reading of the decomp, so the real
 check is hardware. The first connection will print the game's actual frames, word for word.
 
-## Stage D2 onwards (next)
+## Stages D2 and E: link players, then the gift (simulator: done, 28 October)
 
-After joining, link_rfu_2 switches both sides to **UNI** (unreliable, every frame) packets of
-`COMM_SLOT_LENGTH` bytes:
-- The child sends `gSendCmd`: 8 u16s, the first carrying the command and a 3-bit sequence
-  number in its top bits.
-- The host sends `gRfu.recvCmds`: every player's commands.
+After joining, link_rfu_2 switches both sides to **UNI** (unreliable, every frame) packets. What
+the program does, and what the game model in `tests/rfu_game_model.py` checks it against (ports of
+`link_rfu_2.c`, `link_rfu_3.c`, `link.c`, `mystery_gift_link.c`, `mystery_gift_client.c` and
+`util.c`):
 
-The commands that matter for Mystery Gift:
-- `RFUCMD_SEND_PLAYER_IDS(_NEW)` (0x7700/0x7800): who is who.
-- `RFUCMD_SEND_BLOCK_INIT/BLOCK/BLOCK_REQ` (0x8800/0x8900/0xA100): link.c's block transfers. The
-  link player records go this way, then everything `mystery_gift_link.c` sends.
-- `RFUCMD_READY_CLOSE_LINK` (0x5F00) at the end.
+- **Every frame.** Before saying "data ready" (0x28), the host builds one packet; `0x26` hands it
+  over once. Its UNI sub-frame is `gRfu.recvCmds`: seven u16s for each of five players, 70 bytes.
+  Row 0 is our own command; row 1 is the game's last command, echoed back with its 3-bit sequence
+  number removed. The game (link player 1) depends on that echo: its block sender waits to see
+  its own `0x8800` come back, and keeps resending its last chunk until it has received its whole
+  block back. Rows 2–4 stay empty.
+- **The game's side.** It answers each new packet with one 14-byte sub-frame (`0x25`), or just
+  hands the clock back (`0x27`) when it has nothing ready, as librfu does.
+- **Link players.** The host sends `0x7700` (two players; slot 0 is player 1), then `0x8800`
+  block request (200 bytes), then its own link-player block: "GameFreak inc.", a `struct
+  LinkPlayer` (Emerald, Japanese, trainer 01234, name "DUO"), the magic again. The game sends
+  its own block the same way. Both sides check the magic strings. If nothing arrives in 4 s, the
+  host asks again.
+- **Standby.** The game sends `0x6600` and waits until it has the leader's too; the host
+  answers each one with the same count.
+- **Mystery Gift.** `mystery_gift_link.c` sends a 6-byte header (ident, CRC-16, size), then the
+  data in blocks of up to 252 bytes. The server follows Emerald's
+  `gMysteryGiftServerScript_SendWonderCard`, trimmed to what a distributor needs:
+  1. send the client script `sClientScript_SendGameData`;
+  2. receive the game's `MysteryGiftLinkGameData` (the PC shows its first 64 bytes);
+  3. send `sClientScript_SaveCard`: receive card, save card, receive RAM script, save it, send
+     "ready to end", return "card received";
+  4. send the Wonder Card (0xA4 bytes for Japanese);
+  5. send the RAM script (1000 bytes, padded to 1024 as Emerald does);
+  6. receive "ready to end" (1024 bytes).
 
-Then `mystery_gift_server.c`'s script for a Wonder Card sends the card, its script and the RAM
-script, and waits for the client's replies. The host side needs:
-1. a UNI sender and receiver for slot 0, much simpler than NI;
-2. a small link_rfu_2 parent: player ids, block send and receive, sequence numbers;
-3. the server script with the user's `.wc3` (uploaded by the PC into a second memory area if the
-   12 KB program area is too small).
+  The card-checking steps (does the game already have a card, the questionnaire) are skipped:
+  their layout in the Japanese game's data isn't known. So a card the game already holds is
+  replaced, as `SaveWonderCard` does.
+- **No card loaded.** The server sends `sClientScript_NothingSent` instead. The game then says
+  there was nothing to receive. This is the safe first hardware run.
+- **Closing.** The game sends `0x5F00`; the host sends its own; the game disconnects (`0x30`).
+- **Pacing.** The host sends each block start (`0x8800`) 8 times rather than 4. It leaves 8
+  frames between blocks, so the game always has time to take one block before the next starts.
+  The game ignores repeats.
+- **The card** comes from the user's own `.wc3` file: `--wonder-card FILE.wc3`. The PC checks the
+  size (1252 bytes Japanese, 1420 others) and that the card has an event flag. It uploads card
+  size + card + RAM script (`0x2C` PUT, one word a packet, then a CRC-32 check). Nothing from the
+  file goes into the repository.
+- **Memory.** Everything still fits the program area: 11.5 KB of the 11.75 KB below Datel's
+  message buffer at 0x0203AE00. To make room, the trace went to 64 entries and the capture to
+  four commands of eight words. Once the link is up, the per-frame `0x24`–`0x27` traffic is
+  left out of the trace.
+
+Tests: the whole sequence runs end to end. With a made-up card, the game ends with "card
+received", holding exactly the card and RAM script sent. Without a card it ends with "nothing
+sent". Nine planted bugs check that the tests notice when the host side goes wrong:
+
+- echo removed;
+- wrong player number;
+- standby ignored;
+- close never agreed;
+- sequence bits left in;
+- chunk bytes swapped;
+- header CRC off by one bit;
+- "save as Wonder News";
+- the PC reading the RAM script from the wrong offset.
+
+**What only hardware can tell.** The model and the host come from the same reading of the
+decomp, which is the English game. Two things specific to the Japanese game:
+
+- **Client script numbers.** They are assumed to match. Japanese and English Emerald share this
+  code (FireRed's `mevent` is the same design), but no Japanese decomp exists to confirm it.
+- **Wonder Card and RAM script sizes.** These come from the `.wc3` layout, as suloku's tool
+  writes it.
+
+If the Japanese numbers differ, the game would most likely stop with a communication error. At
+worst it would freeze. Either way the cartridge is safe: everything received stays in RAM until
+the game's own save step, which only runs after a successful "card received".

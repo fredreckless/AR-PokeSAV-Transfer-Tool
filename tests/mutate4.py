@@ -28,6 +28,14 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "host acknowledges with the wrong window number": ("ni.n[ni.phase] << 11 | 1u << 18", "((ni.n[ni.phase] + 1) & 3) << 11 | 1u << 18", "NI channel"),
     "host never moves on after the game acknowledges": ("        nis.acked[phase] = 1;", "        ;", "may join"),
     "host sends the wrong join status": ("static const u8 join_group_ok = 5;", "static const u8 join_group_ok = 6;", "may join"),
+    "parent doesn't echo the game's commands": ("        memcpy(out + bytes + 3 + 14, rx_cmd, 14);                    /* row 1: the game's, echoed */\n", "", "Mystery Gift delivers"),
+    "parent gives the game the wrong player number": ("tx_cmd[2] = 0x0001;", "tx_cmd[2] = 0x0002;", "Mystery Gift delivers"),
+    "parent ignores the game's standby": ("    case CMD_READY_EXIT: standby_reply = 1;", "    case CMD_READY_EXIT: standby_reply = 0;", "Mystery Gift delivers"),
+    "parent never agrees to close the link": ("    case CMD_READY_CLOSE: close_reply = 1;", "    case CMD_READY_CLOSE: close_reply = 0;", "nothing to send"),
+    "parent keeps the game's sequence number": ("            child_uni[0] &= 0x1F;", "            ;", "Mystery Gift delivers"),
+    "parent swaps the bytes in block chunks": ("tx_cmd[1 + j] = lo | hi << 8;", "tx_cmd[1 + j] = hi | lo << 8;", "Mystery Gift delivers"),
+    "server's header CRC is off by one bit": ("            crc = ~crc;", "            crc = ~crc ^ 1;", "Mystery Gift delivers"),
+    "server tells the game to save the card as Wonder News": ("CLI_SAVE_CARD = 10,", "CLI_SAVE_CARD = 9,", "Mystery Gift delivers"),
     "adapter has no watchdog mid-command": ("        if (phase != PH_COMMAND && phase != PH_ID && now() - last_word_at > WATCHDOG_LINES) {", "        if (0) {", "wireless adapter: the game gives up"),
 }
 
@@ -41,6 +49,7 @@ PC_MUTANTS = {
     "DeleteFile allowed": ("    0x1C: \"DeleteFile", "    0x1D: \"DeleteFile", "refusals"),
     "adapter test never stops the program": ("    finally:\n        word = program_poll(duo, 1)\n        st = program_stop(duo)\n", "    finally:\n        word = st = 0\n", "adapter test"),
     "adapter program answers with the wrong ID": ("ADAPTER_IMAGE", "ADAPTER_IMAGE_WRONG_ID", "adapter test: answers"),
+    "Wonder Card's RAM script read from the wrong place": ("    script = data[4 + size + 0x50 + 4:4 + size + 0x50 + 4 + 1000]", "    script = data[4 + size + 0x50:4 + size + 0x50 + 1000]", "Mystery Gift delivers"),
     "known game table ignored": ("    known = KNOWN_SAVE_GAMES.get(info[\"code\"][:3])\n    if forced:", "    known = None\n    if forced:", "known games"),
 }
 
