@@ -886,6 +886,12 @@ static void idle_after_command(void)
  *     its clock a microsecond or two after it notices the low (librfu_intr.c: handshake_wait(0),
  *     STWI_stop_timer_in_RAM, two SIOCNT writes), so the flick must be long enough to be noticed
  *     down the cable, and short enough to be over before that first clock edge.
+ *   - Lab session 15 (29,562 flicks up to 12 us wide, none noticed; the game noticed at once when
+ *     we sat disarmed and low): while armed, our SO shows the loaded word's first bit, whatever
+ *     SIOCNT bit 3 says (as GBATEK describes an active transfer). So the flick now DISARMS for a
+ *     moment - SO really goes low - and re-arms before the game's first clock edge. If the game
+ *     clocks while we are still disarmed the word is lost: we see its SO go low with no word, and
+ *     narrow the flick.
  *   - Lab sessions 12-14: a two-instruction flick (~0.25 us) is noticed only rarely. The width
  *     is now tuned while running: if the game never clocks, flicks get wider; if it clocks but
  *     then rejects the word (first bit wrong), they get narrower. Per-width counts go to the PC.
@@ -943,6 +949,8 @@ static void arm_idle(void)
     SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;
 }
 
+static void judge_flick(int accepted);
+
 #define FLICK_QUIET 40          /* polls of SIOCNT (see calibrate): well over one 16 us word */
 #define PULSES_PER_WIDTH 4
 #define FLICK_LINES 790        /* ~50 ms of flicking: inside librfu's 80 ms handshake timeout */
@@ -956,15 +964,15 @@ static void arm_word(u32 w)
         SIOCNT = CNT_32BIT | CNT_START;
         return;
     }
+    SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;             /* armed: SO shows the word's first bit */
     if (flick_good >= 0)
         flick_w = flick_good;                                 /* start from the last width that worked */
     t0 = now();
     for (;;) {
         u32 fw = flick_w, si_bits[2] = { 0, 0 }, done_at = 0xFF;
-        SIOCNT = CNT_32BIT | CNT_START;                       /* low: ready */
+        SIOCNT = CNT_32BIT;                                   /* disarmed for a moment: SO really low */
         spin(fw);
-        if (SIOCNT & CNT_START)                               /* (never re-arm a finished word) */
-            SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;     /* high again for the first bit */
+        SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;         /* armed again before the first clock edge */
         w_pulses[fw]++;
         for (u32 i = 0; i < FLICK_QUIET; i++) {
             u32 c = SIOCNT;
@@ -972,7 +980,10 @@ static void arm_word(u32 w)
                 si_bits[i >> 5] |= 1u << (i & 31);
             if (!(c & CNT_START)) { done_at = i; break; }
         }
-        if (cap < SCOPE_N && (done_at != 0xFF || tries == 0)) {
+        /* The game went low (it saw us and clocked) but our word never completed: it clocked while
+         * we were still disarmed, and the word is lost. The pulse is too wide. */
+        int lost = done_at == 0xFF && (si_bits[0] != 0xFFFFFFFF || (si_bits[1] & 0xFF) != 0xFF);
+        if (cap < SCOPE_N && (done_at != 0xFF || tries == 0 || lost)) {
             scope_si[cap][0] = si_bits[0];
             scope_si[cap][1] = si_bits[1];
             scope_meta[cap] = fw | (done_at << 8) | (w & 0xFFFF0000);
@@ -981,6 +992,12 @@ static void arm_word(u32 w)
         if (done_at != 0xFF) {
             w_clocked[fw]++;
             last_flick = fw;                                  /* judged at the next handshake */
+            return;
+        }
+        if (lost) {
+            w_clocked[fw]++;
+            last_flick = fw;
+            judge_flick(0);                                   /* narrower; the game will retry */
             return;
         }
         if (++tries % PULSES_PER_WIDTH == 0 && flick_w < W_MAX)

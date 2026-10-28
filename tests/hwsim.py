@@ -239,7 +239,11 @@ class Hw:
         return struct.unpack("<H", self.mu.mem_read(0x04000128, 2))[0]
 
     def lg_duo_so(self):
-        return (self.lg_cnt() >> 3) & 1
+        cnt = self.lg_cnt()
+        if self.lg_first and cnt & 0x80 and not cnt & 0x1 and cnt & 0x1000:
+            # lab session 15: while armed, SO shows the loaded word's first bit, not SIOCNT bit 3
+            return struct.unpack("<I", self.mu.mem_read(0x04000120, 4))[0] >> 31
+        return (cnt >> 3) & 1
 
     def lg_on_read(self, mu, access, addr, size, value, _):
         if addr in (0x04000006, 0x04000007):
@@ -248,13 +252,47 @@ class Hw:
             c = self.lg_cnt() & ~4 | (4 if self.game_so else 0)
             mu.mem_write(0x04000128, struct.pack("<H", c))
 
+    def lg_pin_model(self, mu, old, v):
+        """Lab session 15's reading of the hardware. Armed, SO follows the word's first bit, so a
+        low written to bit 3 while armed shows nothing. Disarmed, SO is bit 3: a 'ready' flick
+        must disarm for a moment. If the game's clock starts before the DUO re-arms, the word is
+        lost."""
+        armed_now = v & 0x80 and not v & 0x1 and v & 0x1000
+        was_armed = old & 0x80 and not old & 0x1 and old & 0x1000
+        if armed_now:
+            msb = struct.unpack("<I", mu.mem_read(0x04000120, 4))[0] >> 31
+            if not msb and not was_armed:
+                self.duo_low_seen = True              # a plain armed low (top bit 0): ready
+                self.armed_low_since = self.blocks
+            return
+        if v & 0x8:
+            return
+        if was_armed:                                 # disarmed and low: a flick starts
+            if self.armed_low_since is None or self.blocks - self.armed_low_since >= 60:
+                self.armed_low_since = self.blocks    # (the game's clock follows its FIRST sighting)
+            elif self.duo_low_seen:
+                self.link_trouble.append("the DUO flicked again just before the game's clock")
+                self.flick_mid_word = True
+            if self.lg_flick:
+                w = struct.unpack("<I", mu.mem_read(self.lg_flick[0], 4))[0]
+                self.last_pulse_w = w
+                self.duo_low_seen = w >= self.lg_flick[1]
+            else:
+                self.duo_low_seen = True
+        else:
+            self.duo_low_seen = True                  # a steady low (end of a command)
+
     def lg_on_siocnt(self, mu, access, addr, size, value, _):
         old = self.lg_cnt()
         v = value & 0xFFFF if addr == 0x04000128 and size >= 2 else \
             (old & 0xFF00 | value & 0xFF) if addr == 0x04000128 else (old & 0xFF | (value << 8) & 0xFF00)
-        if v & 0x8 or not v & 0x80:
+        if self.lg_first:
+            self.lg_pin_model(mu, old, v)
+        elif v & 0x8 or not v & 0x80:
             self.armed_low_since = None
-        if not v & 0x8:
+        if self.lg_first:
+            pass
+        elif not v & 0x8:
             if self.lg_flick and v & 0x80:     # an armed low: a flick of flick_w spin steps
                 addr, wmin, wmax = self.lg_flick
                 w = struct.unpack("<I", mu.mem_read(addr, 4))[0]
@@ -264,7 +302,9 @@ class Hw:
                 self.duo_low_seen = True        # a real GBA polling SI could catch even a brief low
             if v & 0x80 and not (old & 0x80 and not old & 0x8):
                 self.armed_low_since = self.blocks
-        if self.lg_first and self.lg_xfer is not None and self.lg_xfer[1] is not None:
+            elif not v & 0x80 and old & 0x80:           # disarmed and low: a flick starts
+                self.armed_low_since = self.blocks
+        if self.lg_first and self.lg_xfer is not None and isinstance(self.lg_xfer[1], int):
             # touching SIOCNT while the game clocks a word loses that word (lab session 13)
             self.lg_xfer = (self.lg_xfer[0], self.lg_xfer[1] ^ 0x0000FFFF)
             self.link_trouble.append("the DUO wrote SIOCNT in the middle of a word")
@@ -346,7 +386,7 @@ class Hw:
                     self.lg_resume(None); continue
                 return
             if k == "xfer":
-                if (self.lg_xfer is None and (self.lg_flick or self.lg_first) and self.armed_low_since is not None
+                if (self.lg_xfer is None and self.armed_low_since is not None
                         and self.blocks - self.armed_low_since < 60):
                     return      # the game's clock starts a little after it sees the flick (librfu: stop
                                 # the timer, two SIOCNT writes); the flick window decides the first bit
@@ -359,14 +399,20 @@ class Hw:
                     if armed and self.lg_first and len(op) > 2 and op[2] == 2:
                         duo_word = ((cnt >> 3 & 1) << 31) | (duo_word & 0x7FFFFFFF)
                         if self.lg_flick and self.last_pulse_w is not None and self.last_pulse_w > self.lg_flick[2]:
-                            duo_word &= 0x7FFFFFFF      # the flick was still low at the first clock edge
+                            duo_word = "lost"           # still disarmed at the first clock edge
+                    if armed and getattr(self, "flick_mid_word", False):
+                        duo_word = "lost"               # a second flick landed on the clock edges
+                    self.flick_mid_word = False
                     self.last_pulse_w = None
                     self.lg_xfer = (self.blocks + self.lg_x, duo_word)
                     return
                 done_at, duo_word = self.lg_xfer
                 if self.blocks < done_at:
                     return
-                if duo_word is None:
+                if duo_word == "lost":
+                    got = 0                             # it read our low SO; our own word never ran
+                    self.link_trouble.append(f"the game clocked {op[1]:#010x} while the DUO was disarmed")
+                elif duo_word is None:
                     got = 0xFFFFFFFF if self.lg_duo_so() else 0
                     self.link_trouble.append(f"the game clocked {op[1]:#010x} but the DUO wasn't ready")
                 else:

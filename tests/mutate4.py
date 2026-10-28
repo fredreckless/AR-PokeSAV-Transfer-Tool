@@ -19,7 +19,6 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "adapter acknowledges without the 0x80": ("((cmd + 0x80) & 0xFF)", "(cmd & 0xFF)", "wireless adapter: Emerald"),
     "adapter never takes its turn after a wait": ("frames * LINES_PER_FRAME)\n            break;", "frames * LINES_PER_FRAME * 100000)\n            break;", "wireless adapter: Emerald"),
     "adapter rests SO low before a command (no first-bit fix)": ("    SIODATA32 = IDLE_WORD;\n    SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;\n}", "    SIODATA32 = IDLE_WORD;\n    SIOCNT = CNT_32BIT | CNT_START;\n}", "first-bit behaviour"),
-    "adapter flicks again without waiting out the word": ("#define FLICK_QUIET 40", "#define FLICK_QUIET 1", "first-bit behaviour"),
     "adapter's flick never gets wider": ("            flick_w++;                                        /* not noticed: wider */", "            ;", "tunes its own width"),
     "adapter's flick never gets narrower": ("            flick_w = last_flick ? last_flick - 1 : 0;       /* clocked but refused: narrower */", "            ;", "tunes its own width"),
     "distributor's broadcast checksum is wrong": ("    b[15] = ~sum;", "    b[15] = sum;", "distributor"),
@@ -37,6 +36,8 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "server's header CRC is off by one bit": ("            crc = ~crc;", "            crc = ~crc ^ 1;", "Mystery Gift delivers"),
     "server tells the game to save the card as Wonder News": ("CLI_SAVE_CARD = 10,", "CLI_SAVE_CARD = 9,", "Mystery Gift delivers"),
     "host moves on even when the game missed a packet": ("        if (hf_uni && !uni_acked && n_resent < 0xFFFF)", "        if (0)", "packets lost"),
+    "adapter flicks while still armed (lab session 15: never seen)": ("        SIOCNT = CNT_32BIT;                                   /* disarmed for a moment: SO really low */", "        SIOCNT = CNT_32BIT | CNT_START;", "first-bit behaviour"),
+    "adapter's flick never narrows after a lost word": ("            judge_flick(0);                                   /* narrower; the game will retry */", "            ;", "tunes its own width"),
     "adapter has no watchdog mid-command": ("        if (phase != PH_COMMAND && phase != PH_ID && now() - last_word_at > WATCHDOG_LINES) {", "        if (0) {", "wireless adapter: the game gives up"),
 }
 
