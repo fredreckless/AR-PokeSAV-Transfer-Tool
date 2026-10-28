@@ -94,7 +94,9 @@ From librfu_rfu.c, so stage C can be built against it:
 ## Progress in the simulator (night of 27–28 October)
 
 - **Stage B.** One host in range: serial 0x7F7D, RfuGameData (Japanese, Emerald, hasCard), user
-  name "DUO", librfu's checksum. Connecting works.
+  name "DUO", librfu's checksum. Connecting works. (Since session 16 the name is "DUO" plus a
+  space, padded with 0x00, and the trainer ID is 0x5678, so that every word of the `0x1D` answer
+  after its header has a top bit of 0 and needs no flick.)
 - **Stage C.** The adapter speaks for the host once a frame (`0x28`) and serves the host's frames
   on `0x26`. The host receives the game's 26-byte name over NI and acknowledges every chunk.
 - **Stage D1.** Once it has the name, the host sends link_rfu_2's status byte
@@ -122,7 +124,7 @@ the program does, and what the game model in `tests/rfu_game_model.py` checks it
   hands the clock back (`0x27`) when it has nothing ready, as librfu does.
 - **Link players.** The host sends `0x7700` (two players; slot 0 is player 1), then `0x8800`
   block request (200 bytes), then its own link-player block: "GameFreak inc.", a `struct
-  LinkPlayer` (Emerald, Japanese, trainer 01234, name "DUO"), the magic again. The game sends
+  LinkPlayer` (Emerald, Japanese, trainer 0x5678, name "DUO"), the magic again. The game sends
   its own block the same way. Both sides check the magic strings. If nothing arrives in 4 s, the
   host asks again.
 - **Standby.** The game sends `0x6600` and waits until it has the leader's too; the host

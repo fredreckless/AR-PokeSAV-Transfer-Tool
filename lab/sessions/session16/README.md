@@ -44,4 +44,20 @@
     choose the values, for example the host ID (already 0x7DA5) and the padding.
   - Recording, per word index, which flick lost the word.
 
+**Done after the session (evening, 28 October).**
+- 0x1D's answer now needs one flick instead of four. The words were 0x9966079D, 0x00007DA5,
+  0x0FA17F7D, 0x00001234, 0x00000000, 0xB8000015, 0xFFC9CFBE, 0xFFFFFFFF. Now they are
+  0x9966079D, 0x00007DA5, 0x0FA17F7D, 0x00005678, 0x00000000, 0x2C000015, 0x00C9CFBE,
+  0x000000FF:
+  - the name is "DUO" plus a space (0x00), so its end mark 0xFF sits in a low byte, with 0x00
+    padding after it. The game copies all 8 bytes (`Rfu_GetWonderDistributorPlayerData`) but
+    reads names only up to the end mark;
+  - the trainer ID is 0x5678 (in the link-player block too), which brings the checksum byte down
+    to 0x2C.
+- "The game stopped answering" now says where: for example "answer word 4 was refused", "the
+  answer's header was refused", or "answer word 2 was never clocked" (the watchdog).
+- Probable cause of "unknown command (0xBD)": after sleep, the game clocks once more without
+  loading a new word, so its SIODATA still holds what it last received, our own 0x996600BD. A
+  command byte of 0x80 or above is always an acknowledgement, never a command, so it is harmless.
+
 Nothing was written to either cartridge.

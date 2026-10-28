@@ -22,6 +22,7 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "adapter's flick never gets wider": ("            flick_w++;                                        /* not noticed: wider */", "            ;", "tunes its own width"),
     "adapter's flick never gets narrower": ("            flick_w = last_flick ? last_flick - 1 : 0;       /* clocked but refused: narrower */", "            ;", "tunes its own width"),
     "distributor's broadcast checksum is wrong": ("    b[15] = ~sum;", "    b[15] = sum;", "distributor"),
+    "distributor's name puts 0xFF in a word's top byte (needs flicks)": ("{ 0xBE, 0xCF, 0xC9, 0x00, 0xFF, 0, 0, 0 }", "{ 0xBE, 0xCF, 0xC9, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF }", "distributor: Emerald's search"),
     "distributor doesn't say it has a card": ("               | 1 << 5                  /* hasCard */", "               | 0 << 5                  /* hasCard */", "distributor"),
     "host never acknowledges the game's chunks": ("    if (ni.state & NI_BUSY) {\n        u32 f", "    if (0) {\n        u32 f", "NI channel"),
     "host acknowledges with the wrong window number": ("ni.n[ni.phase] << 11 | 1u << 18", "((ni.n[ni.phase] + 1) & 3) << 11 | 1u << 18", "NI channel"),

@@ -237,6 +237,7 @@ def find_distributor(game, polls=150):
         for h in parse_candidates(ack):
             if h["checksum_ok"] and h["serial"] == 0x7F7D and h["gname"]["hasCard"] and not h["gname"]["started"]:
                 yield from game.command(0x1E)
+                h["words"] = list(ack)
                 return h
         yield ("delay", 16 * MS)
     raise LinkError("no distributor found")

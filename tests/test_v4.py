@@ -1109,6 +1109,9 @@ def _():
     assert found["serial"] == 0x7F7D and found["checksum_ok"] and found["gname"]["hasCard"], found
     assert found["gname"]["language"] == 1 and found["gname"]["version"] == 3 and found["uname"][:3] == bytes([0xBE, 0xCF, 0xC9])
     assert conn["status"] == 0 and conn["child_id"] == 0x2C41 and conn["swap"] == 0x99660028, conn
+    # lab session 16: each top-bit-1 word needs a flick, and flicks lose words - only the header may
+    assert found["words"][0] >> 16 == 0x9966 and all(w < 0x80000000 for w in found["words"][1:]), found["words"]
+    assert found["uname"][3:5] == bytes([0x00, 0xFF]) and found["gname"]["trainer"] == 0x5678, found
     names = [t for t, _ in trace]
     assert any(n.startswith("the game connected to the distributor") for n in names), names
     assert game.retries == 0, game.retries
@@ -1294,7 +1297,7 @@ def _():
     hw, game, trace, st, counters = adapter_session(script, lag_bits=1)
     names = [t for t, _ in trace]
     assert hw.lg_result == "failed" and game.retries == 2, (hw.lg_result, game.retries)
-    assert names[0].startswith("ID exchange") and names.count("the game stopped answering in the middle of a command (0x3d)") == 3, names
+    assert names[0].startswith("ID exchange") and names.count("the game stopped answering in the middle of a command (0x3d: no handshake after its command word)") == 3, names
 
 
 @test("2 MHz probe: on perfect wires the lagged answer is refused and the unshifted ones are accepted")

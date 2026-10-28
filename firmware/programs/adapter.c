@@ -131,9 +131,16 @@ static int swap_after;                 /* the game hands us the clock after this
  * for (link_rfu_2.c / union_room.c in the decomp): serial number 0x7F7D, RFU_SERIAL_WONDER_
  * DISTRIBUTOR, and as its "game name" a struct RfuGameData with compatibility.hasCard set.
  * Layout as librfu's rfu_REQ_configGameData builds it: serial (2), gname (13), checksum (1),
- * uname (8); checksum = ~(sum of gname[0..7] + uname[0..7]). */
+ * uname (8); checksum = ~(sum of gname[0..7] + uname[0..7]).
+ * Lab session 16: every answer word with a top bit of 1 needs a 'ready' flick, and about one
+ * flick in ten loses its word. So the values we choose keep every word of this answer below
+ * 0x80000000: the name is "DUO" plus a space (0x00), so its end mark (0xFF) falls in the low
+ * byte of a word, the padding after it is 0x00 (the game copies all 8 bytes but reads only up
+ * to the end mark), and the trainer ID puts the checksum byte below 0x80. Only the 0x9966
+ * header still needs a flick. */
 #define HOST_ID      0x7DA5
 #define CHILD_ID     0x2C41
+#define HOST_TRAINER 0x5678           /* with the name below, the checksum byte is 0x2C */
 #define SERIAL_WONDER_DISTRIBUTOR 0x7F7D
 static u32 host_cfg[6], host_on = 1, connect_polls, child_connected;
 
@@ -144,13 +151,13 @@ static void build_host(void)
                | 1 << 5                  /* hasCard */
                | 1 << 7 | 1 << 8 | 1 << 9 /* canLinkNationally, hasNationalDex, gameClear */
                | 3 << 10;                /* version: Emerald */
-    static const u8 uname[8] = { 0xBE, 0xCF, 0xC9, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };   /* "DUO" */
+    static const u8 uname[8] = { 0xBE, 0xCF, 0xC9, 0x00, 0xFF, 0, 0, 0 };   /* "DUO " */
     u8 sum = 0;
     memset(b, 0, sizeof b);
     b[0] = SERIAL_WONDER_DISTRIBUTOR & 0xFF;
     b[1] = SERIAL_WONDER_DISTRIBUTOR >> 8;
     b[2] = compat; b[3] = compat >> 8;   /* RfuGameData.compatibility */
-    b[4] = 0x34;   b[5] = 0x12;          /* .playerTrainerId */
+    b[4] = HOST_TRAINER & 0xFF; b[5] = HOST_TRAINER >> 8;   /* .playerTrainerId */
     b[12] = 21;                          /* .activity = ACTIVITY_WONDER_CARD, not started */
     memcpy(b + 16, uname, 8);
     for (int i = 0; i < 8; i++)
@@ -569,7 +576,7 @@ static void build_player_block(void)
     u8 *lp = player_block + 16;
     lp[0] = 3; lp[1] = 0x40;                       /* version: Emerald + 0x4000 */
     lp[3] = 0x80;                                  /* lp_field_2 = 0x8000 */
-    lp[4] = 0x34; lp[5] = 0x12;                    /* trainerId */
+    lp[4] = HOST_TRAINER & 0xFF; lp[5] = HOST_TRAINER >> 8;   /* trainerId, as broadcast */
     lp[8] = 0xBE; lp[9] = 0xCF; lp[10] = 0xC9;     /* name "DUO" */
     memset(lp + 11, 0xFF, 5);
     lp[26] = 1;                                    /* language: Japanese */
@@ -1056,7 +1063,7 @@ static int handshake_then_arm(u32 word)
         judge_flick(0);
 #endif
         n_lost++;
-        trace(EV_LOST, 0, req_cmd);
+        trace(EV_LOST, 0, req_cmd | phase << 8 | ack_next << 16);   /* which word was refused */
 #ifdef PROBE
         enc = enc + 1 < N_ENC ? enc + 1 : 0;                   /* the game will try again */
 #endif
@@ -1338,7 +1345,7 @@ u32 start(api_t *api)
          * game gave up on it (and will reset us or start again): wait for a new command. */
         if (phase != PH_COMMAND && phase != PH_ID && now() - last_word_at > WATCHDOG_LINES) {
             n_lost++;
-            trace(EV_LOST, 0, req_cmd);
+            trace(EV_LOST, 0, req_cmd | (phase | 0x80) << 8 | ack_next << 16);   /* never clocked */
             back_to_idle();
         }
     }
