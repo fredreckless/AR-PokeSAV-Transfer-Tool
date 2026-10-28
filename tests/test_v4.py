@@ -1037,14 +1037,15 @@ def adapter_symbol(name):
 
 
 def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits=0, first_bit=False,
-                    flick_window=None, wonder_card=None):
+                    flick_window=None, wonder_card=None, check_search=False):
     hw, duo = run42()
     game = RFU.Game()
     if attach:
         flick = (adapter_symbol("flick_w"),) + tuple(flick_window) if flick_window else None
         hw.attach_link_game(script(game), lag_bits=lag_bits, first_bit=first_bit, flick=flick)
     r = quiet(W.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds, adapter_probe=seconds,
-                                                          wonder_card=wonder_card), poll_s=0.2,
+                                                          wonder_card=wonder_card, check_search=check_search),
+              poll_s=0.2,
               stop_when=(lambda: hw.lg_done) if attach else None, program=program)
     entries, st, counters = r[0][:3]
     hw.probe = r[0][3] if len(r[0]) > 3 else None
@@ -1116,6 +1117,30 @@ def _():
     assert any(n.startswith("the game connected to the distributor") for n in names), names
     assert game.retries == 0, game.retries
     assert W.adapter_trace.last_capture == [(0x24, 2, 1, [0x00000400, 0x12345678])], W.adapter_trace.last_capture
+
+
+@test("search check: four entries per answer, all with good checksums, so librfu restarts its search (0x1E, 0x1C)")
+def _():
+    def script(game):
+        yield ("until_ready",)
+        assert (yield from game.check_id()) == 0x8001
+        for cmd, data in ((0x10, []), (0x17, [0x003C0420]), (0x16, [2, 0, 0, 0, 0, 0xFFFFFFFF]), (0x1C, [])):
+            yield from game.command(cmd, data)
+        for _ in range(30):
+            hosts = RFU.parse_candidates((yield from game.command(0x1D)))
+            if len(hosts) == 4:                     # librfu: findParentCount == RFU_CHILD_MAX
+                yield from game.command(0x1E)       # rfu_REQ_endSearchParent, then start again
+                yield from game.command(0x1C)
+                return hosts
+            yield ("delay", 16 * RFU.MS)
+        raise RFU.LinkError(f"never four entries (last answer had {len(hosts)})")
+    hw, game, trace, st, counters = adapter_session(script, first_bit=True, check_search=True)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors)
+    hosts = hw.lg_result
+    assert [h["id"] for h in hosts] == [0x7DA5, 0x7DA6, 0x7DA7, 0x7DA8] and all(h["checksum_ok"] for h in hosts), hosts
+    names = [t for t, _ in trace]
+    assert "stop searching (0x1E)" in names and names.count("start searching (0x1C)") == 2, names
+    assert "Search check" in hw.text, hw.text
 
 
 @test("distributor: after connecting, the game's name arrives over librfu's NI channel, every chunk acknowledged")

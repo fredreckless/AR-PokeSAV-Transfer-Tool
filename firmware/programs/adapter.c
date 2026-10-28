@@ -142,7 +142,7 @@ static int swap_after;                 /* the game hands us the clock after this
 #define CHILD_ID     0x2C41
 #define HOST_TRAINER 0x5678           /* with the name below, the checksum byte is 0x2C */
 #define SERIAL_WONDER_DISTRIBUTOR 0x7F7D
-static u32 host_cfg[6], host_on = 1, connect_polls, child_connected;
+static u32 host_cfg[6], host_on = 1, n_hosts = 1, connect_polls, child_connected;
 
 static void build_host(void)
 {
@@ -759,15 +759,20 @@ static void respond(void)
     case 0x1C: adapter_state = ST_SEARCHING; break;
     case 0x1D: case 0x1E:                                              /* who is in range */
         if (host_on && (adapter_state == ST_SEARCHING || cmd == 0x1E)) {
-            ack[0] = HOST_ID;                                          /* id, next free slot 0 */
-            memcpy(ack + 1, host_cfg, sizeof host_cfg);
-            ack_len = 7;
+            /* n_hosts = 4 is the PC's --check-search: librfu restarts its search (0x1E, 0x1C) as
+             * soon as one answer holds four entries whose checksums are good - proof on real
+             * hardware that our answer's data words arrive intact. */
+            for (u32 k = 0; k < n_hosts; k++) {
+                ack[7 * k] = HOST_ID + k;                              /* id, next free slot 0 */
+                memcpy(ack + 7 * k + 1, host_cfg, sizeof host_cfg);
+            }
+            ack_len = 7 * n_hosts;
         }
         if (cmd == 0x1E) adapter_state = ST_IDLE;
         break;
     case 0x1F:
         adapter_state = ST_CONNECTING;
-        connect_polls = host_on && (req[0] & 0xFFFF) == HOST_ID ? 1 : 0;
+        connect_polls = host_on && (req[0] & 0xFFFF) - HOST_ID < n_hosts ? 1 : 0;
         break;
     case 0x20: case 0x21:                                              /* connected yet? */
         if (connect_polls && (cmd == 0x21 || ++connect_polls > 2)) {
@@ -1315,6 +1320,7 @@ static int pc_service(api_t *api)
         break;
     case 22: v = link_state | mg_step << 4 | mg_errors << 8 | (n_child_cmds & 0xFFFF) << 16; break;
     case 25: v = (n_uni & 0xFFFF) | n_resent << 16; break;
+    case 26: n_hosts = idx >= 1 && idx <= 4 ? idx : 1; v = n_hosts; break;      /* --check-search */
     case 23: v = (i & 15) < 16 ? game_data[4 * (i & 15)] | game_data[4 * (i & 15) + 1] << 8
                  | game_data[4 * (i & 15) + 2] << 16 | (u32)game_data[4 * (i & 15) + 3] << 24 : 0; break;
     case 24: v = child_player[4 * (i & 15)] | child_player[4 * (i & 15) + 1] << 8
