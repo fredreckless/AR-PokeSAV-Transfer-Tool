@@ -26,6 +26,7 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "adapter arms a top-bit-0 word straight from high (lab session 17)": ("        SIOCNT = CNT_32BIT;\n        SIOCNT = CNT_32BIT | CNT_START;\n        return;", "        SIOCNT = CNT_32BIT | CNT_START;\n        return;", "distributor: Emerald's search"),
     "serial sweep offers each block only once (the game can't find its host again)": ("id = ((n >> 10) << 9 | (n & 511))", "id = ((n >> 9) << 9 | (n & 511))", "serial sweep"),
     "serial sweep doesn't record the serial the game connects to": ("        if (sweep) found_serial = req[0] & 0xFFFF;", "", "serial sweep"),
+    "distributor uses the English serial 0x7F7D (BPEJ ignores it, lab session 18)": ("#define SERIAL_WONDER_DISTRIBUTOR 0x7F7F", "#define SERIAL_WONDER_DISTRIBUTOR 0x7F7D", "distributor: Emerald's search"),
     "distributor doesn't say it has a card": ("               | 1 << 5                  /* hasCard */", "               | 0 << 5                  /* hasCard */", "distributor"),
     "host never acknowledges the game's chunks": ("    if (ni.state & NI_BUSY) {\n        u32 f", "    if (0) {\n        u32 f", "NI channel"),
     "host acknowledges with the wrong window number": ("ni.n[ni.phase] << 11 | 1u << 18", "((ni.n[ni.phase] + 1) & 3) << 11 | 1u << 18", "NI channel"),

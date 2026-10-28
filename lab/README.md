@@ -39,6 +39,7 @@ python lab_runner.py                                                     # run t
 | 28 Oct, 16:20 | session 16 | Disarming flick | Hello, setup, broadcast and start-search complete for the first time; stops at 0x1D (7-word answer) ([details](sessions/session16/README.md)) |
 | 28 Oct, 17:30 | session 17 | 0x1D, one flick | Header taken; answer word 1 (top bit 0) never clocked: arming from resting high keeps SO high ([details](sessions/session17/README.md)) |
 | 28 Oct, 20:40 | session 18 | 0x1D answered | 4,171 answers, no interruptions, but the game never picks the distributor; `--check-search`: data words arrive intact; `--find-serial`: BPEJ has no 0x7F7D; `--sweep-serial` added ([details](sessions/session18/README.md)) |
+| 28 Oct, 21:30 | session 19 | Serial sweep | BPEJ's distributor serial is **0x7F7F**; connect, NI name, join, link players and all Mystery Gift steps run on hardware ([details](sessions/session19/README.md)) |
 
 Experiments deliberately **not** done:
 - two GBA packets in a row, which would hang the GBA;

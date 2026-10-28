@@ -222,9 +222,13 @@ def parse_candidates(ack):
     return hosts
 
 
+JP_DISTRIBUTOR_SERIAL = 0x7F7F
+
+
 def find_distributor(game, polls=150):
     """Emerald's Mystery Gift search (InitializeRfuLinkManager_JoinGroup + the union room's
-    wonder-distributor filter): keep polling until a host with serial 0x7F7D and hasCard shows."""
+    wonder-distributor filter): keep polling until a host with the Japanese game's distributor serial
+    (0x7F7F, lab session 18; the English decomp has 0x7F7D) and hasCard shows."""
     yield ("until_ready",)
     if (yield from game.check_id()) != 0x8001:
         raise LinkError("adapter not found")
@@ -235,7 +239,7 @@ def find_distributor(game, polls=150):
     for _ in range(polls):
         ack = yield from game.command(0x1D)
         for h in parse_candidates(ack):
-            if h["checksum_ok"] and h["serial"] == 0x7F7D and h["gname"]["hasCard"] and not h["gname"]["started"]:
+            if h["checksum_ok"] and h["serial"] == JP_DISTRIBUTOR_SERIAL and h["gname"]["hasCard"] and not h["gname"]["started"]:
                 yield from game.command(0x1E)
                 h["words"] = list(ack)
                 return h

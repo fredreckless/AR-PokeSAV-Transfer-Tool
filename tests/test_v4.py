@@ -1099,7 +1099,7 @@ def _():
     assert counters & 0xFFFF == 2 and counters >> 16 == 0
 
 
-@test("distributor: Emerald's search finds a Wonder Card distributor (serial 0x7F7D, checksum good, hasCard) and connects")
+@test("distributor: Emerald's search finds a Wonder Card distributor (serial 0x7F7F as in BPEJ, checksum good, hasCard) and connects")
 def _():
     def script(game):
         found = yield from RFU.find_distributor(game)
@@ -1109,7 +1109,7 @@ def _():
     hw, game, trace, st, counters = adapter_session(script, first_bit=True)
     assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors)
     found, conn = hw.lg_result
-    assert found["serial"] == 0x7F7D and found["checksum_ok"] and found["gname"]["hasCard"], found
+    assert found["serial"] == 0x7F7F and found["checksum_ok"] and found["gname"]["hasCard"], found
     assert found["gname"]["language"] == 1 and found["gname"]["version"] == 3 and found["uname"][:3] == bytes([0xBE, 0xCF, 0xC9])
     assert conn["status"] == 0 and conn["child_id"] == 0x2C41 and conn["swap"] == 0x99660028, conn
     # lab session 16: each top-bit-1 word needs a flick, and flicks lose words - only the header may

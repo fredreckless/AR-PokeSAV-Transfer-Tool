@@ -128,7 +128,7 @@ static int swap_after;                 /* the game hands us the clock after this
 
 /* ------------------------------------------------------------------ a distributor in range
  * What a searching game sees (0x1D): one host, broadcasting what Emerald's Mystery Gift looks
- * for (link_rfu_2.c / union_room.c in the decomp): serial number 0x7F7D, RFU_SERIAL_WONDER_
+ * for (link_rfu_2.c / union_room.c in the decomp): serial number 0x7F7F (BPEJ; 0x7D in English), RFU_SERIAL_WONDER_
  * DISTRIBUTOR, and as its "game name" a struct RfuGameData with compatibility.hasCard set.
  * Layout as librfu's rfu_REQ_configGameData builds it: serial (2), gname (13), checksum (1),
  * uname (8); checksum = ~(sum of gname[0..7] + uname[0..7]).
@@ -141,7 +141,8 @@ static int swap_after;                 /* the game hands us the clock after this
 #define HOST_ID      0x7DA5
 #define CHILD_ID     0x2C41
 #define HOST_TRAINER 0x5678           /* with the name below, the checksum byte is 0x2C */
-#define SERIAL_WONDER_DISTRIBUTOR 0x7F7D
+#define SERIAL_WONDER_DISTRIBUTOR 0x7F7F   /* Japanese Emerald (BPEJ), found by --sweep-serial;
+                                             the English decomp's is 0x7F7D, absent from BPEJ */
 static u32 host_cfg[6], host_on = 1, n_hosts = 1, connect_polls, child_connected;
 /* --sweep-serial: the Japanese Emerald doesn't contain 0x7F7D (session 18), so offer every serial
  * number in turn, three per answer, each host's ID being its serial. Each block of serials is shown
