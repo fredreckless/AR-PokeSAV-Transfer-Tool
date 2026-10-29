@@ -52,8 +52,10 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
   is unknown.
 - **One card at a time.** The game keeps one Wonder Card and one RAM script. A new card replaces
   both, so collect each item from the delivery man before receiving the next card.
-- **The "first visit" problem** was Japanese Emerald's Mystery Event menu (ふしぎな できごと),
-  which waits for an e-Reader. Go straight to ふしぎな おくりもの.
+- **The "first visit" problem** (corrected in session 22): the game was started too early.
+  Japanese Emerald looks for a Wireless Adapter as ふしぎな おくりもの opens. If the DUO isn't
+  running the adapter yet, the game offers the e-Reader instead. Backing out and going in again
+  works once the adapter is "Ready". So: start the game only after "Ready".
 
 ## Code facts
 
@@ -118,10 +120,16 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
    - The DUO would play the e-Reader in a separate program, porting pokeruby's
      `mystery_event_menu.c` and `link.c`.
    - Prize: the Eon Ticket.
-4. **Clearer start-up on the PC (to do).** Show a progress bar while the program uploads to the
-   DUO, with a plain "Don't start the game's Mystery Gift yet". Then, once the adapter is
-   running, a clear "Now start Mystery Gift on the other GBA". It's the same for the e-Reader.
-   Why: in session 21 the user started the game before "Ready", and the upload stalled.
+4. **Clearer start-up on the PC (to do; the user's design).** Guide a strict order:
+   1. Before running anything: "Both GBAs should be switched off."
+   2. Run the command. Then: "Switch on the DUO's GBA now (leave the game's GBA off)."
+   3. A progress bar while the program uploads and the card loads: "Setting up the DUO's
+      GBA... don't switch on the game's GBA yet."
+   4. Only then: "Ready - now switch on the game's GBA and choose Mystery Gift."
+
+   It's the same for the e-Reader. Why: starting the game early caused both the e-Reader
+   message (the game found no adapter as Mystery Gift opened) and the stalled upload in
+   session 21. Session 22, started in the right order, ran twice back to back without trouble.
 
 ## References (not in the repo)
 

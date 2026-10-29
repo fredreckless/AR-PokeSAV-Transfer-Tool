@@ -17,8 +17,9 @@ through the simulator (with a planted bug for each new behaviour) before it touc
   - Ignore the harmless echoed acknowledgements ("unknown command 0xBD / 0x96"). Done: a word is
     ignored only when it is exactly our own last acknowledgement, so a genuinely unknown command
     is still refused.
-  - The "second visit" to the Mystery Gift menu turned out to be a first visit to Japanese
-    Emerald's Mystery Event menu (ふしぎな できごと), which waits for an e-Reader. Nothing to fix.
+  - The "second visit" to the Mystery Gift menu: the game had been started before the adapter
+    was ready. On opening ふしぎな おくりもの, it found no adapter and offered the e-Reader instead
+    (corrected in lab session 22). The fix is the start-up order: see the hand-over's to-do list.
 
 Results:
 - The everyday adapter build is 10,792 bytes, with about 960 bytes spare.
