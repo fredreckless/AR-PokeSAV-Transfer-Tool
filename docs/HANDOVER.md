@@ -118,6 +118,10 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
    - The DUO would play the e-Reader in a separate program, porting pokeruby's
      `mystery_event_menu.c` and `link.c`.
    - Prize: the Eon Ticket.
+4. **Clearer start-up on the PC (to do).** Show a progress bar while the program uploads to the
+   DUO, with a plain "Don't start the game's Mystery Gift yet". Then, once the adapter is
+   running, a clear "Now start Mystery Gift on the other GBA". It's the same for the e-Reader.
+   Why: in session 21 the user started the game before "Ready", and the upload stalled.
 
 ## References (not in the repo)
 
