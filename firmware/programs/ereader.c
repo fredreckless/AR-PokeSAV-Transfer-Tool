@@ -263,7 +263,7 @@ static int pc_service(api_t *api)
 __attribute__((section(".text.start")))
 u32 start(api_t *api)
 {
-    u16 saved_ie = REG_IE;
+    u16 saved_ie = REG_IE, saved_rcnt = RCNT, saved_siocnt = SIOCNT;   /* all handed back at the end */
     REG_IE = saved_ie & ~IF_SERIAL;              /* we poll IF ourselves: no serial interrupt */
     RCNT = 0;
     SIOCNT = MULTI_MODE | BAUD_115200 | CNT_IRQ;
@@ -284,7 +284,9 @@ u32 start(api_t *api)
         if (!(REG_IF & IF_SERIAL))               /* the link first: never let a transfer wait */
             pc_service(api);
     }
-    SIOCNT = 0;
+    SIOCNT = saved_siocnt & ~(CNT_START | CNT_IRQ);
+    RCNT = saved_rcnt;
+    REG_IF = IF_SERIAL;                          /* no serial request left pending for the firmware */
     REG_IE = saved_ie;
     return state | transfers << 8;
 }

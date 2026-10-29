@@ -85,7 +85,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 - **Datel's own delete and overwrite commands are blocked outright,** including DeleteFile (0x1C). Another GBA Action Replay tool sends that command at start-up, and on a MAX DUO it would delete a stored file. More on that in [the protocol notes](docs/PROTOCOL.md#a-warning-about-other-tools).
 - **The wireless tool reads and writes nothing on either cartridge.** When you receive a Wonder Card, the game saves it itself, as at a real distribution. That's why backing up first is worth it.
 - **The firmware update is the one step that writes,** and only to the DUO itself, never to your games. It asks you to type `UPDATE` first, and it uses Datel's own update process. You can go back to Datel's official firmware the same way.
-- **Every change is tested before real hardware.** That means about 98 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
+- **Every change is tested before real hardware.** That means about 99 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
 
 ## Other things it can do
 
@@ -116,7 +116,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 **Receiving a card:**
 1. **Back up your save first** with `maxduo_saves.py`. The game keeps one Wonder Card, and a new one replaces the old one, together with its script. Collect any item from the old card first.
 2. Put the game in the second GBA, connect the cable, and switch the DUO's GBA on to USB SERVER MODE.
-3. Run `python duo_wireless.py --trace --wonder-card "YOUR CARD.wc3"`. It should report "Wonder Card loaded". It also checks the card's and script's checksums, as the game would, and warns if the card's language doesn't match the game's.
+3. Run `python duo_wireless.py --trace --wonder-card "YOUR CARD.wc3"`. Wait until it says "Wonder Card loaded" and "Ready". (If the DUO misses part of the upload, which can happen straight after an earlier run, the tool waits about 16 s and sends it again.) It also checks the card's and script's checksums, as the game would, and warns if the card's language doesn't match the game's.
 4. On the game, choose **Mystery Gift → Wonder Cards → Wireless** (ふしぎな おくりもの → ふしぎな カード → じゅしん スポット). Japanese Emerald also has a separate Mystery Event (ふしぎな できごと) menu, which waits for an e-Reader; it isn't this one.
 5. When the game says the card has been saved and the link has ended, press Ctrl+C on the PC. Then collect the item, as the card describes: in Emerald, upstairs in any Pokémon Center.
 
@@ -186,7 +186,7 @@ This repository holds the whole project, not just the finished tool.
 ```
 pip install -r requirements.txt
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE --all
-python tests/run_each.py      # about 98 tests, each in its own process; around 15 minutes
+python tests/run_each.py      # about 99 tests, each in its own process; around 15 minutes
 python tests/mutate4.py       # plants 64 known bugs; each must be caught
 ```
 

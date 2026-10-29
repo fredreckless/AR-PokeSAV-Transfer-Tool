@@ -997,6 +997,29 @@ def _():
     assert "Adapter check answered" in hw.log and any(l.startswith("Program finished") for l in hw.log)
 
 
+@test("v4.2 run: an upload answer held up straight after an earlier run (seen on hardware) -> the tool waits and re-sends")
+def _():
+    hw, duo = run42()
+    quiet(W.adapter_test, duo, types.SimpleNamespace(adapter_test=1), poll_s=0.2, after_s=0.5)   # an earlier run
+    real_read, reads, held = duo.t.read, [0], []
+
+    def late_read(timeout=5000):
+        reads[0] += 1
+        if reads[0] == 4:                      # SETADDR, UPLOAD, packet 1 answered; packet 2's answer is held up
+            held.append(real_read(timeout))
+            threading.Timer(0.3, lambda: hw.d2h.put(held[0])).start()   # ... and turns up much later
+            import usb.core
+            raise usb.core.USBTimeoutError("timeout")
+        return real_read(timeout)
+    duo.t.read = late_read
+    _, text = quiet(W.run_program, duo, "adapter_detect")
+    duo.t.read = real_read
+    assert "missed part of the program upload" in text and "cleared 1 old packet" in text, text
+    assert duo.ask(W.PROG_STOP)[0] == W.PROG_STOP and duo.hello() == 0x104
+    hw.stop(); clean(hw)
+    assert "LAB: upload timed out" in hw.log and hw.log.count("Running program") == 2, hw.log
+
+
 @test("v4.2 adapter test: with nothing on the cable it reports 'nothing from the game' and stops cleanly")
 def _():
     hw, duo = run42()

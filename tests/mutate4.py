@@ -68,6 +68,7 @@ PC_MUTANTS = {
     "card checks never compare the card's CRC": ("    if game_crc16(card) != int.from_bytes(data[0:2], \"little\"):", "    if False:", "card checks"),
     "no warning when the card's language differs from the game's": ("((data >> 16 & 0xF) == 1) != (card_language == \"Japanese\")", "False", "every game: Japanese Emerald still"),
     "fast 32-bit checksum on the save": ('("r8", SAVE_BASE, 0x10000), ("crc", SAVE_BASE, 0x10000), ("w16", MAP_REG, 0x0120)]', '("r8", SAVE_BASE, 0x10000), ("crct", SAVE_BASE, 0x10000), ("w16", MAP_REG, 0x0120)]', "8-bit"),
+    "a stalled program upload is never sent again": ("            if attempt or not stalled:", "            if True:", "held up"),
     "no stale-packet clearing": ("        cleared = self.drain()\n", "        cleared = 0\n", "connect"),
     "partial upload drops interpreter bytes": ("            self._upload_fast(LAB_STAGE, prog[:16])\n", "            self._upload_fast(LAB_STAGE, prog[:12])\n", "resident"),
     "wrong logo constant": ("0x01000000: 0x62B5CBC1", "0x01000000: 0x62B5CBC0", "logo constants"),

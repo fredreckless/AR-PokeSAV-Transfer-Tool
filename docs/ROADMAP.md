@@ -25,7 +25,7 @@ Results:
 - The lab build (`--lab`) is 11,660 bytes. It keeps the instruments but leaves out the serial
   sweep.
 
-## Stage 1: Wonder Cards for every Gen 3 game (simulator done; hardware to come)
+## Stage 1: Wonder Cards for every Gen 3 game (simulator done; Japanese Emerald confirmed on hardware)
 
 - **Recognise the game.** The adapter reads the version and language from the game's own
   broadcast data (command 0x16), then picks the distributor serial and card size itself.
@@ -33,7 +33,7 @@ Results:
 
   | Game | Serial | Status |
   |---|---|---|
-  | Japanese Emerald | 0x7F7F | confirmed on hardware (lab session 19) |
+  | Japanese Emerald | 0x7F7F | confirmed on hardware (lab session 19); chosen automatically (session 21) |
   | Others | 0x7F7D | from the English decomps; confirm with `--sweep-serial` |
 
   Each confirmed result goes into the table.
@@ -42,7 +42,8 @@ Results:
   receives a full-size (0x14C) card from serial 0x7F7D with an English host.
 - **The host's language follows the game,** both in its broadcast data and in its link-player
   block. The trace names the game, for example "broadcast data (0x16) … - Japanese Emerald".
-- **Hardware.** A short session per cartridge: English and European Emerald, and FireRed/LeafGreen
+- **Hardware.** Japanese Emerald: game recognised, serial chosen and two cards received back to
+  back without `--serial` (lab session 21). Still to do, a short session per cartridge: English and European Emerald, and FireRed/LeafGreen
   in any language. **Testers welcome.**
 
 ## Stage 2: Wonder News (simulator done, 29 October 2026; hardware to come)

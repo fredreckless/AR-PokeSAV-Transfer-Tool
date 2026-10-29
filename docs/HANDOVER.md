@@ -12,7 +12,8 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
     folder) and embeds the GBA program `firmware/programs/adapter.c`.
 - **Working on real hardware:** Japanese Emerald (BPEJ) receives a Wonder Card and its RAM script
   over the whole link: search, connect, NI name, join, link players, Mystery Gift server, close.
-  Lab sessions 16–20 tell the story.
+  Lab sessions 16–20 tell the story. Session 21: the game and serial are now recognised
+  automatically, and two cards were received back to back.
 - **Repository:** `fredreckless/ActionReplayMaxDuo-Pokemon-Toolkit` (renamed from
   `ar-pokesav-transfer-tool`; GitHub redirects). `main` holds everything.
 - **User's PC folder:** an `ActionReplay` folder in their Windows user folder, Windows, Python 3.10 via Thonny. Files reach
@@ -45,6 +46,12 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
   words arrive intact (`--check-search`, session 18).
 - **"unknown command (0xBD)/(0x96)"** is the game clocking once more after sleep: it's our own
   last acknowledgement, echoed back. Harmless.
+- **Back-to-back runs.** Straight after a successful run, the next program upload can stall: an
+  upload answer is held up on its way to the PC and turns up later (session 21; also session 16).
+  `run_program` now waits for the DUO to give up (~16 s), says hello again and re-sends. The cause
+  is unknown.
+- **One card at a time.** The game keeps one Wonder Card and one RAM script. A new card replaces
+  both, so collect each item from the delivery man before receiving the next card.
 - **The "first visit" problem** was Japanese Emerald's Mystery Event menu (ふしぎな できごと),
   which waits for an e-Reader. Go straight to ふしぎな おくりもの.
 
@@ -76,12 +83,12 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
     (ID 19) → "received" or "had news" → ready to end.
   - Japanese news is 202 bytes (inferred from the Japanese card's 18-byte text fields; unconfirmed),
     and English news 444.
-- **Build sizes now:** `adapter` 11,164 bytes (about 600 spare); `adapter_lab` 11,692 (68 spare). If a
+- **Build sizes now:** `adapter` 11,264 bytes (about 500 spare); `adapter_lab` 11,740 (20 spare). If a
   planted bug makes the lab build too big, `mutate4` tests the everyday build only.
 - **Build.** Clang 18 + lld. Run `firmware/embed_programs.py` after any change to `adapter.c`.
 - **Tests.**
-  - `tests/run_each.py --jobs=2`: 98 tests.
-  - `tests/mutate4.py`: 64 planted bugs. The kinds are `prog` (adapter.c), `ereader`
+  - `tests/run_each.py --jobs=2`: 99 tests.
+  - `tests/mutate4.py`: 65 planted bugs. The kinds are `prog` (adapter.c), `ereader`
     (ereader.c), `pc`, `fw` and `fw42`. For the adapter's planted bugs alone, run `mutate4.run("prog", name)`.
   - The four firmware-build tests need Datel's 1.06 update file, which wasn't in the last
     session's container. The rest can run from builds taken off the user's installed `.bin`

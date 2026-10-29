@@ -1448,6 +1448,7 @@ static int pc_service(api_t *api)
 __attribute__((section(".text.start")))
 u32 start(api_t *api)
 {
+    u16 saved_rcnt = RCNT, saved_siocnt = SIOCNT;              /* handed back as we found them */
     RCNT = 0;
     SIOCNT = CNT_32BIT;
     adapter_state = ST_ASLEEP;
@@ -1471,6 +1472,7 @@ u32 start(api_t *api)
             back_to_idle();
         }
     }
-    SIOCNT = 0;
+    SIOCNT = saved_siocnt & ~CNT_START;
+    RCNT = saved_rcnt;
     return status_word();
 }
