@@ -5,7 +5,7 @@
 The MAX DUO was only ever able to back up DS saves, and Datel's drivers stopped working long ago. This project gives it a second life. One small firmware update for the DUO works with two Python tools:
 
 - **`maxduo_saves.py`** copies a GBA cartridge's save to your PC as a normal `.sav` file, which you can open in PKHeX or an emulator. It's tested on Pokémon Ruby, Sapphire, FireRed and LeafGreen. A full 128 KB save takes about 50 seconds and is double-checked: the GBA and the PC each compute a checksum, and they must agree.
-- **`duo_wireless.py`** turns the DUO's GBA into a **GBA Wireless Adapter with a Wonder Card distributor in range**, so a Pokémon game on a second GBA can receive a Mystery Gift Wonder Card from your own `.wc3` file. It has delivered the 2005 Old Sea Map card to a Japanese Pokémon Emerald on real hardware ([below](#mystery-gift-wonder-cards)).
+- **`duo_wireless.py`** turns the DUO's GBA into a **GBA Wireless Adapter with a Wonder Card distributor in range**, so a Pokémon game on a second GBA can receive a Mystery Gift Wonder Card from your own `.wc3` file. On real hardware, it has delivered the 2005 Old Sea Map card to a Japanese Pokémon Emerald and the Aurora Ticket to an English LeafGreen ([below](#mystery-gift-wonder-cards)).
 
 > Not affiliated with or endorsed by Datel or Nintendo. "Action Replay" is a trademark of Datel. Use at your own risk; see [Is it safe?](#is-it-safe)
 
@@ -106,7 +106,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 **What works so far.**
 - **Japanese Pokémon Emerald (BPEJ), on real hardware.** The game finds the distributor, connects, receives the Wonder Card and its script, saves them and disconnects cleanly. For example, the Old Sea Map card has been delivered, and the item collected from the Pokémon Center.
 - **The Japanese game's distributor serial is 0x7F7F**, not the 0x7F7D in the English decomp. `--sweep-serial` found it.
-- **Other games and languages** (English and European Emerald, FireRed and LeafGreen) use the same Mystery Gift protocol. The distributor reads the game's language and version from its first broadcast, and picks the serial itself: 0x7F7F for Japanese Emerald, and 0x7F7D (from the decomps) for the rest. These work in the simulator, including the larger international cards, but haven't been tried on real hardware yet. If a game doesn't find the distributor, `--sweep-serial` finds its serial in about six minutes, and `--serial` then uses it. **Testers welcome.**
+- **Other games and languages** (English and European Emerald, FireRed and LeafGreen) use the same Mystery Gift protocol. The distributor reads the game's language and version from its first broadcast, and picks the serial itself: 0x7F7F for Japanese Emerald, and 0x7F7D (from the decomps) for the rest. These work in the simulator, including the larger international cards. On real hardware, English LeafGreen took the full-size Aurora Ticket card first time, using serial 0x7F7D. The other games and languages haven't been tried yet. If a game doesn't find the distributor, `--sweep-serial` finds its serial in about six minutes, and `--serial` then uses it. **Testers welcome.**
 
 **You will need:**
 - Two GBAs: the DUO's, and one for the game.

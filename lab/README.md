@@ -43,6 +43,7 @@ python lab_runner.py                                                     # run t
 | 28 Oct, 21:50 | session 20 | **Old Sea Map received** | Wonder Card and RAM script delivered over the whole link on real hardware; the game saved the card ([details](sessions/session20/README.md)) |
 | 29 Oct, evening | session 21 | Two cards, game recognised | Japanese Emerald and serial 0x7F7F chosen automatically; Old Sea Map then MysticTicket received. An upload stalled after each successful run, so the tool now re-sends ([details](sessions/session21/README.md)) |
 | 29 Oct, 21:10 | session 22 | Back to back, in order | Two more Old Sea Map runs in a row, with the game started after "Ready": both clean, no stall. The e-Reader message was the game starting before the adapter was ready ([details](sessions/session22/README.md)) |
+| 29 Oct, 21:20 | session 23 | **English LeafGreen** | Aurora Ticket (full-size 332-byte card) received first time; game recognised, serial 0x7F7D confirmed ([details](sessions/session23/README.md)) |
 
 Experiments deliberately **not** done:
 - two GBA packets in a row, which would hang the GBA;

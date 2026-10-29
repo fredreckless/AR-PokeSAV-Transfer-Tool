@@ -35,6 +35,7 @@ Results:
   | Game | Serial | Status |
   |---|---|---|
   | Japanese Emerald | 0x7F7F | confirmed on hardware (lab session 19); chosen automatically (session 21) |
+  | English LeafGreen | 0x7F7D | confirmed on hardware (lab session 23) |
   | Others | 0x7F7D | from the English decomps; confirm with `--sweep-serial` |
 
   Each confirmed result goes into the table.
@@ -44,8 +45,9 @@ Results:
 - **The host's language follows the game,** both in its broadcast data and in its link-player
   block. The trace names the game, for example "broadcast data (0x16) … - Japanese Emerald".
 - **Hardware.** Japanese Emerald: game recognised, serial chosen and two cards received back to
-  back without `--serial` (lab session 21). Still to do, a short session per cartridge: English and European Emerald, and FireRed/LeafGreen
-  in any language. **Testers welcome.**
+  back without `--serial` (lab session 21). English LeafGreen: the full-size Aurora Ticket card, first time, serial 0x7F7D (lab session 23).
+  Still to do, a short session per cartridge: English and European Emerald, FireRed, and
+  LeafGreen in other languages. **Testers welcome.**
 
 ## Stage 2: Wonder News (simulator done, 29 October 2026; hardware to come)
 

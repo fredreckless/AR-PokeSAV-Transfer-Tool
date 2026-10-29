@@ -14,6 +14,8 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
   over the whole link: search, connect, NI name, join, link players, Mystery Gift server, close.
   Lab sessions 16–20 tell the story. Session 21: the game and serial are now recognised
   automatically, and two cards were received back to back.
+  Session 23: **English LeafGreen** received the full-size (0x14C) Aurora Ticket card first time,
+  serial 0x7F7D, with an English host.
 - **Repository:** `fredreckless/ActionReplayMaxDuo-Pokemon-Toolkit` (renamed from
   `ar-pokesav-transfer-tool`; GitHub redirects). `main` holds everything.
 - **User's PC folder:** an `ActionReplay` folder in their Windows user folder, Windows, Python 3.10 via Thonny. Files reach
@@ -102,8 +104,8 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
 
 ## Ideas for later (the user's wishes)
 
-1. **More games and languages** (simulator done; see docs/ROADMAP.md). What's left is hardware: a
-   short run per cartridge, with `--sweep-serial` if the game doesn't find the distributor.
+1. **More games and languages** (simulator done; see docs/ROADMAP.md). English LeafGreen is confirmed
+   (session 23). What's left is hardware: a short run per remaining cartridge, with `--sweep-serial` if the game doesn't find the distributor.
 2. **Wonder News** (simulator done). What's left is a real news file and a hardware run.
 3. **Ruby/Sapphire Mystery Event (e-Reader)**, simulator done. The program is `ereader.c`; the
    PC commands are `--mystery-event FILE` and `--ereader`; the notes are docs/EREADER.md. The user
