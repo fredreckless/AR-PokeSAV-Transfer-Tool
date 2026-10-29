@@ -180,6 +180,7 @@ The firmware build is reproducible: the same input always gives the same v4.1, u
 - [Wireless](docs/WIRELESS.md): the Wireless Adapter protocol, as recreated here
 - [Distributor](docs/DISTRIBUTOR.md): the Wonder Card distributor, stage by stage
 - [Lab sessions 16–20](lab/README.md): from the first wireless answers to the Old Sea Map arriving
+- [Roadmap](docs/ROADMAP.md): what's next for the events tool. Testers with English or European Emerald, FireRed or LeafGreen are very welcome
 
 ## Credits
 
