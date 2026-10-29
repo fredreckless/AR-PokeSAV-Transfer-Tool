@@ -132,6 +132,13 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
    It's the same for the e-Reader. Why: starting the game early caused both the e-Reader
    message (the game found no adapter as Mystery Gift opened) and the stalled upload in
    session 21. Session 22, started in the right order, ran twice back to back without trouble.
+5. **Japanese Emerald menus in the instructions (to do).** The title menu has only four
+   entries: つづきから (Continue), さいしょから (New Game), ふしぎな おくりもの (Mystery Gift),
+   せっていを かえる (Options). There's no Mystery Event entry there, so update the README,
+   the tool's prompts and the docs:
+   - give that menu, then ふしぎな カード → じゅしん スポット;
+   - drop the line about a separate ふしぎな できごと menu;
+   - explain that the e-Reader offer means the game was started before "Ready".
 
 ## References (not in the repo)
 
