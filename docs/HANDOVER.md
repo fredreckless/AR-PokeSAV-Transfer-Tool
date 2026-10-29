@@ -182,6 +182,19 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
    - Keep one file; split into modules only if more modes arrive (such as Japanese Emerald's
      Trainer Hill e-Reader cards).
    - Update the README, the tests and the lab runner to match.
+8. **Finish automatically (to do).** Once the game has saved the gift and closed the link
+   (Mystery Gift step 6, close agreed, `0x30`; or the e-Reader's 0x5FFF), stop by itself and say
+   so, rather than waiting for Ctrl+C.
+9. **Check that the card is for the right game (to do).** Today only the card's language is
+   checked, so an Emerald card would pass for LeafGreen even though its script is Emerald's. Find
+   out whether a `.wc3` (card or script) shows which game it's for. If it does, warn on a
+   mismatch, as the language check does.
+10. **Tidier tests (to do).**
+    - Without Datel's update file, the four firmware-build tests should be **skipped**, not
+      failed. `paths.build_file`'s `sys.exit` currently stops a whole `test_v4.py` run part-way.
+    - `adapter_lab` has only 20 bytes spare. Make room before the next lab feature.
+11. **A GitHub release, later (to do; ask first).** A zip of the two scripts plus short
+    instructions, so testers can try other games.
 
 ## References (not in the repo)
 
