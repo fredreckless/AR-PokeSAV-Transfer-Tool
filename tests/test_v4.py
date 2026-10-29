@@ -1289,6 +1289,69 @@ def _():
         assert "202" in str(e) and "444" in str(e)
 
 
+import link_game_model as LG
+
+
+def ereader_run(game, event=None, seconds=60):
+    """The DUO's e-Reader program against a simulated Ruby on the GBA link cable."""
+    hw, duo = run42()
+    hw.attach_mp_game(game.run(), game_master=game.master)      # the cable: who has the purple plug
+    path = None
+    if event is not None:
+        path = os.path.join(tempfile.gettempdir(), "test_event.bin")
+        open(path, "wb").write(event)
+    r = quiet(W.ereader_session, duo, types.SimpleNamespace(ereader=seconds, mystery_event=path),
+              poll_s=0.2, stop_when=lambda: hw.lg_done)
+    hw.text = r[1]
+    assert duo.hello() == 0x104
+    hw.stop(); clean(hw)                              # nothing written to any cartridge
+    return hw, r[0]
+
+
+TEST_EVENT = bytes((i * 29 + 7) & 0xFF for i in range(700))    # made-up bytes, not a real event
+
+
+@test("e-Reader: Ruby as master (purple plug) - handshake, link players, the event arrives intact, the link closes")
+def _():
+    game = LG.RubyMysteryEvent(master=True)
+    hw, report = ereader_run(game, TEST_EVENT)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.log, hw.text[-600:])
+    assert hw.lg_result == TEST_EVENT, (len(hw.lg_result or b""), hw.text[-400:])
+    duo_lp = game.link_players[1]
+    assert duo_lp["link_type"] == 0x5501 and duo_lp["language"] == LG.LANG_ENGLISH, duo_lp
+    assert report["bad_checksums"] == 0 and report["game_language"] == 2, report
+    for line in ("Mystery Event loaded", "link up (the DUO is player 1)", "got the game's link player: link type 0x5501, English",
+                 "sent the Mystery Event", "the game closed the link"):
+        assert line in hw.text, (line, hw.text)
+
+
+@test("e-Reader: Ruby as slave (the DUO on the purple plug) - the DUO starts the transfers and the handshake; a Japanese game gets a Japanese partner")
+def _():
+    game = LG.RubyMysteryEvent(master=False, language=LG.LANG_JAPANESE)
+    hw, report = ereader_run(game, TEST_EVENT[:300])
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.log, hw.text[-600:])
+    assert hw.lg_result == TEST_EVENT[:300]
+    assert game.link_players[0]["language"] == LG.LANG_JAPANESE and "the DUO is player 0" in hw.text, hw.text
+
+
+@test("e-Reader: with no event loaded only link players are exchanged (a dry run); oversize files are refused")
+def _():
+    game = LG.RubyMysteryEvent(master=True)
+    game_gen = game.run(max_transfers=6000)
+    hw, duo = run42()
+    hw.attach_mp_game(game_gen)
+    r = quiet(W.ereader_session, duo, types.SimpleNamespace(ereader=60, mystery_event=None), poll_s=0.2,
+              stop_when=lambda: hw.lg_done)
+    hw.stop(); clean(hw)
+    assert isinstance(hw.lg_error, LG.LinkError) and "no Mystery Event" in str(hw.lg_error), repr(hw.lg_error)
+    assert len(game.link_players) == 2 and "sent our link player" in r[1], r[1]
+    big = os.path.join(tempfile.gettempdir(), "test_event_big.bin"); open(big, "wb").write(bytes(2005))
+    try:
+        W.load_event(None, big); raise AssertionError("2005 bytes accepted")
+    except ValueError as e:
+        assert "2004" in str(e)
+
+
 @test("search check: four entries per answer, all with good checksums, so librfu restarts its search (0x1E, 0x1C)")
 def _():
     def script(game):

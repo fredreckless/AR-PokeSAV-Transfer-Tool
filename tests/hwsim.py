@@ -769,6 +769,117 @@ class Hw:
             self.bad.append(f"CPU fault: {e} at {mu.reg_read(UC_ARM_REG_PC):#x}")
         self.d2h.put(None)
 
+    # ------------------------------------------------------------ link port, multi-player mode
+    def attach_mp_game(self, gen, game_master=True, blocks_per_line=25, xfer_blocks=4):
+        """A second GBA in the four-player link mode (SIOCNT multi-player, 115 kbit/s), running a
+        game's link layer (tests/link_game_model.py) - the e-Reader route. Every transfer moves
+        one 16-bit word from each console at once: each loads SIOMLT_SEND, the master starts it,
+        and both then read SIOMULTI0-3 (player 0 = master, absent players 0xFFFF). The cable
+        decides who is master: game_master=True puts the game on the purple (player 0) plug.
+        The DUO sees completion as IF bit 7 (SIOCNT bit 14 set), cleared by writing 1 to IF,
+        and reads SIOCNT bit 2 (SI: 0 = master) and bit 3 (SD: all ready)."""
+        self.mp = gen
+        self.mp_master, self.lg_bpl, self.mp_x = game_master, blocks_per_line, xfer_blocks
+        self.blocks = 0
+        self.mp_if = 0
+        self.mp_op, self.mp_deadline, self.mp_game_word = None, 0, 0xFFFF
+        self.mp_duo_start = None              # block at which a DUO-started transfer completes
+        self.mp_result, self.mp_error, self.mp_done = None, None, False
+        self.mp_words = []                    # (player 0 word, player 1 word) per transfer
+        self.lg_result = self.lg_error = None
+        self.lg_done = False
+        self.mu.hook_add(UC_HOOK_MEM_READ, self.mp_on_read, begin=0x04000006, end=0x04000007)
+        self.mu.hook_add(UC_HOOK_MEM_READ, self.mp_on_read, begin=0x04000128, end=0x04000129)
+        self.mu.hook_add(UC_HOOK_MEM_READ, self.mp_on_read, begin=0x04000202, end=0x04000203)
+        self.mu.hook_add(UC_HOOK_MEM_WRITE, self.mp_on_write, begin=0x04000202, end=0x04000203)
+        self.mu.hook_add(UC_HOOK_MEM_WRITE, self.mp_on_write, begin=0x04000128, end=0x04000129)
+        self.mu.hook_add(UC_HOOK_BLOCK, self.mp_on_block)
+        self.mp_resume(None)
+
+    def mp_cnt(self):
+        return struct.unpack("<H", self.mu.mem_read(0x04000128, 2))[0]
+
+    def mp_duo_ready(self):
+        rcnt = struct.unpack("<H", self.mu.mem_read(0x04000134, 2))[0]
+        return self.mp_cnt() & 0x3000 == 0x2000 and not rcnt & 0x8000
+
+    def mp_on_read(self, mu, access, addr, size, value, _):
+        if addr in (0x04000006, 0x04000007):
+            mu.mem_write(0x04000006, struct.pack("<H", (self.blocks // self.lg_bpl) % 228))
+        elif addr in (0x04000202, 0x04000203):
+            mu.mem_write(0x04000202, struct.pack("<H", self.mp_if))
+        else:                                              # SI: 0 on the master's plug; SD: ready
+            c = self.mp_cnt() & ~0xC | (4 if self.mp_master else 0) | 8   # the DUO's SI: 1 unless it's master
+            mu.mem_write(0x04000128, struct.pack("<H", c))
+
+    def mp_on_write(self, mu, access, addr, size, value, _):
+        if addr in (0x04000202, 0x04000203):              # IF: writing 1 clears that flag
+            v = value & 0xFFFF if addr == 0x04000202 else (value << 8) & 0xFF00
+            self.mp_if &= ~v
+            return
+        v = value & 0xFFFF if addr == 0x04000128 and size >= 2 else \
+            (self.mp_cnt() & 0xFF00 | value & 0xFF) if addr == 0x04000128 else (self.mp_cnt() & 0xFF | (value << 8) & 0xFF00)
+        if not self.mp_master and v & 0x80 and v & 0x3000 == 0x2000 and self.mp_duo_start is None:
+            self.mp_duo_start = self.blocks + self.mp_x     # the DUO, as master, starts a transfer
+
+    def mp_transfer(self, game_word):
+        """One transfer: returns the four words as everyone sees them."""
+        duo_word = struct.unpack("<H", self.mu.mem_read(0x0400012A, 2))[0] if self.mp_duo_ready() else 0xFFFF
+        words = [game_word, duo_word] if self.mp_master else [duo_word, game_word]
+        words += [0xFFFF, 0xFFFF]
+        self.mp_words.append(tuple(words[:2]))
+        if self.mp_duo_ready():
+            self.mu.mem_write(0x04000120, struct.pack("<4H", *words))
+            cnt = self.mp_cnt() & ~0x00F0 | ((1 if self.mp_master else 0) << 4)   # id; busy (bit 7) off
+            self.mu.mem_write(0x04000128, struct.pack("<H", cnt))
+            if cnt & 0x4000:
+                self.mp_if |= 0x80
+        return words
+
+    def mp_resume(self, value):
+        try:
+            self.mp_op = self.mp.send(value)
+        except StopIteration as e:
+            self.mp_op, self.mp_result, self.mp_done = None, e.value, True
+            self.lg_result, self.lg_done = e.value, True
+            return
+        except Exception as e:                     # the game's own error
+            self.mp_op, self.mp_error, self.mp_done = None, e, True
+            self.lg_error, self.lg_done = e, True
+            return
+        op = self.mp_op
+        if op[0] == "delay":
+            self.mp_deadline = self.blocks + op[1]
+        elif op[0] == "mp_slave":
+            self.mp_game_word = op[1]
+            self.mp_deadline = self.blocks + op[2]
+
+    def mp_on_block(self, mu, addr, size, _):
+        self.blocks += 1
+        for _ in range(16):
+            op = self.mp_op
+            if op is None:
+                return
+            k = op[0]
+            if k == "delay":
+                if self.blocks < self.mp_deadline:
+                    return
+                self.mp_resume(None); continue
+            if k == "until_ready":
+                if not self.mp_duo_ready():
+                    return
+                self.mp_resume(True); continue
+            if k == "mp_xfer":                       # the game, as master, starts a transfer
+                self.mp_resume(self.mp_transfer(op[1])); continue
+            if k == "mp_slave":                      # the game, as slave, waits for the DUO's transfer
+                if self.mp_duo_start is not None and self.blocks >= self.mp_duo_start:
+                    self.mp_duo_start = None
+                    self.mp_resume(self.mp_transfer(self.mp_game_word)); continue
+                if self.blocks >= self.mp_deadline:
+                    self.mp_resume(None); continue
+                return
+            raise RuntimeError(f"unknown multi-player op {op!r}")
+
     def start(self):
         if not self.powered:
             return self                      # GBA off: only the USB chip is alive

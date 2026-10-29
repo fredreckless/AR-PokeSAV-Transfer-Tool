@@ -53,7 +53,17 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "adapter has no watchdog mid-command": ("        if (phase != PH_COMMAND && phase != PH_ID && now() - last_word_at > WATCHDOG_LINES) {", "        if (0) {", "wireless adapter: the game gives up"),
 }
 
+EREADER_MUTANTS = {  # firmware/programs/ereader.c: the e-Reader on the GBA link cable
+    "e-Reader: the checksum slot carries 0": ("        loaded = checksum;\n", "        loaded = 0;\n", "e-Reader: Ruby as master"),
+    "e-Reader: our link player keeps language 0": ("    memcpy(lp + 0x1A, game_player + 16 + 0x1A, 2);          /* language */", "", "e-Reader: Ruby as master"),
+    "e-Reader: never answers the game's 0x5FFF": ("        queue(0x5FFF, 0);                                       /* close: everyone says so */", "        ;", "e-Reader: Ruby as master"),
+    "e-Reader: as master, never says 0x8FFF": ("        loaded = is_master && seen_two >= 20 ? MASTER_HS : SLAVE_HS;", "        loaded = seen_two > 1000000 ? MASTER_HS : SLAVE_HS;", "e-Reader: Ruby as slave"),
+    "e-Reader: as master, never asks for link players": ("            if (is_master) queue(0x2222, 0x5501);                /* ask for link players */", "            ;", "e-Reader: Ruby as slave"),
+    "e-Reader: the event's last chunk is cut short": ("        u32 lo = at < tx_len ? tx_src[at] : 0, hi = at + 1 < tx_len ? tx_src[at + 1] : 0;", "        u32 lo = at + 14 < tx_len ? tx_src[at] : 0, hi = at + 1 < tx_len ? tx_src[at + 1] : 0;", "e-Reader: Ruby as master"),
+}
+
 PC_MUTANTS = {
+    "event files: any size accepted": ("    if not 1 <= len(data) <= 2004:", "    if False:", "e-Reader: with no event"),
     "news files: the CRC is never checked": ("        if game_crc16(data) != crc:", "        if False:", "Wonder News files"),
     "card checks never compare the card's CRC": ("    if game_crc16(card) != int.from_bytes(data[0:2], \"little\"):", "    if False:", "card checks"),
     "no warning when the card's language differs from the game's": ("((data >> 16 & 0xF) == 1) != (card_language == \"Japanese\")", "False", "every game: Japanese Emerald still"),
@@ -98,18 +108,20 @@ def run(kind, name):
                            capture_output=True, text=True, env=dict(os.environ, PYTHONPATH=paths.FIRMWARE))
         assert r.returncode == 0, r.stderr[-800:]
         env = dict(os.environ, V3_FW=os.path.join(work, "fw_mut.bin"))
-    elif kind == "prog":
-        old, new, pick = PROG_MUTANTS[name]
+    elif kind in ("prog", "ereader"):
+        old, new, pick = (PROG_MUTANTS if kind == "prog" else EREADER_MUTANTS)[name]
         sys.path.insert(0, paths.FIRMWARE)
         import programs
-        src_path = os.path.join(paths.FIRMWARE, "programs", "adapter.c")
+        src_name = "adapter.c" if kind == "prog" else "ereader.c"
+        src_path = os.path.join(paths.FIRMWARE, "programs", src_name)
         good_src = open(src_path).read()
         assert good_src.count(old) == 1, name
-        builds = ("adapter", "adapter_lab")             # the everyday and the lab build share adapter.c
+        # the everyday and the lab build share adapter.c
+        builds = ("adapter", "adapter_lab") if kind == "prog" else ("ereader",)
         with BUILD_LOCK:
             good = {b: programs.build(b).hex() for b in builds}
         os.makedirs(os.path.join(work, "programs"))
-        open(os.path.join(work, "programs", "adapter.c"), "w").write(good_src.replace(old, new))
+        open(os.path.join(work, "programs", src_name), "w").write(good_src.replace(old, new))
         shutil.copy(os.path.join(paths.FIRMWARE, "programs", "link.ld"), os.path.join(work, "programs"))
         with BUILD_LOCK:
             saved = programs._HERE
@@ -177,7 +189,8 @@ if __name__ == "__main__":
         jobs = next((int(a.split("=", 1)[1]) for a in sys.argv[1:] if a.startswith("--jobs=")),
                     (os.cpu_count() or 2) * 2)
         todo = ([("fw", n) for n in FW_MUTANTS] + [("fw42", n) for n in FW42_MUTANTS]
-                + [("prog", n) for n in PROG_MUTANTS] + [("pc", n) for n in PC_MUTANTS])
+                + [("prog", n) for n in PROG_MUTANTS] + [("ereader", n) for n in EREADER_MUTANTS]
+                + [("pc", n) for n in PC_MUTANTS])
         with cf.ThreadPoolExecutor(max_workers=jobs) as pool:
             ok = all(list(pool.map(lambda kn: run(*kn), todo)))
         print("every planted bug was caught" if ok else "SOME PLANTED BUGS WERE MISSED")

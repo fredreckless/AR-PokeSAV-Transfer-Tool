@@ -65,7 +65,15 @@ After receiving news, the delivery man gives berries.
 
 **Needs:** a real Wonder News file for the game and language, and one hardware run.
 
-## Stage 3: Mystery Event for Ruby and Sapphire (the e-Reader route)
+## Stage 3: Mystery Event for Ruby and Sapphire (the e-Reader route; simulator done, 29 October 2026)
+
+Done in the simulator:
+- `firmware/programs/ereader.c` (4 KB) plays the e-Reader in either cable role.
+- `tests/link_game_model.py` is a Ruby written from the behaviour in docs/EREADER.md.
+- The simulator models the four-player link mode (`attach_mp_game`).
+- Three tests (game as master, game as slave, dry run) and seven planted bugs.
+
+Still to come: a hardware run with your AGB-005, and a real English Mystery Event file.
 
 - **The DUO plays the e-Reader** on the standard link (two-player mode at 115 kbit/s), as a
   separate GBA program.

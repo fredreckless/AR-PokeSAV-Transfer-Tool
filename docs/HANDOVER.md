@@ -80,8 +80,9 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
   planted bug makes the lab build too big, `mutate4` tests the everyday build only.
 - **Build.** Clang 18 + lld. Run `firmware/embed_programs.py` after any change to `adapter.c`.
 - **Tests.**
-  - `tests/run_each.py --jobs=2`: 95 tests.
-  - `tests/mutate4.py`: 57 planted bugs. For the adapter's planted bugs alone, run `mutate4.run("prog", name)`.
+  - `tests/run_each.py --jobs=2`: 98 tests.
+  - `tests/mutate4.py`: 64 planted bugs. The kinds are `prog` (adapter.c), `ereader`
+    (ereader.c), `pc`, `fw` and `fw42`. For the adapter's planted bugs alone, run `mutate4.run("prog", name)`.
   - The four firmware-build tests need Datel's 1.06 update file, which wasn't in the last
     session's container. The rest can run from builds taken off the user's installed `.bin`
     files (strip the 4-byte CRC header into `firmware/build/fw_v42.bin`, and so on).
@@ -95,7 +96,14 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
 1. **More games and languages** (simulator done; see docs/ROADMAP.md). What's left is hardware: a
    short run per cartridge, with `--sweep-serial` if the game doesn't find the distributor.
 2. **Wonder News** (simulator done). What's left is a real news file and a hardware run.
-3. **Ruby/Sapphire Mystery Event (e-Reader).**
+3. **Ruby/Sapphire Mystery Event (e-Reader)**, simulator done. The program is `ereader.c`; the
+   PC commands are `--mystery-event FILE` and `--ereader`; the notes are docs/EREADER.md. The user
+   has an AGB-005. What's left is a hardware run and a real English event file. Plan for the
+   first run:
+   - try the game on the purple plug (the game as master) first;
+   - if anything goes wrong, try the other end.
+
+   Details:
    - Unlock it by saying "MYSTERY EVENT IS EXCITING" to the questionnaire.
    - The game links over the standard link at 115 kbit/s (multi-player mode, needing SD), so a
      GBA link cable (AGB-005) is required, not the MGB-010.

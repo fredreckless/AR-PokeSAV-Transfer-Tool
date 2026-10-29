@@ -85,7 +85,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 - **Datel's own delete and overwrite commands are blocked outright,** including DeleteFile (0x1C). Another GBA Action Replay tool sends that command at start-up, and on a MAX DUO it would delete a stored file. More on that in [the protocol notes](docs/PROTOCOL.md#a-warning-about-other-tools).
 - **The wireless tool reads and writes nothing on either cartridge.** When you receive a Wonder Card, the game saves it itself, as at a real distribution. That's why backing up first is worth it.
 - **The firmware update is the one step that writes,** and only to the DUO itself, never to your games. It asks you to type `UPDATE` first, and it uses Datel's own update process. You can go back to Datel's official firmware the same way.
-- **Every change is tested before real hardware.** That means about 95 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
+- **Every change is tested before real hardware.** That means about 98 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
 
 ## Other things it can do
 
@@ -135,6 +135,27 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 
 The DUO writes nothing to either cartridge. The only write is the game saving the card it received, as it would at a real distribution.
 
+## Mystery Event: the e-Reader route (experimental)
+
+Ruby and Sapphire (and Japanese Emerald) receive their events through **Mystery Event**, from the Card e-Reader+ over an ordinary GBA link cable. `duo_wireless.py` can have the DUO's GBA play the e-Reader:
+
+```
+python duo_wireless.py --mystery-event "YOUR EVENT.bin"
+```
+
+**You will need:**
+- a Nintendo **GBA** link cable (AGB-005). Game Boy and Game Boy Color cables lack the SD line this mode needs;
+- your own Mystery Event script for your game and language.
+
+**On the game:**
+1. Unlock Mystery Event: tell the questionnaire man in a Pokémon Center "MYSTERY EVENT IS EXCITING".
+2. From the title menu, choose **MYSTERY EVENT**.
+3. Press A when the game asks.
+
+Either end of the cable works: the DUO follows whichever role the cable gives it. It copies the game's link type and language into its own link-player details, so the game's checks agree. It then sends the event, and the game runs it and saves. `--ereader` alone is a dry run, with link players only.
+
+**Status:** this works in the simulator, including both cable ends, and is waiting for its first hardware session. See [docs/EREADER.md](docs/EREADER.md).
+
 ## If something goes wrong
 
 | Message or problem | Try this |
@@ -165,8 +186,8 @@ This repository holds the whole project, not just the finished tool.
 ```
 pip install -r requirements.txt
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE --all
-python tests/run_each.py      # about 95 tests, each in its own process; around 15 minutes
-python tests/mutate4.py       # plants 57 known bugs; each must be caught
+python tests/run_each.py      # about 98 tests, each in its own process; around 15 minutes
+python tests/mutate4.py       # plants 64 known bugs; each must be caught
 ```
 
 The adapter program (`firmware/programs/adapter.c`) is built with clang and lld (LLVM 18). You only need them to rebuild it: `duo_wireless.py` carries a copy (refresh it with `python firmware/embed_programs.py`), which a test checks against a fresh build.
@@ -183,6 +204,7 @@ The firmware build is reproducible: the same input always gives the same v4.1, u
 - [Wireless](docs/WIRELESS.md): the Wireless Adapter protocol, as recreated here
 - [Distributor](docs/DISTRIBUTOR.md): the Wonder Card distributor, stage by stage
 - [Lab sessions 16–20](lab/README.md): from the first wireless answers to the Old Sea Map arriving
+- [e-Reader](docs/EREADER.md): Mystery Event over the link cable, as the DUO plays it
 - [Roadmap](docs/ROADMAP.md): what's next for the events tool. Testers with English or European Emerald, FireRed or LeafGreen are very welcome
 
 ## Credits
