@@ -151,12 +151,29 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
        questionnaire, **and** only when no adapter answers. The user's game shows four entries
        in all, so it isn't unlocked.
    - **Update** the README, the tool's prompts (tie into item 4) and the docs, with the above.
-6. **Where to enter the questionnaire phrases (to do; the user's notes).** Put these in the README
-   and the docs:
-   - **FireRed/LeafGreen:** the questionnaire in any Poké Mart ("LINK TOGETHER WITH ALL" unlocks
-     Mystery Gift).
-   - **Ruby/Sapphire:** the person by the PC in Petalburg City's Pokémon Center ("MYSTERY EVENT IS
-     EXCITING" unlocks Mystery Event).
+6. **Where to enter the questionnaire phrases (to do; the user's research, 29 October).** For
+   the README and the docs. After entering a phrase, **save and restart**, so the new entry
+   appears on the title menu.
+   - **Ruby/Sapphire, Mystery Event:** the man by the PC in Petalburg City's Pokémon Center
+     (after beating Norman). The phrase is "MYSTERY EVENT IS EXCITING".
+   - **FireRed/LeafGreen, Mystery Gift:** the questionnaire in any Poké Mart. The phrase is
+     "LINK TOGETHER WITH ALL".
+   - **Emerald, Mystery Gift:** the Poké Mart questionnaire (the clipboard by the counter). The
+     phrase is "LINK TOGETHER WITH ALL". The Japanese Easy Chat words are still to be checked.
+     Emerald's man in the Petalburg Pokémon Center only takes your profile.
+   - **Japanese Emerald, Mystery Event (ふしぎな できごと):** the Petalburg Poké Mart questionnaire.
+     A Japanese walkthrough gives 「ふしぎ できごと わくわく ドキドキ」 (unverified). Overseas
+     Emerald has no Mystery Event.
+   - **Verify before publishing:**
+     - The research calls the Old Sea Map a Mystery Event card. But our `.wc3` is a Mystery Gift
+       Wonder Card, and it arrived over Mystery Gift (session 20). That it was only legitimately
+       given to Japanese Emerald stands.
+     - Check the Japanese phrases against a Japanese guide.
+   - **Sources the user gave:**
+     - Serebii, Ruby/Sapphire Mystery Event;
+     - SuperCheats, the Emerald Petalburg man and the Poké Mart survey;
+     - ポケモンWiki, エメラルド 攻略ページ;
+     - Project Pokémon, Old Sea Map.
 
 ## References (not in the repo)
 
