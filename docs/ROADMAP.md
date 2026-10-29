@@ -45,10 +45,25 @@ Results:
 - **Hardware.** A short session per cartridge: English and European Emerald, and FireRed/LeafGreen
   in any language. **Testers welcome.**
 
-## Stage 2: Wonder News
+## Stage 2: Wonder News (simulator done, 29 October 2026; hardware to come)
 
 The same Mystery Gift steps, but the server tells the game to save news rather than a card.
 After receiving news, the delivery man gives berries.
+
+- `--wonder-news FILE`: the distributor advertises news (hasNews, `ACTIVITY_WONDER_NEWS`).
+  - It sends the news under `MG_LINKID_NEWS`, and reads the game's answer: FALSE if the game saved
+    it, TRUE if it already had the same news.
+  - It then ends with "news received" or "you already had it", as the decomp's server does.
+- **Sizes.**
+  - English news is 444 bytes (pokeemerald).
+  - **Japanese news is taken to be 202 bytes.** That's unconfirmed: the Japanese Old Sea Map card
+    showed that Japanese text fields are 18 bytes, against 40 in English. A real Japanese news
+    item will settle it.
+- **File checks.** Files can be the bare news, or the save's form with the CRC-16 in front. The
+  CRC is checked, and news ID 0 is reported, since the game treats it as no news.
+- **The lab build** leaves Wonder News out, to stay inside the memory limit.
+
+**Needs:** a real Wonder News file for the game and language, and one hardware run.
 
 ## Stage 3: Mystery Event for Ruby and Sapphire (the e-Reader route)
 

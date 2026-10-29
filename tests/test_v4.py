@@ -1038,7 +1038,7 @@ def adapter_symbol(name, program="adapter"):
 
 def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits=0, first_bit=False,
                     flick_window=None, wonder_card=None, check_search=False,
-                    sweep_serial=False, serial=None):
+                    sweep_serial=False, serial=None, wonder_news=None):
     hw, duo = run42()
     game = RFU.Game()
     if attach:
@@ -1046,7 +1046,8 @@ def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits
         hw.attach_link_game(script(game), lag_bits=lag_bits, first_bit=first_bit, flick=flick)
     r = quiet(W.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds, adapter_probe=seconds,
                                                           wonder_card=wonder_card, check_search=check_search,
-                                                          sweep_serial=sweep_serial, serial=serial),
+                                                          sweep_serial=sweep_serial, serial=serial,
+                                                          wonder_news=wonder_news),
               poll_s=0.2,
               stop_when=(lambda: hw.lg_done) if attach else None, program=program)
     entries, st, counters = r[0][:3]
@@ -1215,6 +1216,77 @@ def _():
     hw, game, trace, st, counters = adapter_session(english, first_bit=True, wonder_card=path)
     assert hw.lg_error is None and hw.lg_result["serial"] == 0x7F7D
     assert "the Wonder Card is Japanese, but the game is English Emerald" in hw.text, hw.text
+
+
+def test_news(language="Japanese", with_crc=True, news_id=0x0042):
+    """Made-up Wonder News in the layout the tool reads (test data only - not any real event)."""
+    size = 202 if language == "Japanese" else 444
+    news = bytearray((i * 11 + 3) & 0xFF for i in range(size))
+    news[0:2] = news_id.to_bytes(2, "little")
+    news[2], news[3] = 1, 2                                 # sendType, bgType
+    data = (W.game_crc16(news).to_bytes(4, "little") if with_crc else b"") + bytes(news)
+    path = os.path.join(tempfile.gettempdir(), f"test_news_{language[:2]}_{int(with_crc)}.bin")
+    open(path, "wb").write(data)
+    return path, bytes(news)
+
+
+def news_script(compat=RFU.JP_EMERALD, saved_news=None, news_size=202):
+    def script(game):
+        found = yield from RFU.find_distributor(game, compat=compat, news=True)
+        yield from RFU.connect_to(game, found["id"])
+        yield from RFU.send_child_name(game, RFU.child_name_bytes())
+        yield from RFU.wait_join_status(game)
+        child = RFU.ChildLink()
+        client = yield from RFU.receive_gift(game, child, client_kw=dict(saved_news=saved_news, news_size=news_size))
+        return found, child, client
+    return script
+
+
+@test("Wonder News: Japanese Emerald finds a news distributor (hasNews), saves the news and is told 'news received'")
+def _():
+    path, news = test_news("Japanese")
+    hw, game, trace, st, counters = adapter_session(news_script(), first_bit=True, seconds=120, wonder_card=None,
+                                                    wonder_news=path)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors, [t for t, _ in trace][-10:])
+    found, child, client = hw.lg_result
+    assert found["gname"]["hasNews"] and not found["gname"]["hasCard"] and found["gname"]["activity"] == 22, found
+    assert client.result == RFU.CLI_MSG_NEWS_RECEIVED and client.saved_news == news, (client.result, client.history)
+    assert "Wonder News loaded" in hw.text and "the game saved the news" in hw.text, hw.text
+    names = [t for t, _ in trace]
+    assert any("next, Wonder News" in n for n in names) and any("next, the game's answer" in n for n in names), names
+
+
+@test("Wonder News: a game that already has the same news keeps it and is told so; an English game takes 444-byte news")
+def _():
+    path, news = test_news("Japanese", with_crc=False)
+    hw, game, trace, st, counters = adapter_session(news_script(saved_news=news), first_bit=True, seconds=120,
+                                                    wonder_news=path)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors)
+    found, child, client = hw.lg_result
+    assert client.result == RFU.CLI_MSG_HAD_NEWS and client.saved_news == news, (client.result, client.history)
+    assert "already had this news" in hw.text, hw.text
+    path, news = test_news("English")
+    hw, game, trace, st, counters = adapter_session(news_script(RFU.EN_FIRERED, news_size=444), first_bit=True,
+                                                    seconds=120, wonder_news=path)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors)
+    found, child, client = hw.lg_result
+    assert client.result == RFU.CLI_MSG_NEWS_RECEIVED and client.saved_news == news and found["serial"] == 0x7F7D
+
+
+@test("Wonder News files: bare or with the save's CRC, Japanese or English; bad sizes refused, damage and ID 0 reported")
+def _():
+    for language in ("Japanese", "English"):
+        for with_crc in (True, False):
+            path, news = test_news(language, with_crc)
+            lang, got, problems = W.parse_wonder_news(open(path, "rb").read())
+            assert got == news and problems == [] and lang.startswith(language[:2]), (lang, problems)
+    data = bytearray(open(test_news("English")[0], "rb").read()); data[20] ^= 1
+    assert "checksum" in " ".join(W.parse_wonder_news(bytes(data))[2])
+    assert "ID is 0" in " ".join(W.parse_wonder_news(open(test_news("Japanese", news_id=0)[0], "rb").read())[2])
+    try:
+        W.parse_wonder_news(bytes(300)); raise AssertionError("300 bytes accepted")
+    except ValueError as e:
+        assert "202" in str(e) and "444" in str(e)
 
 
 @test("search check: four entries per answer, all with good checksums, so librfu restarts its search (0x1E, 0x1C)")

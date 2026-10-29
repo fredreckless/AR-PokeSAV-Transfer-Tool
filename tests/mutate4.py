@@ -31,7 +31,10 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "distributor always uses the Japanese serial (ignores the game)": ("                    : lang == 1 && (compat >> 10 & 0xF) == 3 ? SERIAL_JP_EMERALD : SERIAL_DECOMP;", "                    : SERIAL_JP_EMERALD;", "every game: an English FireRed"),
     "distributor keeps a Japanese host for every game": ("        if (lang) host_lang = lang;", "", "every game: an English FireRed"),
     "--serial is ignored by the adapter": ("        if (idx) pc_serial = idx & 0x7FFF;", "", "every game: Japanese Emerald still"),
-    "distributor doesn't say it has a card": ("               | 1 << 5                  /* hasCard */", "               | 0 << 5                  /* hasCard */", "distributor"),
+    "news: the distributor ignores the game's answer (always 'received')": ("        const u32 *script = mg_resp ? script_had_news : script_news_received;", "        const u32 *script = mg_resp && 0 ? script_had_news : script_news_received;", "Wonder News: a game that already has"),
+    "news: the distributor still advertises a card": ("               | (GIFT_IS_NEWS ? 1 << 4 : 1 << 5)   /* hasNews or hasCard: what we offer */", "               | 1 << 5", "Wonder News: Japanese Emerald finds"),
+    "news: sent under the Wonder Card's link ID": ("        case 3: *op = MG_SEND; *ident = ID_NEWS;", "        case 3: *op = MG_SEND; *ident = ID_CARD;", "Wonder News: Japanese Emerald finds"),
+    "distributor doesn't say it has a card": ("(GIFT_IS_NEWS ? 1 << 4 : 1 << 5)", "(GIFT_IS_NEWS ? 1 << 4 : 0 << 5)", "distributor"),
     "host never acknowledges the game's chunks": ("    if (ni.state & NI_BUSY) {\n        u32 f", "    if (0) {\n        u32 f", "NI channel"),
     "host acknowledges with the wrong window number": ("ni.n[ni.phase] << 11 | 1u << 18", "((ni.n[ni.phase] + 1) & 3) << 11 | 1u << 18", "NI channel"),
     "host never moves on after the game acknowledges": ("        nis.acked[phase] = 1;", "        ;", "may join"),
@@ -51,6 +54,7 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
 }
 
 PC_MUTANTS = {
+    "news files: the CRC is never checked": ("        if game_crc16(data) != crc:", "        if False:", "Wonder News files"),
     "card checks never compare the card's CRC": ("    if game_crc16(card) != int.from_bytes(data[0:2], \"little\"):", "    if False:", "card checks"),
     "no warning when the card's language differs from the game's": ("((data >> 16 & 0xF) == 1) != (card_language == \"Japanese\")", "False", "every game: Japanese Emerald still"),
     "fast 32-bit checksum on the save": ('("r8", SAVE_BASE, 0x10000), ("crc", SAVE_BASE, 0x10000), ("w16", MAP_REG, 0x0120)]', '("r8", SAVE_BASE, 0x10000), ("crct", SAVE_BASE, 0x10000), ("w16", MAP_REG, 0x0120)]', "8-bit"),
@@ -111,7 +115,14 @@ def run(kind, name):
             saved = programs._HERE
             programs._HERE = work
             try:
-                bad = {b: programs.build(b).hex() for b in builds}
+                bad = {}
+                for b in builds:
+                    try:
+                        bad[b] = programs.build(b).hex()
+                    except AssertionError:          # the planted bug doesn't fit this build: test the other
+                        if b == "adapter":
+                            raise
+                        bad[b] = good[b]
             finally:
                 programs._HERE = saved
         assert any(good[b] != bad[b] for b in builds), name

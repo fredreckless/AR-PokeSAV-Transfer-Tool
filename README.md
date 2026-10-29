@@ -85,7 +85,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 - **Datel's own delete and overwrite commands are blocked outright,** including DeleteFile (0x1C). Another GBA Action Replay tool sends that command at start-up, and on a MAX DUO it would delete a stored file. More on that in [the protocol notes](docs/PROTOCOL.md#a-warning-about-other-tools).
 - **The wireless tool reads and writes nothing on either cartridge.** When you receive a Wonder Card, the game saves it itself, as at a real distribution. That's why backing up first is worth it.
 - **The firmware update is the one step that writes,** and only to the DUO itself, never to your games. It asks you to type `UPDATE` first, and it uses Datel's own update process. You can go back to Datel's official firmware the same way.
-- **Every change is tested before real hardware.** That means about 92 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
+- **Every change is tested before real hardware.** That means about 95 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
 
 ## Other things it can do
 
@@ -123,6 +123,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 | Command | What it does |
 |---|---|
 | `python duo_wireless.py --trace --wonder-card FILE.wc3` | Offers the Wonder Card from your `.wc3` file over Mystery Gift, and lists every adapter command the game sends ([docs/DISTRIBUTOR.md](docs/DISTRIBUTOR.md)). Nothing from the file is kept |
+| `python duo_wireless.py --trace --wonder-news FILE` | Offers Wonder News instead (your own file: the bare news, or the save's form with its CRC in front). On the game: Mystery Gift → Wonder News → Wireless. If it already has the same news, it keeps its own and says so |
 | `python duo_wireless.py --trace` | The same, with no card: the distributor tells the game it has nothing to send |
 | `python duo_wireless.py --trace --sweep-serial` | Offers every distributor serial number in turn until the game connects to one (about 6 minutes). Use it for a game or language not tried yet |
 | `python duo_wireless.py --trace --serial 7F7D ...` | Use this distributor serial rather than the one chosen for the game |
@@ -164,8 +165,8 @@ This repository holds the whole project, not just the finished tool.
 ```
 pip install -r requirements.txt
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE --all
-python tests/run_each.py      # about 92 tests, each in its own process; around 15 minutes
-python tests/mutate4.py       # plants 53 known bugs; each must be caught
+python tests/run_each.py      # about 95 tests, each in its own process; around 15 minutes
+python tests/mutate4.py       # plants 57 known bugs; each must be caught
 ```
 
 The adapter program (`firmware/programs/adapter.c`) is built with clang and lld (LLVM 18). You only need them to rebuild it: `duo_wireless.py` carries a copy (refresh it with `python firmware/embed_programs.py`), which a test checks against a fresh build.

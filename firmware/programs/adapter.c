@@ -168,11 +168,19 @@ __attribute__((noinline)) static u32 next_sweep_serial(void)
 }
 #endif
 
+#define GIFT_MAX (4 + 0x14C + 1000)
+static u32 gift_words[(GIFT_MAX + 3) / 4];               /* (defined with the Mystery Gift server) */
+#ifdef LAB
+#define GIFT_IS_NEWS 0                   /* the lab build sends Wonder Cards only, to make room */
+#else
+#define GIFT_IS_NEWS (gift_words[0] >> 16 & 1)
+#endif
+
 static void build_host(void)
 {
     u8 b[24];
     u32 compat = host_lang               /* language: the game's own (Japanese until it says) */
-               | 1 << 5                  /* hasCard */
+               | (GIFT_IS_NEWS ? 1 << 4 : 1 << 5)   /* hasNews or hasCard: what we offer */
                | 1 << 7 | 1 << 8 | 1 << 9 /* canLinkNationally, hasNationalDex, gameClear */
                | 3 << 10;                /* version: Emerald */
     static const u8 uname[8] = { 0xBE, 0xCF, 0xC9, 0x00, 0xFF, 0, 0, 0 };   /* "DUO " */
@@ -182,7 +190,7 @@ static void build_host(void)
     b[1] = dist_serial >> 8;
     b[2] = compat; b[3] = compat >> 8;   /* RfuGameData.compatibility */
     b[4] = HOST_TRAINER & 0xFF; b[5] = HOST_TRAINER >> 8;   /* .playerTrainerId */
-    b[12] = 21;                          /* .activity = ACTIVITY_WONDER_CARD, not started */
+    b[12] = 21 + GIFT_IS_NEWS;           /* .activity = ACTIVITY_WONDER_CARD (or _NEWS), not started */
     memcpy(b + 16, uname, 8);
     for (int i = 0; i < 8; i++)
         sum += b[2 + i] + uname[i];
@@ -393,13 +401,14 @@ static u16 crc16(const u8 *p, u32 n, u16 crc)    /* util.c CalcCRC16WithTable, b
     return crc;
 }
 
-/* What the PC loads (0x2C PUT): the Wonder Card's size, the card, then the 1000-byte RAM
- * script (struct RamScriptData), all from the user's own .wc3 file. Nothing is sent without it
- * except "nothing to send" (the game then says so - a safe dry run). */
+/* What the PC loads (0x2C PUT), from the user's own files:
+ *   a Wonder Card: its size, the card, then the 1000-byte RAM script (struct RamScriptData);
+ *   or Wonder News: its size with bit 16 set, then the news (struct WonderNews).
+ * Nothing is sent without one except "nothing to send" (the game then says so - a safe dry run). */
 #define GIFT_MAX (4 + 0x14C + 1000)
 static u32 gift_words[(GIFT_MAX + 3) / 4], put_at, gift_ready;
 #define GIFT ((const u8 *)gift_words)
-#define CARD_SIZE (gift_words[0] & 0xFFFF)
+#define CARD_SIZE (gift_words[0] & 0xFFFF)                /* (the news size, for news) */
 
 /* Our outgoing block: one link_rfu_2 block. Bytes come from a source that is zero past its
  * end (the RAM script is sent as 1024 bytes, MG_LINK_BUFFER_SIZE, as Emerald's server does). */
@@ -470,23 +479,47 @@ static void rb_chunk(u32 n)
 /* The Mystery Gift server: Emerald's gMysteryGiftServerScript_SendWonderCard, reduced to what a
  * distributor needs. Client scripts are struct MysteryGiftClientCmd {u32 instr, parameter}. */
 enum { CLI_RETURN = 1, CLI_RECV = 2, CLI_SEND_LOADED = 3, CLI_COPY_RECV = 4, CLI_LOAD_GAME_DATA = 8,
-       CLI_SAVE_CARD = 10, CLI_SAVE_RAM_SCRIPT = 17, CLI_SEND_READY_END = 20 };
-enum { ID_CLIENT_SCRIPT = 16, ID_GAME_DATA = 17, ID_READY_END = 20, ID_CARD = 22, ID_RAM_SCRIPT = 25 };
-enum { MSG_NOTHING_SENT = 0, MSG_CARD_RECEIVED = 2 };
+       CLI_SAVE_NEWS = 9, CLI_SAVE_CARD = 10, CLI_SAVE_RAM_SCRIPT = 17, CLI_SEND_READY_END = 20 };
+enum { ID_CLIENT_SCRIPT = 16, ID_GAME_DATA = 17, ID_RESPONSE = 19, ID_READY_END = 20, ID_CARD = 22,
+       ID_NEWS = 23, ID_RAM_SCRIPT = 25 };
+enum { MSG_NOTHING_SENT = 0, MSG_CARD_RECEIVED = 2, MSG_NEWS_RECEIVED = 3, MSG_HAD_NEWS = 7 };
 static const u32 script_send_game_data[] = { CLI_LOAD_GAME_DATA, 0, CLI_SEND_LOADED, 0,
                                              CLI_RECV, ID_CLIENT_SCRIPT, CLI_COPY_RECV, 0 };
 static const u32 script_save_card[] = { CLI_RECV, ID_CARD, CLI_SAVE_CARD, 0, CLI_RECV, ID_RAM_SCRIPT,
                                         CLI_SAVE_RAM_SCRIPT, 0, CLI_SEND_READY_END, 0, CLI_RETURN, MSG_CARD_RECEIVED };
 static const u32 script_nothing_sent[] = { CLI_SEND_READY_END, 0, CLI_RETURN, MSG_NOTHING_SENT };
+#ifndef LAB
+/* Wonder News (the decomp's server script for news): the game saves the news unless it already
+ * has the same one, and answers with a word - FALSE if it saved it, TRUE if it already had it. */
+static const u32 script_save_news[] = { CLI_RECV, ID_NEWS, CLI_SAVE_NEWS, 0, CLI_SEND_LOADED, 0,
+                                        CLI_RECV, ID_CLIENT_SCRIPT, CLI_COPY_RECV, 0 };
+static const u32 script_news_received[] = { CLI_SEND_READY_END, 0, CLI_RETURN, MSG_NEWS_RECEIVED };
+static const u32 script_had_news[] = { CLI_SEND_READY_END, 0, CLI_RETURN, MSG_HAD_NEWS };
+#endif
 
 enum { MG_SEND, MG_RECV, MG_END };
-static u32 mg_step, mg_sub, mg_off, mg_ident, mg_size, mg_errors, mg_got;
+static u32 mg_step, mg_sub, mg_off, mg_ident, mg_size, mg_errors, mg_got, mg_resp;
 static u8 mg_head[8];
 
 /* step table: what the server does, in order */
 static void mg_item(u32 step, u32 *op, u32 *ident, const u8 **src, u32 *len, u32 *size)
 {
     *src = 0; *len = *size = 0;
+#ifndef LAB
+    if (gift_ready && GIFT_IS_NEWS && step >= 2) {
+        const u32 *script = mg_resp ? script_had_news : script_news_received;
+        switch (step) {
+        case 2: *op = MG_SEND; *ident = ID_CLIENT_SCRIPT; *src = (const u8 *)script_save_news;
+                *len = *size = sizeof script_save_news; return;
+        case 3: *op = MG_SEND; *ident = ID_NEWS; *src = GIFT + 4; *len = *size = CARD_SIZE; return;
+        case 4: *op = MG_RECV; *ident = ID_RESPONSE; return;
+        case 5: *op = MG_SEND; *ident = ID_CLIENT_SCRIPT; *src = (const u8 *)script;
+                *len = *size = sizeof script_news_received; return;
+        case 6: *op = MG_RECV; *ident = ID_READY_END; return;
+        default: *op = MG_END; *ident = 0; return;
+        }
+    }
+#endif
     switch (step) {
     case 0: *op = MG_SEND; *ident = ID_CLIENT_SCRIPT; *src = (const u8 *)script_send_game_data;
             *len = *size = sizeof script_send_game_data; break;
@@ -561,6 +594,8 @@ static void mg_frame(void)
         u32 n = mg_size - mg_off < 252 ? mg_size - mg_off : 252;
         if (ident == ID_GAME_DATA && mg_off == 0)
             memcpy(game_data, rb.head, sizeof game_data);
+        if (ident == ID_RESPONSE && mg_off == 0)
+            mg_resp = rb.head[0];                                /* TRUE: it already had this news */
         mg_off += n;
         if (mg_off >= mg_size)
             mg_next();
@@ -748,7 +783,7 @@ static u32 host_frame(void)
  * librfu's own framing of the child's first messages (its game name over the NI channel) - the
  * ground truth the host side will be built against. */
 #define CAP_CMDS 3
-#define CAP_WORDS 8
+#define CAP_WORDS 6
 #ifdef LAB
 static u32 cap_cmd[CAP_CMDS], cap_data[CAP_CMDS][CAP_WORDS], cap_count;
 
@@ -965,7 +1000,7 @@ static int flick_good = -1;              /* the last width the game accepted, or
 #define LAB_ONLY(x) x
 static u16 w_pulses[W_MAX + 1], w_clocked[W_MAX + 1], w_accepted[W_MAX + 1], w_rejected[W_MAX + 1];
 static u32 spin_per_8_lines, polls_per_8_lines;
-#define SCOPE_N 4
+#define SCOPE_N 3
 static u32 scope_si[SCOPE_N][2], scope_meta[SCOPE_N], scope_count;
 #else
 #define LAB_ONLY(x)
@@ -1379,8 +1414,11 @@ static int pc_service(api_t *api)
     case 20: put_at = 0; gift_ready = 0; v = sizeof gift_words; break;   /* start loading a gift */
     case 21:                                                   /* loaded: check it, then use it */
         v = api->crc32(gift_words, put_at * 4);
-        gift_ready = put_at * 4 >= 4 + CARD_SIZE + 1000 && CARD_SIZE >= 16 && CARD_SIZE <= 0x14C;
+        gift_ready = GIFT_IS_NEWS ? put_at * 4 >= 4 + CARD_SIZE && CARD_SIZE >= 16 && CARD_SIZE <= 0x1BC
+                                  : put_at * 4 >= 4 + CARD_SIZE + 1000 && CARD_SIZE >= 16 && CARD_SIZE <= 0x14C;
+        build_host();                                          /* offer a card or news accordingly */
         break;
+    case 28: v = mg_resp | GIFT_IS_NEWS << 8 | gift_ready << 9; break;   /* news: did it already have it? */
     case 22: v = link_state | mg_step << 4 | mg_errors << 8 | (n_child_cmds & 0xFFFF) << 16; break;
     case 25: v = (n_uni & 0xFFFF) | n_resent << 16; break;
     case 27:                                                   /* --serial (0: choose by game) */

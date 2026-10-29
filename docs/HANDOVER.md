@@ -21,8 +21,9 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
 
 ## Ground rules (from the user; keep them)
 
-- Push to GitHub, or change it in any way, only with the user's explicit permission each time.
-  Stop-hook messages asking to push are declined politely.
+- **Pushing (updated 29 October):** the user has given standing permission to push. Keep `main`
+  and `v42-local` in step, pushing both together after the suite and planted bugs pass. Any other
+  GitHub change (settings, releases, issues) still needs asking first.
 - Never write cartridge saves from our code. Leave the button, the AT switch and the clock alone.
   Never send flash erase/program commands (0x80/0xA0).
 - The user installs firmware themselves (typing UPDATE).
@@ -68,10 +69,19 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
   echo after sleep) is ignored.
 - **Card checks** (`check_wc3`): the game's CRC-16 over the card and the RAM script, and the
   0x33 marker.
+- **Wonder News** (`--wonder-news`; the everyday build only):
+  - the gift's size word has bit 16 set;
+  - the host offers hasNews and activity 22;
+  - the server steps are: game data → save-news script → news (ID 23) → the game's answer
+    (ID 19) → "received" or "had news" → ready to end.
+  - Japanese news is 202 bytes (inferred from the Japanese card's 18-byte text fields; unconfirmed),
+    and English news 444.
+- **Build sizes now:** `adapter` 11,164 bytes (about 600 spare); `adapter_lab` 11,692 (68 spare). If a
+  planted bug makes the lab build too big, `mutate4` tests the everyday build only.
 - **Build.** Clang 18 + lld. Run `firmware/embed_programs.py` after any change to `adapter.c`.
 - **Tests.**
-  - `tests/run_each.py --jobs=2`: 92 tests.
-  - `tests/mutate4.py`: 53 planted bugs. For the adapter's planted bugs alone, run `mutate4.run("prog", name)`.
+  - `tests/run_each.py --jobs=2`: 95 tests.
+  - `tests/mutate4.py`: 57 planted bugs. For the adapter's planted bugs alone, run `mutate4.run("prog", name)`.
   - The four firmware-build tests need Datel's 1.06 update file, which wasn't in the last
     session's container. The rest can run from builds taken off the user's installed `.bin`
     files (strip the 4-byte CRC header into `firmware/build/fw_v42.bin`, and so on).
@@ -84,8 +94,7 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
 
 1. **More games and languages** (simulator done; see docs/ROADMAP.md). What's left is hardware: a
    short run per cartridge, with `--sweep-serial` if the game doesn't find the distributor.
-2. **Wonder News.** The same gift steps with a different save command; the delivery man then
-   gives berries.
+2. **Wonder News** (simulator done). What's left is a real news file and a hardware run.
 3. **Ruby/Sapphire Mystery Event (e-Reader).**
    - Unlock it by saying "MYSTERY EVENT IS EXCITING" to the questionnaire.
    - The game links over the standard link at 115 kbit/s (multi-player mode, needing SD), so a

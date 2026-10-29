@@ -236,7 +236,7 @@ def distributor_serial(compat):
     return JP_DISTRIBUTOR_SERIAL if compat & 0xF == 1 and compat >> 10 & 0xF == 3 else DECOMP_DISTRIBUTOR_SERIAL
 
 
-def find_distributor(game, polls=150, compat=JP_EMERALD, serial=None):
+def find_distributor(game, polls=150, compat=JP_EMERALD, serial=None, news=False):
     """Emerald's (or FireRed/LeafGreen's) Mystery Gift search (InitializeRfuLinkManager_JoinGroup +
     the union room's wonder-distributor filter): broadcast our own game data, then keep polling
     until a host with this game's distributor serial and hasCard shows."""
@@ -251,7 +251,8 @@ def find_distributor(game, polls=150, compat=JP_EMERALD, serial=None):
     for _ in range(polls):
         ack = yield from game.command(0x1D)
         for h in parse_candidates(ack):
-            if h["checksum_ok"] and h["serial"] == want and h["gname"]["hasCard"] and not h["gname"]["started"]:
+            offers = h["gname"]["hasNews"] if news else h["gname"]["hasCard"]   # HasWonderCardOrNewsByLinkGroup
+            if h["checksum_ok"] and h["serial"] == want and offers and not h["gname"]["started"]:
                 yield from game.command(0x1E)
                 h["words"] = list(ack)
                 return h
@@ -847,19 +848,20 @@ class MGLink:
 
 
 CLI_NONE, CLI_RETURN, CLI_RECV, CLI_SEND_LOADED, CLI_COPY_RECV = 0, 1, 2, 3, 4
-CLI_LOAD_GAME_DATA, CLI_SAVE_CARD, CLI_SAVE_RAM_SCRIPT, CLI_SEND_READY_END = 8, 10, 17, 20
-CLI_MSG_NOTHING_SENT, CLI_MSG_CARD_RECEIVED = 0, 2
-MG_ID_CLIENT_SCRIPT, MG_ID_GAME_DATA, MG_ID_READY_END = 16, 17, 20
+CLI_LOAD_GAME_DATA, CLI_SAVE_NEWS, CLI_SAVE_CARD, CLI_SAVE_RAM_SCRIPT, CLI_SEND_READY_END = 8, 9, 10, 17, 20
+CLI_MSG_NOTHING_SENT, CLI_MSG_CARD_RECEIVED, CLI_MSG_NEWS_RECEIVED, CLI_MSG_HAD_NEWS = 0, 2, 3, 7
+MG_ID_CLIENT_SCRIPT, MG_ID_GAME_DATA, MG_ID_RESPONSE, MG_ID_READY_END = 16, 17, 19, 20
 
 
 class MGClient:
-    """mystery_gift_client.c, the commands a Wonder Card distributor uses."""
-    def __init__(self, child, game_data=None):
+    """mystery_gift_client.c, the commands a Wonder Card or Wonder News distributor uses."""
+    def __init__(self, child, game_data=None, saved_news=None, news_size=202):
         self.link = MGLink(child, 1, 0)
         self.func, self.param = "init", 0
         self.send_buf = bytearray(0x400)
         self.game_data = game_data or bytes(range(0x60))
         self.saved_card = self.saved_ram_script = None
+        self.saved_news, self.news_size = saved_news, news_size    # the news already in the save
         self.result = None
         self.history = []
 
@@ -898,6 +900,15 @@ class MGClient:
                 self.link.init_send(MG_ID_GAME_DATA, self.send_buf, len(self.game_data))
             elif instr == CLI_SAVE_CARD:
                 self.saved_card = bytes(self.link.recv_buf[:self.link.recv_size])
+            elif instr == CLI_SAVE_NEWS:
+                # IsWonderNewsSameAsSaved / ValidateWonderNews: same as saved, or ID 0 -> not saved, TRUE
+                news = bytes(self.link.recv_buf[:self.news_size])
+                same = news == self.saved_news or (news[0] | news[1] << 8) == 0
+                if not same:
+                    self.saved_news = news
+                self.send_buf[:] = bytes(0x400)
+                self.send_buf[0:4] = int(same).to_bytes(4, "little")
+                self.link.init_send(MG_ID_RESPONSE, self.send_buf, 4)   # MysteryGiftClient_InitSendWord
             elif instr == CLI_SAVE_RAM_SCRIPT:
                 self.saved_ram_script = bytes(self.link.recv_buf[:1000])
             elif instr != CLI_NONE:
@@ -905,7 +916,7 @@ class MGClient:
         return self.func == "done"
 
 
-def receive_gift(game, child, max_frames=3000, drop_every=0):
+def receive_gift(game, child, max_frames=3000, drop_every=0, client_kw=None):
     """After joining: every frame the adapter says 'data ready', the game reads the host's packet,
     runs link_rfu_2 and its tasks (player exchange, standby, the Mystery Gift client), sends its
     own sub-frame and hands the clock back. Ends after the link is closed (0x30).
@@ -924,7 +935,7 @@ def receive_gift(game, child, max_frames=3000, drop_every=0):
         child.msc(ack)
         child.main()
         if child.received_remote_link_players and client is None:
-            client = MGClient(child)                                # MG_STATE_CLIENT_LINK_WAIT
+            client = MGClient(child, **(client_kw or {}))           # MG_STATE_CLIENT_LINK_WAIT
             if not standby_set:
                 child.set_standby()                                 # Task_CardOrNewsOverWireless 13
                 standby_set = True
