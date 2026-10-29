@@ -43,7 +43,15 @@ typedef struct {
 #define CNT_IRQ     0x4000               /* sets IF bit 7 when a transfer completes */
 #define IF_SERIAL   0x0080
 #define LINES_PER_FRAME 228
-#define MASTER_GAP  12                   /* scanlines between our transfers as master (~0.76 ms) */
+/* As master we pace exactly like Ruby's own master (link.c), because a slave game needs it:
+ *  - one transfer per frame while handshaking, and one 9-transfer command cycle per frame after:
+ *    the game takes in (and sends) at most one command per frame;
+ *  - within a cycle, the next transfer starts 0.75 ms after the last one *finished* (Ruby: timer 3,
+ *    197 x 64 cycles, started at the end of its serial interrupt) - time for the slave's interrupt
+ *    to load its next word. Lab session 24: 12 scanlines from the *start* (~0.44 ms after the end),
+ *    and cycles back to back, gave checksum mismatches on 45% of commands. */
+#define GAP_AFTER_DONE 13                /* scanlines (~0.83 ms) from a transfer's end to the next */
+#define LINK_UP_WAIT   (2 * LINES_PER_FRAME)
 
 #define MASTER_HS 0x8FFF
 #define SLAVE_HS  0xB9A0
@@ -271,15 +279,24 @@ u32 start(api_t *api)
     loaded = SLAVE_HS;
     SIOMLT_SEND = loaded;
     last_vcount = VCOUNT & 0xFF;
-    u32 last_start = now();
+    u32 last_done = now(), next_cycle = last_done;
     while (!stop_requested) {
         is_master = !(SIOCNT & CNT_SI);
         if (REG_IF & IF_SERIAL) {
             REG_IF = IF_SERIAL;
+            u32 was = state;
             on_transfer();
-        } else if (is_master && !(SIOCNT & CNT_START) && now() - last_start >= MASTER_GAP) {
-            last_start = now();
-            SIOCNT = MULTI_MODE | BAUD_115200 | CNT_IRQ | CNT_START;   /* our turn to start one */
+            last_done = now();
+            if (was < ST_CONNECTED && state >= ST_CONNECTED)
+                next_cycle = last_done + LINK_UP_WAIT;          /* Ruby's master pauses here too */
+        } else if (is_master && !(SIOCNT & CNT_START) && now() - last_done >= GAP_AFTER_DONE) {
+            /* the first transfer of a cycle (or any handshake transfer) waits for the next frame */
+            int cycle_start = state < ST_CONNECTED || send_idx == 0;
+            if (!cycle_start || (int)(now() - next_cycle) >= 0) {
+                if (cycle_start)
+                    next_cycle = now() + LINES_PER_FRAME;
+                SIOCNT = MULTI_MODE | BAUD_115200 | CNT_IRQ | CNT_START;   /* our turn to start one */
+            }
         }
         if (!(REG_IF & IF_SERIAL))               /* the link first: never let a transfer wait */
             pc_service(api);

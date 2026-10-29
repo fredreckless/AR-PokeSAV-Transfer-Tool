@@ -1020,6 +1020,29 @@ def _():
     assert "LAB: upload timed out" in hw.log and hw.log.count("Running program") == 2, hw.log
 
 
+@test("connect: a first answer that's held up (seen on hardware) -> the tool waits and tries again")
+def _():
+    hw = hwsim.Hw(FW42, GAME, "sanyo", RUBY).start(); LIVE.append(hw)
+    duo = M.MaxDuo(hwsim.Transport(hw))
+    real_read, reads, held = duo.t.read, [0], []
+
+    def late_read(timeout=5000):
+        pkt = real_read(timeout)
+        reads[0] += 1
+        if reads[0] == 2:                      # hello answered; the firmware check's answer is held up
+            held.append(pkt)
+            threading.Timer(0.3, lambda: hw.d2h.put(held[0])).start()
+            import usb.core
+            raise usb.core.USBTimeoutError("timeout")
+        return pkt
+    duo.t.read = late_read
+    (version, v42), text = quiet(W.connect, duo, 30)
+    duo.t.read = real_read
+    assert version == 0x104 and v42 and "trying again" in text, text
+    assert duo.hello() == 0x104
+    hw.stop(); clean(hw)
+
+
 @test("v4.2 adapter test: with nothing on the cable it reports 'nothing from the game' and stops cleanly")
 def _():
     hw, duo = run42()
@@ -1355,6 +1378,14 @@ def _():
     assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.log, hw.text[-600:])
     assert hw.lg_result == TEST_EVENT[:300]
     assert game.link_players[0]["language"] == LG.LANG_JAPANESE and "the DUO is player 0" in hw.text, hw.text
+    # paced like Ruby's own master: a transfer and the one nine later are a whole frame apart
+    # (one handshake transfer, or one 9-transfer command cycle, per frame; a few lines of jitter
+    # within a cycle are fine - back to back is ~4,000 blocks), and the game was
+    # always ready for each transfer (lab session 24)
+    st, frame = hw.mp_start_blocks, hw.mp_frame_blocks
+    assert len(st) > 100 and all(st[i + 9] - st[i] >= frame - 300 for i in range(len(st) - 9)), \
+        min(st[i + 9] - st[i] for i in range(len(st) - 9))
+    assert hw.mp_missed == 0, hw.mp_missed
 
 
 @test("e-Reader: with no event loaded only link players are exchanged (a dry run); oversize files are refused")

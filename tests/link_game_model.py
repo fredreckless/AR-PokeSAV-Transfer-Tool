@@ -9,6 +9,7 @@ CMD_LENGTH = 8
 LINKTYPE_MYSTERY_EVENT = 0x5501
 MAGIC = b"GameFreak inc."
 LANG_JAPANESE, LANG_ENGLISH = 1, 2
+QUEUE_CAPACITY = 50                       # link.c: received commands waiting for the game
 
 
 class LinkError(Exception):
@@ -102,17 +103,28 @@ class LinkLayer:
 
 class RubyMysteryEvent:
     """mystery_event_menu.c, as far as the link sees it."""
-    def __init__(self, master=True, language=LANG_ENGLISH, press_a_after=30, pace=300):
+    def __init__(self, master=True, language=LANG_ENGLISH, press_a_after=30, pace=300, frame_blocks=25 * 228):
+        """pace: blocks from a transfer's end to the next within a command cycle (Ruby's timer 3,
+        0.75 ms); frame_blocks: one frame. As in link.c, a master starts one handshake transfer
+        per frame and one 9-transfer cycle per frame, and the game takes in one received command
+        per frame (LinkMain1 -> DequeueRecvCmds), with room for 50 waiting."""
         self.master, self.language = master, language
-        self.press_a_after, self.pace = press_a_after, pace
+        self.press_a_after, self.pace, self.frame_blocks = press_a_after, pace, frame_blocks
         self.link_players = {}
         self.block = None
         self.log = []
 
-    def _xfer(self, word):
+    def _next_frame(self):
+        t = yield ("now",)
+        yield ("delay", self.frame_blocks - t % self.frame_blocks)
+
+    def _xfer(self, word, cycle_end=True):
         if self.master:
             words = yield ("mp_xfer", word)
-            yield ("delay", self.pace)
+            if cycle_end:
+                yield from self._next_frame()
+            else:
+                yield ("delay", self.pace)
         else:
             words = yield ("mp_slave", word, 40000)
             if words is None:
@@ -143,13 +155,25 @@ class RubyMysteryEvent:
         pending, blocks, closing = set(), {}, set()
         own_block = link_player_block(language=self.language)
         sent_close = False
+        rxq, last_frame = [], None
         for _ in range(max_transfers):
-            words = yield from self._xfer(link.loaded)
+            # (a master's cycle ends after the transfer that loads the checksum: send index 8)
+            words = yield from self._xfer(link.loaded, cycle_end=link.send_idx == CMD_LENGTH)
             link.on_transfer(words)
             if link.bad_checksums:
                 raise LinkError("a command's checksum didn't match")
-            while link.received:
-                cmd = link.received.pop(0)
+            rxq += link.received
+            link.received = []
+            if len(rxq) > QUEUE_CAPACITY:
+                raise LinkError("the receive queue overflowed: commands came faster than one a frame")
+            frame = (yield ("now",)) // self.frame_blocks
+            if frame != last_frame and rxq:          # the main loop takes one command a frame
+                last_frame = frame
+                rxq_now = [rxq.pop(0)]
+            else:
+                rxq_now = []
+            while rxq_now:
+                cmd = rxq_now.pop(0)
                 for i in range(2):
                     c = cmd[0][i]
                     if c == 0x2222:

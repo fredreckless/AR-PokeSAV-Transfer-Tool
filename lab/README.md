@@ -44,6 +44,7 @@ python lab_runner.py                                                     # run t
 | 29 Oct, evening | session 21 | Two cards, game recognised | Japanese Emerald and serial 0x7F7F chosen automatically; Old Sea Map then MysticTicket received. An upload stalled after each successful run, so the tool now re-sends ([details](sessions/session21/README.md)) |
 | 29 Oct, 21:10 | session 22 | Back to back, in order | Two more Old Sea Map runs in a row, with the game started after "Ready": both clean, no stall. The e-Reader message was the game starting before the adapter was ready ([details](sessions/session22/README.md)) |
 | 29 Oct, 21:20 | session 23 | **English LeafGreen** | Aurora Ticket (full-size 332-byte card) received first time; game recognised, serial 0x7F7D confirmed ([details](sessions/session23/README.md)) |
+| 29 Oct, 21:55 | session 24 | e-Reader dry run (Ruby) | Handshake and link up on hardware for the first time, the DUO as master; then 45% checksum mismatches, no link players. Our master was paced too fast: now paced like Ruby's ([details](sessions/session24/README.md)) |
 
 Experiments deliberately **not** done:
 - two GBA packets in a row, which would hang the GBA;

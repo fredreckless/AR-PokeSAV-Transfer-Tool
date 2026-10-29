@@ -59,6 +59,8 @@ EREADER_MUTANTS = {  # firmware/programs/ereader.c: the e-Reader on the GBA link
     "e-Reader: never answers the game's 0x5FFF": ("        queue(0x5FFF, 0);                                       /* close: everyone says so */", "        ;", "e-Reader: Ruby as master"),
     "e-Reader: as master, never says 0x8FFF": ("        loaded = is_master && seen_two >= 20 ? MASTER_HS : SLAVE_HS;", "        loaded = seen_two > 1000000 ? MASTER_HS : SLAVE_HS;", "e-Reader: Ruby as slave"),
     "e-Reader: as master, never asks for link players": ("            if (is_master) queue(0x2222, 0x5501);                /* ask for link players */", "            ;", "e-Reader: Ruby as slave"),
+    "e-Reader: as master, the session-24 gap (12 lines from the start)": ("#define GAP_AFTER_DONE 13 ", "#define GAP_AFTER_DONE 7 ", "e-Reader: Ruby as slave"),
+    "e-Reader: as master, command cycles back to back": ("                    next_cycle = now() + LINES_PER_FRAME;", "                    next_cycle = now();", "e-Reader: Ruby as slave"),
     "e-Reader: the event's last chunk is cut short": ("        u32 lo = at < tx_len ? tx_src[at] : 0, hi = at + 1 < tx_len ? tx_src[at + 1] : 0;", "        u32 lo = at + 14 < tx_len ? tx_src[at] : 0, hi = at + 1 < tx_len ? tx_src[at + 1] : 0;", "e-Reader: Ruby as master"),
 }
 
@@ -69,6 +71,7 @@ PC_MUTANTS = {
     "no warning when the card's language differs from the game's": ("((data >> 16 & 0xF) == 1) != (card_language == \"Japanese\")", "False", "every game: Japanese Emerald still"),
     "fast 32-bit checksum on the save": ('("r8", SAVE_BASE, 0x10000), ("crc", SAVE_BASE, 0x10000), ("w16", MAP_REG, 0x0120)]', '("r8", SAVE_BASE, 0x10000), ("crct", SAVE_BASE, 0x10000), ("w16", MAP_REG, 0x0120)]', "8-bit"),
     "a stalled program upload is never sent again": ("            if attempt or not stalled:", "            if True:", "held up"),
+    "a first connect that times out is never tried again": ("            if attempt or not maxduo_saves._is_timeout(err):\n                raise\n            print(f\"The DUO didn't finish", "            if True:\n                raise\n            print(f\"The DUO didn't finish", "connect: a first answer"),
     "no stale-packet clearing": ("        cleared = self.drain()\n", "        cleared = 0\n", "connect"),
     "partial upload drops interpreter bytes": ("            self._upload_fast(LAB_STAGE, prog[:16])\n", "            self._upload_fast(LAB_STAGE, prog[:12])\n", "resident"),
     "wrong logo constant": ("0x01000000: 0x62B5CBC1", "0x01000000: 0x62B5CBC0", "logo constants"),

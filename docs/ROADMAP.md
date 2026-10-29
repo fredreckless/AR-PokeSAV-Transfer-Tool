@@ -69,7 +69,7 @@ After receiving news, the delivery man gives berries.
 
 **Needs:** a real Wonder News file for the game and language, and one hardware run.
 
-## Stage 3: Mystery Event for Ruby and Sapphire (the e-Reader route; simulator done, 29 October 2026)
+## Stage 3: Mystery Event for Ruby and Sapphire (the e-Reader route; simulator done, 29 October 2026; first hardware run in lab session 24)
 
 Done in the simulator:
 - `firmware/programs/ereader.c` (4 KB) plays the e-Reader in either cable role.

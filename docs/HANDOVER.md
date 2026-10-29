@@ -91,8 +91,8 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
   planted bug makes the lab build too big, `mutate4` tests the everyday build only.
 - **Build.** Clang 18 + lld. Run `firmware/embed_programs.py` after any change to `adapter.c`.
 - **Tests.**
-  - `tests/run_each.py --jobs=2`: 99 tests.
-  - `tests/mutate4.py`: 65 planted bugs. The kinds are `prog` (adapter.c), `ereader`
+  - `tests/run_each.py --jobs=2`: 100 tests.
+  - `tests/mutate4.py`: 68 planted bugs. The kinds are `prog` (adapter.c), `ereader`
     (ereader.c), `pc`, `fw` and `fw42`. For the adapter's planted bugs alone, run `mutate4.run("prog", name)`.
   - The four firmware-build tests need Datel's 1.06 update file, which wasn't in the last
     session's container. The rest can run from builds taken off the user's installed `.bin`

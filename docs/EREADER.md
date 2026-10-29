@@ -12,8 +12,23 @@ receive a Mystery Event, as read from pret/pokeruby (`src/link.c`, `src/mystery_
 - **Who is master.** That's decided by the cable. The console on the end whose SI is grounded is
   player 0. On a Nintendo AGB-005 cable, that's the purple plug. Game Boy and Game Boy Color
   cables won't do, because multi-player mode needs the SD line.
-- **Pacing.** The master starts each transfer from a timer: in Ruby, timer 3 with 197 ticks of 64
-  cycles, about 0.75 ms apart. A slave only reacts.
+- **Pacing** (corrected after lab session 24). A slave only reacts, but it needs the master to
+  pace exactly like this:
+  - **One command a frame.** During the handshake, the master starts one transfer per frame
+    (VBlank). Once connected, it runs one cycle of nine transfers per frame: a checksum slot,
+    then eight words.
+    - The game sends at most one command per frame, and takes in one received command per frame
+      (`LinkMain1` → `DequeueRecvCmds`), with room for 50 waiting.
+  - **Within a cycle, 0.75 ms between transfers.** Each next transfer starts 0.75 ms after the
+    previous one **finished**: timer 3, 197 ticks of 64 cycles, started at the end of the
+    master's serial interrupt. That gives the slave's interrupt time to load its next word.
+  - **What went wrong in session 24.** The DUO was master, starting transfers 12 scanlines after
+    the previous *start*: only ~0.44 ms after the end, with cycles back to back. 45% of commands
+    had checksum mismatches.
+  - **The fix.** `ereader.c` now waits 13 scanlines (~0.83 ms) after each transfer ends, and
+    starts one cycle per frame.
+  - **The simulator** now gives the slave game a 0.6 ms reaction time and a five-scanline
+    transfer, and checks the one-cycle-per-frame rule.
 
 ## The game's link layer (link.c)
 
