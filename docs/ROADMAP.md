@@ -3,7 +3,7 @@
 Each stage builds on the last. The cheapest and most useful steps come first. Every stage goes
 through the simulator (with a planted bug for each new behaviour) before it touches real hardware.
 
-## Stage 0: Make room and tidy up
+## Stage 0: Make room and tidy up (done, 29 October 2026)
 
 - **Free up memory.** Move the lab instrumentation (flick tables, link scope, command capture,
   timing calibration) into a separate lab build, so the everyday distributor has room to grow.
@@ -14,10 +14,18 @@ through the simulator (with a planted bug for each new behaviour) before it touc
   CRC-16 (the game's own `CalcCRC16WithTable`), the script's magic and empty map fields, and the
   card size against the language. Warn about anything odd.
 - **Small fixes.**
-  - Ignore the harmless echoed acknowledgements ("unknown command 0xBD / 0x96").
-  - Look into why the Mystery Gift menu sometimes needs a second visit.
+  - Ignore the harmless echoed acknowledgements ("unknown command 0xBD / 0x96"). Done: a word is
+    ignored only when it is exactly our own last acknowledgement, so a genuinely unknown command
+    is still refused.
+  - The "second visit" to the Mystery Gift menu turned out to be a first visit to Japanese
+    Emerald's Mystery Event menu (ふしぎな できごと), which waits for an e-Reader. Nothing to fix.
 
-## Stage 1: Wonder Cards for every Gen 3 game
+Results:
+- The everyday adapter build is 10,792 bytes, with about 960 bytes spare.
+- The lab build (`--lab`) is 11,660 bytes. It keeps the instruments but leaves out the serial
+  sweep.
+
+## Stage 1: Wonder Cards for every Gen 3 game (simulator done; hardware to come)
 
 - **Recognise the game.** The adapter reads the version and language from the game's own
   broadcast data (command 0x16), then picks the distributor serial and card size itself.
@@ -29,8 +37,11 @@ through the simulator (with a planted bug for each new behaviour) before it touc
   | Others | 0x7F7D | from the English decomps; confirm with `--sweep-serial` |
 
   Each confirmed result goes into the table.
-- **FireRed and LeafGreen.** Their Mystery Gift is the same protocol (pret/pokefirered). Model
-  them in the simulator, and test both card sizes (Japanese 0xA4, others 0x14C).
+- **FireRed and LeafGreen.** Their Mystery Gift is the same protocol (pret/pokefirered), and
+  `Rfu_GetWonderDistributorPlayerData` is identical. In the simulator, an English FireRed now
+  receives a full-size (0x14C) card from serial 0x7F7D with an English host.
+- **The host's language follows the game,** both in its broadcast data and in its link-player
+  block. The trace names the game, for example "broadcast data (0x16) … - Japanese Emerald".
 - **Hardware.** A short session per cartridge: English and European Emerald, and FireRed/LeafGreen
   in any language. **Testers welcome.**
 

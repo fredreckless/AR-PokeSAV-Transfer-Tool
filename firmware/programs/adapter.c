@@ -141,33 +141,45 @@ static int swap_after;                 /* the game hands us the clock after this
 #define HOST_ID      0x7DA5
 #define CHILD_ID     0x2C41
 #define HOST_TRAINER 0x5678           /* with the name below, the checksum byte is 0x2C */
-#define SERIAL_WONDER_DISTRIBUTOR 0x7F7F   /* Japanese Emerald (BPEJ), found by --sweep-serial;
-                                             the English decomp's is 0x7F7D, absent from BPEJ */
+/* The distributor serial each game wants (Stage 1): Japanese Emerald (BPEJ) wants 0x7F7F - found
+ * by --sweep-serial, lab session 19; it doesn't contain 0x7F7D at all. The English decomps (Emerald,
+ * FireRed/LeafGreen) say 0x7F7D, used for every other game until a sweep says otherwise. Chosen
+ * when the game sends its broadcast data (0x16), which names its language and version; the PC
+ * can override it (pc_serial, --serial). */
+#define SERIAL_JP_EMERALD 0x7F7F
+#define SERIAL_DECOMP     0x7F7D
+static u32 dist_serial = SERIAL_JP_EMERALD, pc_serial, host_lang = 1;
 static u32 host_cfg[6], host_on = 1, n_hosts = 1, connect_polls, child_connected;
 /* --sweep-serial: the Japanese Emerald doesn't contain 0x7F7D (session 18), so offer every serial
  * number in turn, three per answer, each host's ID being its serial. Each block of serials is shown
  * twice, each time in less than the 240 frames Emerald then spends looking for the host it
  * accepted - so it finds it again and connects (0x1F) to that ID. */
-static u32 sweep, sweep_n, found_serial;
+static u32 sweep_n, found_serial;
+#ifdef LAB
+#define sweep 0                          /* the lab build leaves the sweep out, to make room */
+#define next_sweep_serial() 0
+#else
+static u32 sweep;
 /* 512 serials a block, each block offered twice (a cycle is ~171 answers, ~2.8 s); then the next */
 __attribute__((noinline)) static u32 next_sweep_serial(void)
 {
     u32 n = sweep_n++, id = ((n >> 10) << 9 | (n & 511)) & 0x7FFF;
     return id < 3 ? 3 : id;                                    /* 0 and 2 are other serials */
 }
+#endif
 
 static void build_host(void)
 {
     u8 b[24];
-    u32 compat = 1                       /* language: Japanese */
+    u32 compat = host_lang               /* language: the game's own (Japanese until it says) */
                | 1 << 5                  /* hasCard */
                | 1 << 7 | 1 << 8 | 1 << 9 /* canLinkNationally, hasNationalDex, gameClear */
                | 3 << 10;                /* version: Emerald */
     static const u8 uname[8] = { 0xBE, 0xCF, 0xC9, 0x00, 0xFF, 0, 0, 0 };   /* "DUO " */
     u8 sum = 0;
     memset(b, 0, sizeof b);
-    b[0] = SERIAL_WONDER_DISTRIBUTOR & 0xFF;
-    b[1] = SERIAL_WONDER_DISTRIBUTOR >> 8;
+    b[0] = dist_serial & 0xFF;
+    b[1] = dist_serial >> 8;
     b[2] = compat; b[3] = compat >> 8;   /* RfuGameData.compatibility */
     b[4] = HOST_TRAINER & 0xFF; b[5] = HOST_TRAINER >> 8;   /* .playerTrainerId */
     b[12] = 21;                          /* .activity = ACTIVITY_WONDER_CARD, not started */
@@ -591,7 +603,7 @@ static void build_player_block(void)
     lp[4] = HOST_TRAINER & 0xFF; lp[5] = HOST_TRAINER >> 8;   /* trainerId, as broadcast */
     lp[8] = 0xBE; lp[9] = 0xCF; lp[10] = 0xC9;     /* name "DUO" */
     memset(lp + 11, 0xFF, 5);
-    lp[26] = 1;                                    /* language: Japanese */
+    lp[26] = host_lang;                            /* language: the game's own */
 }
 
 enum { LS_OFF, LS_IDS, LS_REQ, LS_EXCHANGE, LS_SERVE, LS_DONE };
@@ -735,8 +747,9 @@ static u32 host_frame(void)
 /* What the game sends us once connected: the first few data commands, word for word. This is
  * librfu's own framing of the child's first messages (its game name over the NI channel) - the
  * ground truth the host side will be built against. */
-#define CAP_CMDS 4
+#define CAP_CMDS 3
 #define CAP_WORDS 8
+#ifdef LAB
 static u32 cap_cmd[CAP_CMDS], cap_data[CAP_CMDS][CAP_WORDS], cap_count;
 
 static void capture(void)
@@ -749,6 +762,9 @@ static void capture(void)
         cap_data[cap_count][i] = req[i];
     cap_count++;
 }
+#else
+#define capture() ((void)0)
+#endif
 
 static void respond(void)
 {
@@ -763,7 +779,15 @@ static void respond(void)
                        | (child_connected ? 1 << 16 | CHILD_ID : 0); ack_len = 1; break;
     case 0x14: ack[0] = 0xFF; ack_len = 1; break;                      /* slot status */
     case 0x15: memset(ack, 0, 7 * 4); ack[6] = 257; ack_len = 7; break;
-    case 0x16: memcpy(game_config, req, sizeof game_config); break;    /* broadcast data */
+    case 0x16: {                                                       /* broadcast data */
+        u32 compat = req[0] >> 16, lang = compat & 0xF;               /* RfuGameCompatibilityData */
+        memcpy(game_config, req, sizeof game_config);
+        if (lang) host_lang = lang;
+        dist_serial = pc_serial ? pc_serial
+                    : lang == 1 && (compat >> 10 & 0xF) == 3 ? SERIAL_JP_EMERALD : SERIAL_DECOMP;
+        build_host();
+        break;
+    }
     case 0x17: system_config = req[0]; break;                          /* setup */
     case 0x19: adapter_state = ST_HOST_OPEN; break;
     case 0x1A: break;                                                  /* nobody joined */
@@ -930,16 +954,22 @@ static void idle_after_command(void)
  * The end of a command needs a plain low (unarmed) until the game has gone idle. */
 static u32 n_stray, n_flick_timeouts;
 
-#define W_MAX 15
+#define W_MAX 13                         /* (the simulator's tuning test climbs to 12) */
 volatile u32 flick_w = 1;                /* spin-loop iterations the flick stays low (tuned) */
-static u16 w_pulses[W_MAX + 1], w_clocked[W_MAX + 1], w_accepted[W_MAX + 1], w_rejected[W_MAX + 1];
 static int last_flick = -1;              /* width of the flick that started the last word, or -1 */
 static int flick_good = -1;              /* the last width the game accepted, or -1 */
+#ifdef LAB
+/* The lab build (adapter_lab, --lab on the PC) also keeps per-width flick counts, a link-port
+ * scope (SI sampled after the first flicks), a capture of the game's first data commands and the
+ * timing calibration. The everyday build leaves them out to make room. */
+#define LAB_ONLY(x) x
+static u16 w_pulses[W_MAX + 1], w_clocked[W_MAX + 1], w_accepted[W_MAX + 1], w_rejected[W_MAX + 1];
 static u32 spin_per_8_lines, polls_per_8_lines;
-
-/* link-port scope: SI (the game's SO) sampled during the quiet spell after the first flicks */
-#define SCOPE_N 8
+#define SCOPE_N 4
 static u32 scope_si[SCOPE_N][2], scope_meta[SCOPE_N], scope_count;
+#else
+#define LAB_ONLY(x)
+#endif
 
 static void spin(u32 n)                  /* two instructions a step: fine, even steps */
 {
@@ -947,6 +977,7 @@ static void spin(u32 n)                  /* two instructions a step: fine, even 
         __asm__ volatile("1: subs %0, %0, #1\n\tbne 1b" : "+l"(n) : : "cc");
 }
 
+#ifdef LAB
 static u32 count_8_lines(int polls)       /* units of work done in 8 scanlines (0 if VCOUNT is stuck) */
 {
     u32 n = 0, guard = 0, v = VCOUNT & 0xFF;
@@ -972,6 +1003,7 @@ static void calibrate(void)              /* how fast spin() and the polling loop
     spin_per_8_lines = count_8_lines(0);
     polls_per_8_lines = count_8_lines(1);
 }
+#endif
 
 static void arm_idle(void)
 {
@@ -987,7 +1019,8 @@ static void judge_flick(int accepted);
 
 static void arm_word(u32 w)
 {
-    u32 t0, tries = 0, cap = scope_count < SCOPE_N ? scope_count : SCOPE_N;
+    u32 t0, tries = 0;
+    LAB_ONLY(u32 cap = scope_count < SCOPE_N ? scope_count : SCOPE_N;)
     SIODATA32 = w;
     last_flick = -1;
     if (!(w >> 31)) {
@@ -1007,7 +1040,7 @@ static void arm_word(u32 w)
         SIOCNT = CNT_32BIT;                                   /* disarmed for a moment: SO really low */
         spin(fw);
         SIOCNT = CNT_32BIT | CNT_START | CNT_SO_HIGH;         /* armed again before the first clock edge */
-        w_pulses[fw]++;
+        LAB_ONLY(w_pulses[fw]++;)
         for (u32 i = 0; i < FLICK_QUIET; i++) {
             u32 c = SIOCNT;
             if (i < 64 && (c & CNT_SI))
@@ -1017,19 +1050,21 @@ static void arm_word(u32 w)
         /* The game went low (it saw us and clocked) but our word never completed: it clocked while
          * we were still disarmed, and the word is lost. The pulse is too wide. */
         int lost = done_at == 0xFF && (si_bits[0] != 0xFFFFFFFF || (si_bits[1] & 0xFF) != 0xFF);
+#ifdef LAB
         if (cap < SCOPE_N && (done_at != 0xFF || tries == 0 || lost)) {
             scope_si[cap][0] = si_bits[0];
             scope_si[cap][1] = si_bits[1];
             scope_meta[cap] = fw | (done_at << 8) | (w & 0xFFFF0000);
             scope_count = ++cap;
         }
+#endif
         if (done_at != 0xFF) {
-            w_clocked[fw]++;
+            LAB_ONLY(w_clocked[fw]++;)
             last_flick = fw;                                  /* judged at the next handshake */
             return;
         }
         if (lost) {
-            w_clocked[fw]++;
+            LAB_ONLY(w_clocked[fw]++;)
             last_flick = fw;
             judge_flick(0);                                   /* narrower; the game will retry */
             return;
@@ -1050,10 +1085,10 @@ static void judge_flick(int accepted)
     if (last_flick < 0)
         return;
     if (accepted) {
-        w_accepted[last_flick]++;
+        LAB_ONLY(w_accepted[last_flick]++;)
         flick_good = last_flick;
     } else {
-        w_rejected[last_flick]++;
+        LAB_ONLY(w_rejected[last_flick]++;)
         flick_good = -1;
         if (flick_w > 0 && flick_w >= (u32)last_flick)
             flick_w = last_flick ? last_flick - 1 : 0;       /* clocked but refused: narrower */
@@ -1190,6 +1225,14 @@ static void link_word(api_t *api, u32 in)
             arm_idle();
             return;
         }
+        if (in == ack[31] && (in & 0x80)) {
+            /* Our own last acknowledgement coming back: after sleep the game clocks once more
+             * without loading a new word, so its buffer still holds our answer (0x996600BD,
+             * 0x99660096). It isn't a command - ignore it and wait for the real one. (A genuinely
+             * unknown command, even one with bit 7 set, is still refused politely.) */
+            arm_idle();
+            return;
+        }
         if ((in >> 16) == 0x9966) {
 #ifdef PROBE
             tries[enc]++;
@@ -1311,11 +1354,12 @@ static int pc_service(api_t *api)
     case 5: v = n_id | (n_lost << 16); break;
 #ifndef PROBE
     case 8: v = n_stray | (n_flick_timeouts << 16); break;
-    case 15: v = cap_count; break;
     case 17: v = (i & 7) < 8 ? child_name[4 * (i & 7)] | child_name[4 * (i & 7) + 1] << 8
                  | child_name[4 * (i & 7) + 2] << 16 | (u32)child_name[4 * (i & 7) + 3] << 24 : 0; break;
     case 18: v = (ni.state & 0xFFFF) | (child_frames & 0xFF) << 16 | (host_frames & 0xFF) << 24; break;
     case 19: v = nis.state; break;
+#ifdef LAB
+    case 15: v = cap_count; break;
     case 16: v = (idx >> 5) < CAP_CMDS ? ((idx & 31) == 31 ? cap_cmd[idx >> 5]
                                         : (idx & 31) < CAP_WORDS ? cap_data[idx >> 5][idx & 31] : 0) : 0; break;
     case 9: v = i <= W_MAX ? (w_pulses[i] & 0xFFFF) | (w_clocked[i] << 16) : 0; break;
@@ -1325,6 +1369,7 @@ static int pc_service(api_t *api)
     case 13: v = polls_per_8_lines; break;
     case 14: v = (i >> 2) < SCOPE_N ? ((i & 3) == 0 ? scope_si[i >> 2][0] : (i & 3) == 1 ? scope_si[i >> 2][1]
                                         : scope_meta[i >> 2]) : 0; break;
+#endif
 #endif
 #ifdef PROBE
     case 6: v = i < N_ENC ? (tries[i] | accepts[i] << 16) : 0; break;
@@ -1338,9 +1383,16 @@ static int pc_service(api_t *api)
         break;
     case 22: v = link_state | mg_step << 4 | mg_errors << 8 | (n_child_cmds & 0xFFFF) << 16; break;
     case 25: v = (n_uni & 0xFFFF) | n_resent << 16; break;
+    case 27:                                                   /* --serial (0: choose by game) */
+        if (idx) pc_serial = idx & 0x7FFF;
+        v = dist_serial | (game_config[0] >> 16) << 16;
+        break;
     case 26:                                                   /* --check-search, --sweep-serial */
+#ifndef LAB
         if (idx & 0x10) { sweep = 1; n_hosts = 3; }
-        else if (idx >= 1 && idx <= 4) n_hosts = idx;
+        else
+#endif
+        if (idx >= 1 && idx <= 4) n_hosts = idx;
         v = ((sweep_n >> 10) << 9 & 0x7FFF) | found_serial << 16;
         break;
     case 23: v = (i & 15) < 16 ? game_data[4 * (i & 15)] | game_data[4 * (i & 15) + 1] << 8
@@ -1364,7 +1416,7 @@ u32 start(api_t *api)
     phase = PH_ID;
     last_vcount = VCOUNT & 0xFF;
     build_host();
-#ifndef PROBE
+#ifdef LAB
     calibrate();
     last_vcount = VCOUNT & 0xFF;
 #endif

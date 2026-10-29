@@ -85,7 +85,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 - **Datel's own delete and overwrite commands are blocked outright,** including DeleteFile (0x1C). Another GBA Action Replay tool sends that command at start-up, and on a MAX DUO it would delete a stored file. More on that in [the protocol notes](docs/PROTOCOL.md#a-warning-about-other-tools).
 - **The wireless tool reads and writes nothing on either cartridge.** When you receive a Wonder Card, the game saves it itself, as at a real distribution. That's why backing up first is worth it.
 - **The firmware update is the one step that writes,** and only to the DUO itself, never to your games. It asks you to type `UPDATE` first, and it uses Datel's own update process. You can go back to Datel's official firmware the same way.
-- **Every change is tested before real hardware.** That means about 88 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
+- **Every change is tested before real hardware.** That means about 92 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
 
 ## Other things it can do
 
@@ -106,7 +106,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 **What works so far.**
 - **Japanese Pokémon Emerald (BPEJ), on real hardware.** The game finds the distributor, connects, receives the Wonder Card and its script, saves them and disconnects cleanly. For example, the Old Sea Map card has been delivered, and the item collected from the Pokémon Center.
 - **The Japanese game's distributor serial is 0x7F7F**, not the 0x7F7D in the English decomp. `--sweep-serial` found it.
-- **Other games and languages** (English and European Emerald, FireRed and LeafGreen) use the same Mystery Gift protocol. They haven't been tried yet. Each probably needs only its own serial (`--sweep-serial` finds it in about six minutes) and a matching `.wc3`.
+- **Other games and languages** (English and European Emerald, FireRed and LeafGreen) use the same Mystery Gift protocol. The distributor reads the game's language and version from its first broadcast, and picks the serial itself: 0x7F7F for Japanese Emerald, and 0x7F7D (from the decomps) for the rest. These work in the simulator, including the larger international cards, but haven't been tried on real hardware yet. If a game doesn't find the distributor, `--sweep-serial` finds its serial in about six minutes, and `--serial` then uses it. **Testers welcome.**
 
 **You will need:**
 - Two GBAs: the DUO's, and one for the game.
@@ -116,7 +116,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 **Receiving a card:**
 1. **Back up your save first** with `maxduo_saves.py`. The game keeps one Wonder Card, and a new one replaces the old one, together with its script. Collect any item from the old card first.
 2. Put the game in the second GBA, connect the cable, and switch the DUO's GBA on to USB SERVER MODE.
-3. Run `python duo_wireless.py --trace --wonder-card "YOUR CARD.wc3"`. It should report "Wonder Card loaded".
+3. Run `python duo_wireless.py --trace --wonder-card "YOUR CARD.wc3"`. It should report "Wonder Card loaded". It also checks the card's and script's checksums, as the game would, and warns if the card's language doesn't match the game's.
 4. On the game, choose **Mystery Gift → Wonder Cards → Wireless** (ふしぎな おくりもの → ふしぎな カード → じゅしん スポット). Japanese Emerald also has a separate Mystery Event (ふしぎな できごと) menu, which waits for an e-Reader; it isn't this one.
 5. When the game says the card has been saved and the link has ended, press Ctrl+C on the PC. Then collect the item, as the card describes: in Emerald, upstairs in any Pokémon Center.
 
@@ -125,6 +125,8 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 | `python duo_wireless.py --trace --wonder-card FILE.wc3` | Offers the Wonder Card from your `.wc3` file over Mystery Gift, and lists every adapter command the game sends ([docs/DISTRIBUTOR.md](docs/DISTRIBUTOR.md)). Nothing from the file is kept |
 | `python duo_wireless.py --trace` | The same, with no card: the distributor tells the game it has nothing to send |
 | `python duo_wireless.py --trace --sweep-serial` | Offers every distributor serial number in turn until the game connects to one (about 6 minutes). Use it for a game or language not tried yet |
+| `python duo_wireless.py --trace --serial 7F7D ...` | Use this distributor serial rather than the one chosen for the game |
+| `python duo_wireless.py --trace --lab ...` | The lab build: also reports flick tuning, a link-port scope and the game's first data commands |
 | `python duo_wireless.py --trace --check-search` | Link check: the game restarts its search after every answer only if our answers arrive intact |
 | `python duo_wireless.py --find-serial [--deep]` | Read-only search of the cartridge in the DUO for the distributor serial. `--deep` reads the ROM into memory (never to disk) |
 | `python duo_wireless.py --test` | Detection only: answers a Pokémon game's Wireless Adapter check ([docs/WIRELESS.md](docs/WIRELESS.md)) |
@@ -162,8 +164,8 @@ This repository holds the whole project, not just the finished tool.
 ```
 pip install -r requirements.txt
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE --all
-python tests/run_each.py      # about 88 tests, each in its own process; around 15 minutes
-python tests/mutate4.py       # plants 47 known bugs; each must be caught
+python tests/run_each.py      # about 92 tests, each in its own process; around 15 minutes
+python tests/mutate4.py       # plants 53 known bugs; each must be caught
 ```
 
 The adapter program (`firmware/programs/adapter.c`) is built with clang and lld (LLVM 18). You only need them to rebuild it: `duo_wireless.py` carries a copy (refresh it with `python firmware/embed_programs.py`), which a test checks against a fresh build.

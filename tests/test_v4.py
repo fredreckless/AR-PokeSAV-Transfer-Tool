@@ -1023,30 +1023,30 @@ import rfu_game_model as RFU
 _SYMS = {}
 
 
-def adapter_symbol(name):
-    """Address of a global in the adapter program (needs clang; the embedded copy is checked
+def adapter_symbol(name, program="adapter"):
+    """Address of a global in an adapter build (needs clang; the embedded copies are checked
     against a fresh build by another test, so the layouts match)."""
-    if not _SYMS:
+    if program not in _SYMS:
         sys.path.insert(0, paths.FIRMWARE)
         import programs
         try:
-            _SYMS.update(programs.symbols("adapter"))
+            _SYMS[program] = programs.symbols(program)
         except (RuntimeError, OSError, subprocess.CalledProcessError) as e:
             raise Skip(f"needs clang/llvm to locate program symbols: {e}")
-    return _SYMS[name]
+    return _SYMS[program][name]
 
 
 def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits=0, first_bit=False,
                     flick_window=None, wonder_card=None, check_search=False,
-                    sweep_serial=False):
+                    sweep_serial=False, serial=None):
     hw, duo = run42()
     game = RFU.Game()
     if attach:
-        flick = (adapter_symbol("flick_w"),) + tuple(flick_window) if flick_window else None
+        flick = (adapter_symbol("flick_w", program),) + tuple(flick_window) if flick_window else None
         hw.attach_link_game(script(game), lag_bits=lag_bits, first_bit=first_bit, flick=flick)
     r = quiet(W.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds, adapter_probe=seconds,
                                                           wonder_card=wonder_card, check_search=check_search,
-                                                          sweep_serial=sweep_serial),
+                                                          sweep_serial=sweep_serial, serial=serial),
               poll_s=0.2,
               stop_when=(lambda: hw.lg_done) if attach else None, program=program)
     entries, st, counters = r[0][:3]
@@ -1106,7 +1106,7 @@ def _():
         conn = yield from RFU.connect_to(game, found["id"])
         yield from game.command(0x24, [0x00000400, 0x12345678])      # a child's first data
         return found, conn
-    hw, game, trace, st, counters = adapter_session(script, first_bit=True)
+    hw, game, trace, st, counters = adapter_session(script, first_bit=True, program="adapter_lab")
     assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors)
     found, conn = hw.lg_result
     assert found["serial"] == 0x7F7F and found["checksum_ok"] and found["gname"]["hasCard"], found
@@ -1182,6 +1182,41 @@ def _():
     assert "Most likely: 0x1234" in text and "BPEJ" in text, text
 
 
+@test("every game: an English FireRed gets serial 0x7F7D and an English host, and receives a full-size (0x14C) card")
+def _():
+    path, card, script = test_wc3("English")
+    hw, game, trace, st, counters = adapter_session(lambda g: gift_script(g, RFU.EN_FIRERED), first_bit=True,
+                                                    seconds=120, wonder_card=path)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors, [t for t, _ in trace][-10:])
+    child, client = hw.lg_result
+    assert client.result == RFU.CLI_MSG_CARD_RECEIVED and client.saved_card == card and len(card) == 0x14C
+    assert client.saved_ram_script == script
+    assert W.adapter_trace.last_serial == 0x7F7D | RFU.EN_FIRERED << 16, hex(W.adapter_trace.last_serial)
+    assert child.link_players[0][26] == 2, child.link_players[0]                  # host language: English
+    names = [t for t, _ in trace]
+    assert any(n.startswith("broadcast data (0x16)") and n.endswith("English FireRed") for n in names), names
+    assert "Distributor serial used: 0x7f7d, for English FireRed" in hw.text and "Warning" not in hw.text
+
+
+@test("every game: Japanese Emerald still gets 0x7F7F; --serial overrides the choice; a card in the wrong language is warned about")
+def _():
+    def script(game):
+        return (yield from RFU.find_distributor(game, compat=RFU.JP_EMERALD))
+    hw, game, trace, st, counters = adapter_session(script, first_bit=True)
+    assert hw.lg_error is None and hw.lg_result["serial"] == 0x7F7F and hw.lg_result["gname"]["language"] == 1
+    def forced(game):
+        return (yield from RFU.find_distributor(game, compat=RFU.EN_EMERALD, serial=0x1234))
+    hw, game, trace, st, counters = adapter_session(forced, first_bit=True, serial=0x1234)
+    assert hw.lg_error is None and hw.lg_result["serial"] == 0x1234, (repr(hw.lg_error), game.errors)
+    assert "fixed at 0x1234" in hw.text and hw.lg_result["gname"]["language"] == 2
+    path, card, scr = test_wc3("Japanese")
+    def english(game):
+        return (yield from RFU.find_distributor(game, compat=RFU.EN_EMERALD))
+    hw, game, trace, st, counters = adapter_session(english, first_bit=True, wonder_card=path)
+    assert hw.lg_error is None and hw.lg_result["serial"] == 0x7F7D
+    assert "the Wonder Card is Japanese, but the game is English Emerald" in hw.text, hw.text
+
+
 @test("search check: four entries per answer, all with good checksums, so librfu restarts its search (0x1E, 0x1C)")
 def _():
     def script(game):
@@ -1253,14 +1288,15 @@ def test_wc3(language="Japanese"):
     for i in range(10, size):
         card[i] = (i * 7) & 0xFF
     script = bytes([0x33, 0x05, 0x0A, 0x01]) + bytes((i * 13 + 5) & 0xFF for i in range(996))
-    wc3 = bytes(4) + bytes(card) + bytes(0x50) + bytes(4) + script
+    wc3 = (W.game_crc16(card).to_bytes(4, "little") + bytes(card) + bytes(0x50)
+           + W.game_crc16(script).to_bytes(4, "little") + script)           # valid, as the game checks
     path = os.path.join(tempfile.gettempdir(), f"test_card_{language[:2]}.wc3")
     open(path, "wb").write(wc3)
     return path, bytes(card), script
 
 
-def gift_script(game):
-    found = yield from RFU.find_distributor(game)
+def gift_script(game, compat=RFU.JP_EMERALD):
+    found = yield from RFU.find_distributor(game, compat=compat)
     conn = yield from RFU.connect_to(game, found["id"])
     yield from RFU.send_child_name(game, RFU.child_name_bytes())
     yield from RFU.wait_join_status(game)
@@ -1364,7 +1400,8 @@ def _():
         acks["sleep"] = yield from RFU.go_to_sleep(game)
         return acks
     for window in ((6, 9), (11, 12), (0, 0)):       # climb, climb to a narrow window, back off
-        hw, game, trace, st, counters = adapter_session(script, first_bit=True, flick_window=window, seconds=60)
+        hw, game, trace, st, counters = adapter_session(script, first_bit=True, flick_window=window, seconds=60,
+                                                        program="adapter_lab")
         assert hw.lg_error is None and hw.lg_done, (window, repr(hw.lg_error), game.errors)
         tuning = W.adapter_trace.last_tuning
         lo, hi = window
@@ -1418,6 +1455,42 @@ def _():
     (lag, first, plain) = hw.probe
     assert lag[1] >= 1 and lag[2] >= 1 and first[2] == 0 and plain[2] == 0, hw.probe
     assert "consistent one-bit lag" in hw.text, hw.text[-600:]
+
+
+@test("wireless adapter: an echo of our own acknowledgement after sleep (session 16) is ignored, not answered")
+def _():
+    def script(game):
+        yield ("until_ready",)
+        yield from RFU.go_to_sleep(game)
+        yield ("delay", 30 * RFU.MS)
+        yield ("xfer", 0x996600BD, 2)                # the game clocks once with its stale data
+        yield ("delay", 30 * RFU.MS)
+        return (yield from RFU.mystery_gift_search(game, polls=4))
+    hw, game, trace, st, counters = adapter_session(script, first_bit=True)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors)
+    names = [t for t, _ in trace]
+    assert "unknown command (0xBD)" not in names, names           # the echo isn't treated as a command
+    assert "unknown command (0x99)" in names, names               # a real unknown command still is
+    assert "start searching (0x1C)" in names and counters >> 16 == 0, names
+
+
+@test("card checks: a synthetic .wc3 with good CRC-16s passes; damage to the card or script, or a missing marker, is reported")
+def _():
+    for size, total in ((0xA4, 1252), (0x14C, 1420)):
+        card = bytearray(size); card[0:2] = (1002).to_bytes(2, "little")
+        script = bytearray(1000); script[0:4] = b"\x33\xff\xff\xff"; script[4:8] = b"\x02\x00\x00\x00"
+        def build(card, script):
+            return (W.game_crc16(card).to_bytes(4, "little") + bytes(card) + bytes(0x50)
+                    + W.game_crc16(script).to_bytes(4, "little") + bytes(script))
+        good = build(card, script)
+        assert len(good) == total and W.check_wc3(good) == [], W.check_wc3(good)
+        bad_card = bytearray(good); bad_card[10] ^= 1
+        assert "card's checksum" in " ".join(W.check_wc3(bytes(bad_card)))
+        bad_script = bytearray(good); bad_script[-1] ^= 1
+        assert "RAM script's checksum" in " ".join(W.check_wc3(bytes(bad_script)))
+        no_magic = bytearray(script); no_magic[0] = 0
+        assert "marker" in " ".join(W.check_wc3(build(card, no_magic)))
+    assert W.game_crc16(b"") == (~0x1121 & 0xFFFF)                 # the game's starting value
 
 
 @test("wireless adapter: with nothing on the cable the trace stays empty and the program stops cleanly")

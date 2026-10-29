@@ -222,24 +222,36 @@ def parse_candidates(ack):
     return hosts
 
 
-JP_DISTRIBUTOR_SERIAL = 0x7F7F
+JP_DISTRIBUTOR_SERIAL = 0x7F7F          # Japanese Emerald (lab session 19)
+DECOMP_DISTRIBUTOR_SERIAL = 0x7F7D      # pokeemerald / pokefirered
+# RfuGameCompatibilityData as a game broadcasts it (0x16): language bits 0-3, version bits 10-13,
+# plus canLinkNationally / hasNationalDex / gameClear. JP_EMERALD is what the real BPEJ sent.
+JP_EMERALD = 0x0F81
+EN_EMERALD = 0x0F82
+EN_FIRERED = 0x1382
 
 
-def find_distributor(game, polls=150):
-    """Emerald's Mystery Gift search (InitializeRfuLinkManager_JoinGroup + the union room's
-    wonder-distributor filter): keep polling until a host with the Japanese game's distributor serial
-    (0x7F7F, lab session 18; the English decomp has 0x7F7D) and hasCard shows."""
+def distributor_serial(compat):
+    """The serial a game's Rfu_GetWonderDistributorPlayerData accepts (as far as we know)."""
+    return JP_DISTRIBUTOR_SERIAL if compat & 0xF == 1 and compat >> 10 & 0xF == 3 else DECOMP_DISTRIBUTOR_SERIAL
+
+
+def find_distributor(game, polls=150, compat=JP_EMERALD, serial=None):
+    """Emerald's (or FireRed/LeafGreen's) Mystery Gift search (InitializeRfuLinkManager_JoinGroup +
+    the union room's wonder-distributor filter): broadcast our own game data, then keep polling
+    until a host with this game's distributor serial and hasCard shows."""
+    want = serial if serial is not None else distributor_serial(compat)
     yield ("until_ready",)
     if (yield from game.check_id()) != 0x8001:
         raise LinkError("adapter not found")
     yield from game.command(0x10)
     yield from game.command(0x17, [0x003C0420])
-    yield from game.command(0x16, [0x00000002, 0, 0, 0, 0, 0xFFFFFFFF])
+    yield from game.command(0x16, [0x0002 | compat << 16, 0, 0, 0, 0, 0xFFFFFFFF])
     yield from game.command(0x1C)
     for _ in range(polls):
         ack = yield from game.command(0x1D)
         for h in parse_candidates(ack):
-            if h["checksum_ok"] and h["serial"] == JP_DISTRIBUTOR_SERIAL and h["gname"]["hasCard"] and not h["gname"]["started"]:
+            if h["checksum_ok"] and h["serial"] == want and h["gname"]["hasCard"] and not h["gname"]["started"]:
                 yield from game.command(0x1E)
                 h["words"] = list(ack)
                 return h

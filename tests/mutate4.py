@@ -26,7 +26,11 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
     "adapter arms a top-bit-0 word straight from high (lab session 17)": ("        SIOCNT = CNT_32BIT;\n        SIOCNT = CNT_32BIT | CNT_START;\n        return;", "        SIOCNT = CNT_32BIT | CNT_START;\n        return;", "distributor: Emerald's search"),
     "serial sweep offers each block only once (the game can't find its host again)": ("id = ((n >> 10) << 9 | (n & 511))", "id = ((n >> 9) << 9 | (n & 511))", "serial sweep"),
     "serial sweep doesn't record the serial the game connects to": ("        if (sweep) found_serial = req[0] & 0xFFFF;", "", "serial sweep"),
-    "distributor uses the English serial 0x7F7D (BPEJ ignores it, lab session 18)": ("#define SERIAL_WONDER_DISTRIBUTOR 0x7F7F", "#define SERIAL_WONDER_DISTRIBUTOR 0x7F7D", "distributor: Emerald's search"),
+    "distributor uses the English serial 0x7F7D (BPEJ ignores it, lab session 18)": ("#define SERIAL_JP_EMERALD 0x7F7F", "#define SERIAL_JP_EMERALD 0x7F7D", "distributor: Emerald's search"),
+    "adapter answers its own echoed acknowledgement as a command": ("        if (in == ack[31] && (in & 0x80)) {", "        if (0) {", "echo of our own"),
+    "distributor always uses the Japanese serial (ignores the game)": ("                    : lang == 1 && (compat >> 10 & 0xF) == 3 ? SERIAL_JP_EMERALD : SERIAL_DECOMP;", "                    : SERIAL_JP_EMERALD;", "every game: an English FireRed"),
+    "distributor keeps a Japanese host for every game": ("        if (lang) host_lang = lang;", "", "every game: an English FireRed"),
+    "--serial is ignored by the adapter": ("        if (idx) pc_serial = idx & 0x7FFF;", "", "every game: Japanese Emerald still"),
     "distributor doesn't say it has a card": ("               | 1 << 5                  /* hasCard */", "               | 0 << 5                  /* hasCard */", "distributor"),
     "host never acknowledges the game's chunks": ("    if (ni.state & NI_BUSY) {\n        u32 f", "    if (0) {\n        u32 f", "NI channel"),
     "host acknowledges with the wrong window number": ("ni.n[ni.phase] << 11 | 1u << 18", "((ni.n[ni.phase] + 1) & 3) << 11 | 1u << 18", "NI channel"),
@@ -47,6 +51,8 @@ PROG_MUTANTS = {      # firmware/programs/adapter.c: rebuilt and embedded in a c
 }
 
 PC_MUTANTS = {
+    "card checks never compare the card's CRC": ("    if game_crc16(card) != int.from_bytes(data[0:2], \"little\"):", "    if False:", "card checks"),
+    "no warning when the card's language differs from the game's": ("((data >> 16 & 0xF) == 1) != (card_language == \"Japanese\")", "False", "every game: Japanese Emerald still"),
     "fast 32-bit checksum on the save": ('("r8", SAVE_BASE, 0x10000), ("crc", SAVE_BASE, 0x10000), ("w16", MAP_REG, 0x0120)]', '("r8", SAVE_BASE, 0x10000), ("crct", SAVE_BASE, 0x10000), ("w16", MAP_REG, 0x0120)]', "8-bit"),
     "no stale-packet clearing": ("        cleared = self.drain()\n", "        cleared = 0\n", "connect"),
     "partial upload drops interpreter bytes": ("            self._upload_fast(LAB_STAGE, prog[:16])\n", "            self._upload_fast(LAB_STAGE, prog[:12])\n", "resident"),
@@ -95,8 +101,9 @@ def run(kind, name):
         src_path = os.path.join(paths.FIRMWARE, "programs", "adapter.c")
         good_src = open(src_path).read()
         assert good_src.count(old) == 1, name
+        builds = ("adapter", "adapter_lab")             # the everyday and the lab build share adapter.c
         with BUILD_LOCK:
-            good = programs.build("adapter").hex()
+            good = {b: programs.build(b).hex() for b in builds}
         os.makedirs(os.path.join(work, "programs"))
         open(os.path.join(work, "programs", "adapter.c"), "w").write(good_src.replace(old, new))
         shutil.copy(os.path.join(paths.FIRMWARE, "programs", "link.ld"), os.path.join(work, "programs"))
@@ -104,13 +111,15 @@ def run(kind, name):
             saved = programs._HERE
             programs._HERE = work
             try:
-                bad = programs.build("adapter").hex()
+                bad = {b: programs.build(b).hex() for b in builds}
             finally:
                 programs._HERE = saved
-        assert good != bad
+        assert any(good[b] != bad[b] for b in builds), name
         tool = open(os.path.join(paths.ROOT, "duo_wireless.py")).read()
-        assert tool.count(good) == 1
-        open(os.path.join(work, "duo_wireless.py"), "w").write(tool.replace(good, bad))
+        for b in builds:
+            assert tool.count(good[b]) == 1, b
+            tool = tool.replace(good[b], bad[b])
+        open(os.path.join(work, "duo_wireless.py"), "w").write(tool)
         shutil.copy(os.path.join(paths.ROOT, "maxduo_saves.py"), work)
         env = dict(os.environ, MAXDUO_TOOL_DIR=work)
     else:
