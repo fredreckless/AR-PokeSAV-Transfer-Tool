@@ -139,7 +139,7 @@ DUO's 2 MHz answers, it reproduces the session exactly.
 python duo_events.py probe
 ```
 
-This works like `--trace`, but it answers each attempt of a command a different way:
+This works like `gift` (the old `--trace`), but it answers each attempt of a command a different way:
 - **a one-bit lag:** load `W << 1`, with SO at W's top bit;
 - **only the first bit late:** load `W`, with SO at its top bit;
 - **as designed.**

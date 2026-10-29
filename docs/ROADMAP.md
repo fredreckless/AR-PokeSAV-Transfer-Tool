@@ -54,7 +54,7 @@ Results:
 The same Mystery Gift steps, but the server tells the game to save news rather than a card.
 After receiving news, the delivery man gives berries.
 
-- `--wonder-news FILE`: the distributor advertises news (hasNews, `ACTIVITY_WONDER_NEWS`).
+- `news --news FILE` (formerly `--wonder-news`): the distributor advertises news (hasNews, `ACTIVITY_WONDER_NEWS`).
   - It sends the news under `MG_LINKID_NEWS`, and reads the game's answer: FALSE if the game saved
     it, TRUE if it already had the same news.
   - It then ends with "news received" or "you already had it", as the decomp's server does.
