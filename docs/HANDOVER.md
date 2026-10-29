@@ -141,8 +141,22 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
      says もらいもの, the game was started too early: restart it after "Ready".
    - **The route:** ふしぎな おくりもの → ふしぎな カード → じゅしん スポット → よみこむ (receive),
      then B back to the title menu.
-   - **Update** the README, the tool's prompts (tie into item 4) and the docs. Drop the line
-     about a separate ふしぎな できごと menu.
+   - **What the decomp says** (pokeemerald `main_menu.c`; the English build has Mystery Events
+     switched off):
+     - The third entry is Mystery Gift when an adapter answers. Without one, it's the e-Reader
+       (`CB2_InitEReader`, `ereader_screen.c`), which reads **Trainer Hill e-Reader cards**.
+       That's a different protocol from Ruby's Mystery Event, and we haven't built it.
+     - A fourth entry, ふしぎな できごと (Mystery Event, `CB2_InitMysteryEventMenu`, the
+       Ruby-style menu that `ereader.c` speaks to), appears only once it's unlocked at the
+       questionnaire, **and** only when no adapter answers. The user's game shows four entries
+       in all, so it isn't unlocked.
+   - **Update** the README, the tool's prompts (tie into item 4) and the docs, with the above.
+6. **Where to enter the questionnaire phrases (to do; the user's notes).** Put these in the README
+   and the docs:
+   - **FireRed/LeafGreen:** the questionnaire in any Poké Mart ("LINK TOGETHER WITH ALL" unlocks
+     Mystery Gift).
+   - **Ruby/Sapphire:** the person by the PC in Petalburg City's Pokémon Center ("MYSTERY EVENT IS
+     EXCITING" unlocks Mystery Event).
 
 ## References (not in the repo)
 
