@@ -174,6 +174,14 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
      - SuperCheats, the Emerald Petalburg man and the Poké Mart survey;
      - ポケモンWiki, エメラルド 攻略ページ;
      - Project Pokémon, Old Sea Map.
+7. **One events tool, named for events (to do; agreed 29 October).** Do this with items 4–6,
+   after the current hardware tests.
+   - Rename `duo_wireless.py` to `duo_events.py`, with commands by event type: `gift --card`,
+     `news --news`, `event --event` (the e-Reader).
+   - Each command gives its own cable and menu instructions, through the shared guided start-up.
+   - Keep one file; split into modules only if more modes arrive (such as Japanese Emerald's
+     Trainer Hill e-Reader cards).
+   - Update the README, the tests and the lab runner to match.
 
 ## References (not in the repo)
 
