@@ -132,13 +132,17 @@ Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real 
    It's the same for the e-Reader. Why: starting the game early caused both the e-Reader
    message (the game found no adapter as Mystery Gift opened) and the stalled upload in
    session 21. Session 22, started in the right order, ran twice back to back without trouble.
-5. **Japanese Emerald menus in the instructions (to do).** The title menu has only four
-   entries: つづきから (Continue), さいしょから (New Game), ふしぎな おくりもの (Mystery Gift),
-   せっていを かえる (Options). There's no Mystery Event entry there, so update the README,
-   the tool's prompts and the docs:
-   - give that menu, then ふしぎな カード → じゅしん スポット;
-   - drop the line about a separate ふしぎな できごと menu;
-   - explain that the e-Reader offer means the game was started before "Ready".
+5. **Japanese Emerald menus in the instructions (to do; the user's observations).**
+   - **The title menu** has four entries: つづきから はじめる (Continue), さいしょから はじめる
+     (New Game), the gift entry, and せっていを かえる (Options).
+   - **The gift entry shows whether the adapter is ready.** It reads ふしぎな もらいもの when the
+     game finds no Wireless Adapter. It reads **ふしぎな おくりもの** when the cable is connected
+     and the DUO is "Ready". So おくりもの on the title screen is the sign to go ahead. If it
+     says もらいもの, the game was started too early: restart it after "Ready".
+   - **The route:** ふしぎな おくりもの → ふしぎな カード → じゅしん スポット → よみこむ (receive),
+     then B back to the title menu.
+   - **Update** the README, the tool's prompts (tie into item 4) and the docs. Drop the line
+     about a separate ふしぎな できごと menu.
 
 ## References (not in the repo)
 
