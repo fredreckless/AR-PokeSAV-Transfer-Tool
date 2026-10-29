@@ -78,6 +78,14 @@ static u32 event_words[(4 + EVENT_MAX + 3) / 4], put_at, event_ready;
 /* ------------------------------------------------------------------ progress, for the PC */
 enum { ST_WAITING, ST_HANDSHAKE, ST_CONNECTED, ST_GOT_PLAYER, ST_SENT_PLAYER, ST_SENT_EVENT, ST_CLOSED };
 static u32 state, is_master, transfers, bad_checksums, game_lp_type, game_lp_lang, stop_requested;
+static u32 sessions;                     /* link-ups so far (the game can start again after a close) */
+static u32 hs_run;                       /* consecutive handshake words from the game while linked */
+
+/* diagnostics for the PC (lab session 24/25): where checksum mismatches happen, and our own timing */
+#define MM_N 4
+static u32 mm_info[MM_N], mm_words[MM_N], mm_sum[MM_N], mm_n;
+static u16 mm_by_state[8];
+static u32 max_gap, events_sent;
 static u8 game_player[60];
 
 /* ------------------------------------------------------------------ the link layer */
@@ -140,6 +148,7 @@ static void next_command(void)           /* what we send in the next 8-word comm
             }
         } else {
             state = ST_SENT_EVENT;
+            events_sent++;
         }
     }
 }
@@ -196,6 +205,7 @@ static void on_transfer(void)            /* after every transfer, as the game's 
         state = ST_HANDSHAKE;
         if (n > 1 && n == prev && w[0] == MASTER_HS) {           /* the link is up */
             state = ST_CONNECTED;
+            sessions++; hs_run = 0;
             send_idx = recv_idx = 0; checksum_ready = 0; nonzero = 0;
             if (is_master) queue(0x2222, 0x5501);                /* ask for link players */
             loaded = 0;
@@ -208,8 +218,28 @@ static void on_transfer(void)            /* after every transfer, as the game's 
         SIOMLT_SEND = loaded;
         return;
     }
+    /* the game handshaking again while we think we're linked: it has closed the link (after an
+     * event, or after an error) and opened it again - go back to the handshake */
+    u16 gw = w[is_master ? 1 : 0];
+    hs_run = ((gw & ~3) == SLAVE_HS || gw == MASTER_HS) ? hs_run + 1 : 0;
+    if (hs_run >= 3) {
+        state = ST_HANDSHAKE; hs_run = 0;
+        rx_on = tx_on = queue_full = player_pending = 0;
+        loaded = SLAVE_HS;
+        SIOMLT_SEND = loaded;
+        return;
+    }
     if (send_idx == 0) {                                         /* the checksum slot */
-        if (checksum_ready && (w[0] != checksum || w[1] != checksum)) bad_checksums++;
+        if (checksum_ready && (w[0] != checksum || w[1] != checksum) && !hs_run) {   /* (not the game starting over) */
+            bad_checksums++;
+            mm_by_state[state & 7]++;
+            if (mm_n < MM_N) {
+                mm_info[mm_n] = state | (transfers & 0xFFFFFF) << 8;
+                mm_words[mm_n] = w[0] | (u32)w[1] << 16;
+                mm_sum[mm_n] = checksum;
+                mm_n++;
+            }
+        }
         checksum = 0; checksum_ready = 1;
     } else {
         frame[recv_idx][0] = w[0]; frame[recv_idx][1] = w[1];
@@ -252,7 +282,12 @@ static int pc_service(api_t *api)
         return 0;
     }
     switch (arg & 0xFF) {
-    case 0: v = state | is_master << 4 | (transfers & 0xFFFFFF) << 8; break;
+    case 0: v = state | is_master << 4 | (sessions & 7) << 5 | (transfers & 0xFFFFFF) << 8; break;
+    case 4: v = idx < MM_N ? mm_info[idx] : 0; break;
+    case 5: v = idx < MM_N ? mm_words[idx] : 0; break;
+    case 6: v = idx < MM_N ? mm_sum[idx] : 0; break;
+    case 7: v = idx < 8 ? mm_by_state[idx] : 0; break;
+    case 8: v = max_gap | events_sent << 16; break;
     case 1: v = bad_checksums | (tx_off & 0xFFFF) << 16; break;
     case 2: v = game_lp_type | game_lp_lang << 16; break;
     case 3: v = idx < 15 ? game_player[4 * idx] | game_player[4 * idx + 1] << 8
@@ -279,22 +314,33 @@ u32 start(api_t *api)
     loaded = SLAVE_HS;
     SIOMLT_SEND = loaded;
     last_vcount = VCOUNT & 0xFF;
-    u32 last_done = now(), next_cycle = last_done;
+    u32 last_done = now(), next_cycle = last_done, in_flight = 0, started_at = 0;
+    u32 last_iter = now();
     while (!stop_requested) {
+        u32 t = now();
+        if (state >= ST_CONNECTED && t - last_iter > max_gap)
+            max_gap = t - last_iter;                 /* our longest look away from the link */
+        last_iter = t;
         is_master = !(SIOCNT & CNT_SI);
         if (REG_IF & IF_SERIAL) {
             REG_IF = IF_SERIAL;
+            in_flight = 0;
             u32 was = state;
             on_transfer();
             last_done = now();
             if (was < ST_CONNECTED && state >= ST_CONNECTED)
                 next_cycle = last_done + LINK_UP_WAIT;          /* Ruby's master pauses here too */
-        } else if (is_master && !(SIOCNT & CNT_START) && now() - last_done >= GAP_AFTER_DONE) {
+        } else if (in_flight && now() - started_at > 2 * LINES_PER_FRAME) {
+            in_flight = 0;                           /* never completed (cable pulled?): carry on */
+        } else if (is_master && !in_flight && !(SIOCNT & CNT_START) && now() - last_done >= GAP_AFTER_DONE) {
+            /* (in_flight, not just the busy bit: a transfer can finish between our look at IF
+             * and our look at SIOCNT, and the next must not start before we've handled it) */
             /* the first transfer of a cycle (or any handshake transfer) waits for the next frame */
             int cycle_start = state < ST_CONNECTED || send_idx == 0;
             if (!cycle_start || (int)(now() - next_cycle) >= 0) {
                 if (cycle_start)
                     next_cycle = now() + LINES_PER_FRAME;
+                in_flight = 1; started_at = now();
                 SIOCNT = MULTI_MODE | BAUD_115200 | CNT_IRQ | CNT_START;   /* our turn to start one */
             }
         }

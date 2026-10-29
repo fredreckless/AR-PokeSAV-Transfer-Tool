@@ -103,12 +103,17 @@ class LinkLayer:
 
 class RubyMysteryEvent:
     """mystery_event_menu.c, as far as the link sees it."""
-    def __init__(self, master=True, language=LANG_ENGLISH, press_a_after=30, pace=300, frame_blocks=25 * 228):
+    def __init__(self, master=True, language=LANG_ENGLISH, press_a_after=30, pace=300, frame_blocks=25 * 228,
+                 menu_rules=True):
         """pace: blocks from a transfer's end to the next within a command cycle (Ruby's timer 3,
         0.75 ms); frame_blocks: one frame. As in link.c, a master starts one handshake transfer
         per frame and one 9-transfer cycle per frame, and the game takes in one received command
         per frame (LinkMain1 -> DequeueRecvCmds), with room for 50 waiting."""
         self.master, self.language = master, language
+        # mystery_event_menu.c only carries on as link master: it waits for LINK_STAT_MASTER, and
+        # closes the link with an error once connected if it isn't master (lab session 25).
+        # menu_rules=False keeps just the link layer, to check the DUO's own master pacing.
+        self.menu_rules = menu_rules
         self.press_a_after, self.pace, self.frame_blocks = press_a_after, pace, frame_blocks
         self.link_players = {}
         self.block = None
@@ -149,6 +154,8 @@ class RubyMysteryEvent:
             if n > max_transfers:
                 raise LinkError(f"no handshake (last words {[hex(w) for w in words]})")
         self.log.append(("connected", n))
+        if self.menu_rules and not self.master:
+            raise LinkError("Ruby's MYSTERY EVENT menu closed the link: the game isn't the link master")
         link = LinkLayer(0 if self.master else 1)
         if self.master:
             link.send(0x2222, LINKTYPE_MYSTERY_EVENT)

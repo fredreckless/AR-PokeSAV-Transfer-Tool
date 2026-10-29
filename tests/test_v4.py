@@ -1344,8 +1344,7 @@ def ereader_run(game, event=None, seconds=60):
     hw.attach_mp_game(game.run(), game_master=game.master)      # the cable: who has the purple plug
     path = None
     if event is not None:
-        path = os.path.join(tempfile.gettempdir(), "test_event.bin")
-        open(path, "wb").write(event)
+        path = event_file(event)
     r = quiet(W.ereader_session, duo, types.SimpleNamespace(ereader=seconds, mystery_event=path),
               poll_s=0.2, stop_when=lambda: hw.lg_done)
     hw.text = r[1]
@@ -1354,15 +1353,80 @@ def ereader_run(game, event=None, seconds=60):
     return hw, r[0]
 
 
-TEST_EVENT = bytes((i * 29 + 7) & 0xFF for i in range(700))    # made-up bytes, not a real event
+import mevent_model as ME
+
+
+def test_me3(script_len=640, gift=(1, 0x97, 0x113), place=(8, 1, 1)):
+    """A made-up saved Mystery Event in the .me3 layout: RAM script block (byte-sum checksum, magic
+    0x33, map group, map number, person, script) and Record Mixing gift (byte-sum, count, chance,
+    item). The script bytes are nonsense - no Nintendo data."""
+    script = bytes(((i * 29 + 7) & 0xFF) or 1 for i in range(script_len))
+    block = (bytes([0x33, *place]) + script).ljust(1000, b"\0")
+    g = bytes([gift[0], gift[1]]) + gift[2].to_bytes(2, "little") if gift else bytes(4)
+    return sum(block).to_bytes(4, "little") + block + (sum(g).to_bytes(4, "little") if gift else bytes(4)) + g
+
+
+def event_file(data, name="test_event (ENG).me3"):
+    path = os.path.join(tempfile.mkdtemp(), name)
+    open(path, "wb").write(data)
+    return path
+
+
+TEST_ME3 = test_me3()
+TEST_EVENT = W.prepare_event(TEST_ME3, "x (ENG).me3")[0]       # the script the DUO actually sends
+
+
+@test("Mystery Event files: a .me3 is wrapped so Ruby stores exactly it; raw scripts are checked; damage, wrong language and other files are refused")
+def _():
+    for gift in ((1, 0x97, 0x113), None):
+        me3 = test_me3(gift=gift)
+        script, text, problems = W.prepare_event(me3, "x (ENG) (UK).me3")
+        assert not problems and "Petalburg City Gym" in text and ("Eon Ticket" in text) == bool(gift), (text, problems)
+        assert script[0] == W.MEV_CHECKCOMPAT and len(script) <= W.MEV_MAX
+        for version in ("Ruby", "Sapphire"):
+            status, saved, store = ME.run(script, "English", version)
+            assert (status, saved) == (ME.LOAD_OK, True), (status, store["trace"])
+            assert store["ram_script"] == me3[:1004] and store["gift"][:8] == me3[1004:], version
+        assert ME.run(script, "German", "Ruby")[:2] == (ME.FAILURE, False)        # the game refuses it
+    # the session-25 trap: a .me3 sent as it is gives "loaded OK" and a save, but stores nothing
+    status, saved, store = ME.run(TEST_ME3)
+    assert (status, saved) == (ME.LOAD_OK, True) and not any(store["ram_script"]) and not any(store["gift"])
+    # damage on the way: the script's checksum command gives "loading error" and no save
+    bad = bytearray(TEST_EVENT); bad[-3] ^= 0x40
+    assert ME.run(bytes(bad))[:2] == (ME.LOAD_ERROR, False)
+    # the file's own checks
+    damaged = bytearray(TEST_ME3); damaged[300] ^= 1
+    assert "checksum" in " ".join(W.prepare_event(bytes(damaged), "x.me3")[2])
+    damaged = bytearray(TEST_ME3); damaged[1009] ^= 1
+    assert "Record Mixing" in " ".join(W.prepare_event(bytes(damaged), "x.me3")[2])
+    for data, name, word in ((bytes(300), "x.bin", "not a saved Mystery Event"),
+                             (bytes([0x10]) + bytes(1011), "x.me3", "not a saved Mystery Event"),
+                             (TEST_ME3, "x (JPN).me3", "Japanese")):
+        try:
+            W.prepare_event(data, name); raise AssertionError(f"{name} accepted")
+        except ValueError as e:
+            assert word in str(e), e
+    assert W.prepare_event(TEST_ME3, "x (GER).me3")[0][5] == 4               # German mask (1 << 2)
+    # a script that's already a Mystery Event script goes as it is, after its own checks
+    assert W.prepare_event(TEST_EVENT, "x.bin")[0] == TEST_EVENT
+    wrong = bytearray(TEST_EVENT); wrong[11] = 0
+    assert "0x4" in " ".join(W.prepare_event(bytes(wrong), "x.bin")[2])
+    # and load_event refuses a file that fails its checks, before anything is sent
+    try:
+        quiet(W.load_event, None, event_file(bytes(damaged))); raise AssertionError("damaged file sent")
+    except ValueError:
+        pass
 
 
 @test("e-Reader: Ruby as master (purple plug) - handshake, link players, the event arrives intact, the link closes")
 def _():
     game = LG.RubyMysteryEvent(master=True)
-    hw, report = ereader_run(game, TEST_EVENT)
+    hw, report = ereader_run(game, TEST_ME3)
     assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.log, hw.text[-600:])
     assert hw.lg_result == TEST_EVENT, (len(hw.lg_result or b""), hw.text[-400:])
+    status, saved, store = ME.run(hw.lg_result, "English", "Ruby")    # what Ruby then does with it
+    assert (status, saved) == (ME.LOAD_OK, True) and store["ram_script"] == TEST_ME3[:1004] \
+        and store["gift"][:8] == TEST_ME3[1004:], (status, store["trace"])
     duo_lp = game.link_players[1]
     assert duo_lp["link_type"] == 0x5501 and duo_lp["language"] == LG.LANG_ENGLISH, duo_lp
     assert report["bad_checksums"] == 0 and report["game_language"] == 2, report
@@ -1371,12 +1435,13 @@ def _():
         assert line in hw.text, (line, hw.text)
 
 
-@test("e-Reader: Ruby as slave (the DUO on the purple plug) - the DUO starts the transfers and the handshake; a Japanese game gets a Japanese partner")
+@test("e-Reader: the DUO as master (pacing check against a game's link layer) - it starts the transfers and the handshake; a Japanese game gets a Japanese partner")
 def _():
-    game = LG.RubyMysteryEvent(master=False, language=LG.LANG_JAPANESE)
-    hw, report = ereader_run(game, TEST_EVENT[:300])
+    game = LG.RubyMysteryEvent(master=False, language=LG.LANG_JAPANESE, menu_rules=False)
+    small = test_me3(script_len=250)
+    hw, report = ereader_run(game, small)
     assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.log, hw.text[-600:])
-    assert hw.lg_result == TEST_EVENT[:300]
+    assert hw.lg_result == W.prepare_event(small, "x (ENG).me3")[0]
     assert game.link_players[0]["language"] == LG.LANG_JAPANESE and "the DUO is player 0" in hw.text, hw.text
     # paced like Ruby's own master: a transfer and the one nine later are a whole frame apart
     # (one handshake transfer, or one 9-transfer command cycle, per frame; a few lines of jitter
@@ -1386,6 +1451,37 @@ def _():
     assert len(st) > 100 and all(st[i + 9] - st[i] >= frame - 300 for i in range(len(st) - 9)), \
         min(st[i + 9] - st[i] for i in range(len(st) - 9))
     assert hw.mp_missed == 0, hw.mp_missed
+
+
+@test("e-Reader: with the DUO on the master end, Ruby's menu gives up - the tool says to swap the cable's ends")
+def _():
+    game = LG.RubyMysteryEvent(master=False)                 # Ruby's real menu rules
+    hw, duo = run42()
+    hw.attach_mp_game(game.run(), game_master=False)
+    r = quiet(W.ereader_session, duo, types.SimpleNamespace(ereader=30, mystery_event=None), poll_s=0.2,
+              stop_when=lambda: hw.lg_done)
+    hw.stop(); clean(hw)
+    assert isinstance(hw.lg_error, LG.LinkError) and "isn't the link master" in str(hw.lg_error), repr(hw.lg_error)
+    assert "swap the cable's ends" in r[1], r[1]
+
+
+@test("e-Reader: two events in one session - after the game closes the link and opens it again, the DUO starts over")
+def _():
+    g1, g2 = LG.RubyMysteryEvent(master=True), LG.RubyMysteryEvent(master=True)
+
+    def twice():
+        a = yield from g1.run()
+        yield ("delay", 25 * 228 * 20)                      # the game shows its message, the player goes back in
+        b = yield from g2.run()
+        return a, b
+    hw, duo = run42()
+    hw.attach_mp_game(twice())
+    r = quiet(W.ereader_session, duo, types.SimpleNamespace(ereader=90, mystery_event=event_file(TEST_ME3)),
+              poll_s=0.2, stop_when=lambda: hw.lg_done)
+    hw.stop(); clean(hw)
+    assert hw.lg_error is None and hw.lg_result == (TEST_EVENT, TEST_EVENT), (repr(hw.lg_error), r[1][-600:])
+    assert "opened the link again" in r[1] and "Mystery Events sent: 2" in r[1], r[1]
+    assert r[0]["bad_checksums"] == 0, r[1]
 
 
 @test("e-Reader: with no event loaded only link players are exchanged (a dry run); oversize files are refused")
@@ -1399,7 +1495,7 @@ def _():
     hw.stop(); clean(hw)
     assert isinstance(hw.lg_error, LG.LinkError) and "no Mystery Event" in str(hw.lg_error), repr(hw.lg_error)
     assert len(game.link_players) == 2 and "sent our link player" in r[1], r[1]
-    big = os.path.join(tempfile.gettempdir(), "test_event_big.bin"); open(big, "wb").write(bytes(2005))
+    big = event_file(bytes([1]) + bytes(2004), "big.bin")             # a script over the game's buffer
     try:
         W.load_event(None, big); raise AssertionError("2005 bytes accepted")
     except ValueError as e:
