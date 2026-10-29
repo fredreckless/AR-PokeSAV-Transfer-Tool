@@ -1,203 +1,225 @@
 # Hand-over (start here in a fresh chat)
 
-Updated 28 October 2026, after the Old Sea Map Wonder Card was received on real hardware.
+Written overnight on 29–30 October 2026, after lab sessions 21–25 and the work that followed
+them. Last commit: see `git log -1` on `main` (`v42-local` is kept identical).
 
-## Where things stand
+## In one paragraph
 
-- **One firmware, two tools.** Reckless v4.2 (`duo_1.06_reckless_v4.2.bin`, update CRC `DD59ED8A`)
-  serves both:
-  - `maxduo_saves.py`: GBA save backups. Finished and frozen; don't add wireless code.
-  - `duo_wireless.py`: Mystery Gift. The DUO's GBA plays a GBA Wireless Adapter with a Wonder
-    Card distributor in range. It imports the USB code from `maxduo_saves.py` (keep both in one
-    folder) and embeds the GBA program `firmware/programs/adapter.c`.
-- **Working on real hardware:** Japanese Emerald (BPEJ) receives a Wonder Card and its RAM script
-  over the whole link: search, connect, NI name, join, link players, Mystery Gift server, close.
-  Lab sessions 16–20 tell the story. Session 21: the game and serial are now recognised
-  automatically, and two cards were received back to back.
-  Session 23: **English LeafGreen** received the full-size (0x14C) Aurora Ticket card first time,
-  serial 0x7F7D, with an English host.
-- **Repository:** `fredreckless/ActionReplayMaxDuo-Pokemon-Toolkit` (renamed from
-  `ar-pokesav-transfer-tool`; GitHub redirects). `main` holds everything.
-- **User's PC folder:** an `ActionReplay` folder in their Windows user folder, Windows, Python 3.10 via Thonny. Files reach
-  it through the desktop bridge when linked. Re-read any file after copying it there: a commit
-  once silently reused an earlier upload.
+The project gives a Datel Action Replay MAX DUO (a GBA cartridge with USB) a second life. One
+custom firmware, **Reckless v4.2**, serves two Python tools:
+- **`maxduo_saves.py`** backs up GBA saves. It's finished; leave it alone.
+- **`duo_events.py`** (renamed from `duo_wireless.py` overnight) runs small GBA programs on the
+  DUO's GBA so that it plays the hardware a distribution used. A Pokémon game on a second GBA
+  then receives the event through its own menus and saves it itself.
+
+Mystery Gift works on real hardware for **Japanese Emerald** and **English LeafGreen**. The
+**e-Reader route** (Mystery Event, Ruby/Sapphire) links up and moves an event block on hardware.
+The first *real* event (the Eon Ticket, now wrapped properly) is the next test.
 
 ## Ground rules (from the user; keep them)
 
-- **Pushing (updated 29 October):** the user has given standing permission to push. Keep `main`
-  and `v42-local` in step, pushing both together after the suite and planted bugs pass. Any other
-  GitHub change (settings, releases, issues) still needs asking first.
-- Never write cartridge saves from our code. Leave the button, the AT switch and the clock alone.
-  Never send flash erase/program commands (0x80/0xA0).
-- The user installs firmware themselves (typing UPDATE).
-- Never commit Datel firmware, Nintendo data (including `.wc3` files and ROM contents) or personal
-  data. That includes the player's trainer ID and name from traces.
-- Warm, natural British English. Concise replies. Ask for just the end of each trace.
+- **Pushing:** standing permission to push. Keep `main` and `v42-local` identical, and push both
+  together after the test suite and the planted bugs pass. Any *other* GitHub change (settings,
+  releases, issues) needs asking first. That includes the release on the to-do list.
+- **Never write cartridge saves** from our code. Leave the DUO's button, the AT switch and the
+  clock alone. Never send flash erase/program commands (0x80/0xA0).
+- **The user installs firmware themselves** (typing UPDATE). Nothing tonight needs new firmware.
+- **Never commit** Datel firmware, Nintendo data (`.wc3`, `.me3`, ROM contents) or personal data.
+  That includes the player's trainer ID and name from traces; leave those out of lab notes.
+- **Tone:** warm, natural British English; concise. Ask for just the end of each trace.
+- **The user's PC:** Windows; Python 3.10 (Thonny); an `ActionReplay` folder in their user folder.
+  - Files reach it through the desktop bridge when the chat is linked.
+  - **After copying a file there, read it back and compare SHA-1s**: a copy once silently reused
+    an earlier upload. Use a fresh staged file name each time.
 
-## What we learnt (hardware)
+## What works, and where
 
-- **Flicks.** At 2 MHz, words after a ready handshake whose top bit is 1 need the "ready" flick:
-  disarm briefly, then re-arm with SO high. About 99.9% are accepted at width 0.
-- **Top-bit-0 words.** They must go low unarmed and then arm (`SIOCNT = 0x1000; 0x1080`).
-  Arming straight from resting high leaves SO high, and the game never clocks (session 17).
-- **Answer data.** The distributor's 0x1D answer is chosen so that only its header needs a flick.
-  The name is "DUO" plus a space, with 0x00 padding; the trainer ID is 0x5678.
-- **Japanese Emerald's distributor serial is 0x7F7F.** The English decomp's 0x7F7D isn't in the
-  ROM. `--sweep-serial` found it (session 19).
-- **The MGB-010 cable** runs at 4× its rated speed and is cross-wired. It's adequate: the data
-  words arrive intact (`--check-search`, session 18).
-- **"unknown command (0xBD)/(0x96)"** is the game clocking once more after sleep: it's our own
-  last acknowledgement, echoed back. Harmless.
-- **Back-to-back runs.** Straight after a successful run, the next program upload can stall: an
-  upload answer is held up on its way to the PC and turns up later (session 21; also session 16).
-  `run_program` now waits for the DUO to give up (~16 s), says hello again and re-sends. The cause
-  is unknown.
-- **One card at a time.** The game keeps one Wonder Card and one RAM script. A new card replaces
-  both, so collect each item from the delivery man before receiving the next card.
-- **The "first visit" problem** (corrected in session 22): the game was started too early.
-  Japanese Emerald looks for a Wireless Adapter as ふしぎな おくりもの opens. If the DUO isn't
-  running the adapter yet, the game offers the e-Reader instead. Backing out and going in again
-  works once the adapter is "Ready". So: start the game only after "Ready".
+| | Status | Lab notes |
+|---|---|---|
+| Mystery Gift, Japanese Emerald | Old Sea Map and MysticTicket received; serial 0x7F7F chosen automatically | sessions 16–22 |
+| Mystery Gift, English LeafGreen | Aurora Ticket (full-size card) received first time; serial 0x7F7D | session 23 |
+| Wonder News | simulator only (needs a real news file) | — |
+| e-Reader → Ruby | link players exchanged (0 mismatches) and a 1,012-byte block sent, with the game as master; the game stored nothing (see below) | sessions 24–25 |
+
+Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
+
+## What to do first in the morning
+
+1. **Ask what Ruby showed after sessions 25's runs 3–4.** A success message is expected, but
+   nothing was stored: the file was sent raw (see "The `.me3` discovery" below).
+2. **Copy the new files to the user's PC** if the overnight session didn't (it should have; check
+   the SHA-1s): `duo_events.py`, `duo_wireless.py` (now a stub), `HANDOVER.md`.
+   `maxduo_saves.py` changed one string only.
+3. **The test to run: the wrapped Eon Ticket.**
+   1. **Back up Ruby's save first** with `maxduo_saves.py`.
+   2. **The game must be on the cable's master end.** The user's cable has two identical black
+      ends. The master end is the one the DUO had when the trace said "the DUO is player 0"
+      (session 25, run 1). In runs 2–4 the ends were swapped, which is right.
+   3. Run `python duo_events.py event --event "RS - Item Eon Ticket (ENG) (UK).me3"`. Then
+      follow the guided start-up: both GBAs off, the DUO's on, wait for "Ready", the game on,
+      MYSTERY EVENT, A.
+   4. **Expect:** link players, "sent the Mystery Event", "the game closed the link", then
+      "Finished". On the game: its success message and a save.
+   5. **Then, in the game:** go to **Petalburg City Gym and talk to Norman.** The RAM script
+      (disassembled locally) does the following:
+      - if you already have the Eon Ticket (bag or PC), or **flag 0xCE
+        (`FLAG_ENCOUNTERED_LATIAS_OR_LATIOS`) is set**, he says his usual line;
+      - otherwise, he speaks; if the bag has room, he gives item 275 (Eon Ticket) and sets
+        `FLAG_SYS_HAS_EON_TICKET` (0x853); if not, a "bag full" message.
+      - The ticket also spreads by Record Mixing (the gift: count 1, chance 151).
+   6. **If it fails**, the end of the trace now shows where any checksum mismatches were, the
+      first four with their words, and the DUO's longest look away from the link.
+4. **A quick check of the new start-up with a Mystery Gift**, for example
+   `python duo_events.py gift --card "FL - Item AuroraTicket (ENG) (UK).wc3"` on LeafGreen.
+   - Expect: progress bars, "Ready. Now switch on the game's GBA", the menu path, and "Finished"
+     by itself after the card arrives.
+   - The game keeps one card at a time, so collect the item first.
+
+## The `.me3` discovery (session 25; details in docs/EREADER.md)
+
+- **What a `.me3` is.** A community `.me3` holds what Ruby **stores** after an event: the RAM
+  script block (byte-sum checksum, magic 0x33, map group, map number, person, script) and the
+  Record Mixing gift. It is **not** the Mystery Event script the e-Reader sent.
+- **Why the raw file fails.** Ruby runs the received buffer as a script. 0xF0 isn't a command,
+  so the engine stops with status 0, "loaded OK". The menu shows its success message and saves,
+  having stored nothing.
+- **What the tool does now.** It wraps a `.me3` in `checkcompat` (English/German from the file
+  name; Ruby and Sapphire), `checksum`, `initramscript`, `setrecordmixinggift` and `end`.
+  - `tests/mevent_model.py` is a model of Ruby's engine, written from pokeruby. It confirms
+    that the game then stores exactly the file's bytes.
+  - It did so locally for the real Eon Ticket file too: 1,012 of 1,012 bytes. That file isn't
+    in the repository.
+- **Ruby's MYSTERY EVENT menu only carries on as the link master** (`gLinkStatus & 0x20`; it
+  closes the link if connected and not master). If the DUO comes up as player 0, the tool says
+  to swap the cable's ends.
+
+## What changed overnight (all pushed, if the session finished)
+
+- **`duo_events.py`** replaces `duo_wireless.py`:
+  - **Commands:** `gift --card`, `news --news`, `event --event`, plus `adapter-test`, `probe`
+    and `find-serial`. Options include `--seconds`, `--keep-going`, `--serial`,
+    `--sweep-serial`, `--check-search` and `--lab`, with the global `--wait`.
+  - **`duo_wireless.py` is now a stub.** Old flags are translated (`translate_legacy`), with a
+    note giving the new command.
+- **The guided start-up** (the user's design):
+  - Both GBAs off, and the cable for that command.
+  - The DUO's GBA on, the game's off.
+  - **Progress bars** while the program uploads ("Setting up the DUO's GBA") and the file loads.
+  - "Ready. Now switch on the game's GBA, then:" followed by each game's menu path.
+    - Japanese Emerald's path comes with romaji, and the おくりもの/もらいもの sign: もらいもの
+      means it was switched on too early.
+    - The unlock phrases and places are given too.
+  - `uprint` never fails on a console that can't show kana.
+- **It finishes by itself:**
+  - Mystery Gift: after a disconnect (0x30) with server step 6.
+  - e-Reader: when the game closes the link after the event; it then says where to go in the
+    game.
+  - `--keep-going` turns this off.
+- **The card/game check.** It warns if a card's file name (Project Pokémon's "E - ", "FL - ",
+  "RS - ") names another game than the one the trace detects. The cards themselves don't show
+  their game reliably: only the RAM scripts' `setvaddress` bases differed in the three files
+  looked at (Emerald 0x0200025x, FRLG 0x020131xx). That's not used.
+- **`ereader.c`:**
+  - **In-flight flag.** It fixes a race: as master, a transfer could start before the previous
+    one had been handled, if it finished between the IF and SIOCNT reads.
+  - **Restarts.** It follows the game starting over after a close (three handshake words in a
+    row), so two events can go in one session.
+  - **Diagnostics for the PC:** mismatch stage counts, the first four mismatches, the longest
+    gap, and events sent.
+  - **Master pacing** (from session 24): one handshake transfer per frame, a two-frame pause at
+    link up, one command cycle per frame, and 13 scanlines from each transfer's end. Only the
+    slave role matters for Ruby, but this is kept and tested.
+- **The simulator is stricter:**
+  - five-scanline transfers;
+  - a slave game that needs 0.6 ms to load its next word (it misses transfers started sooner);
+  - the game takes in one command per frame, with room for 50;
+  - Ruby's master-only menu rule (`menu_rules`).
+- **Tests:**
+  - missing Datel builds (`paths.MissingBuild`), or an `fw.bin` that isn't Datel's untouched
+    firmware, now **skip** instead of failing;
+  - new tests: `.me3` files, the master advice, two events per session, connect retry, upload
+    retry;
+  - about 106 tests; planted bugs in `tests/mutate4.py`.
+- **Docs:** README (new commands, per-game menus, unlock phrases, cable notes), docs/EREADER.md
+  (menu statuses, script commands, the `.me3` layout and wrapping), ROADMAP, and lab notes for
+  sessions 21–25.
+
+## Still on the to-do list
+
+- **A GitHub release** (a zip of the scripts plus short instructions): **ask the user first.**
+- **The lab build (`adapter_lab`) has about 20 bytes spare.** `-Oz` isn't an option, because it
+  pulls in `__aeabi_uidiv`, which we can't link. Before the next lab feature, trim `SCOPE_N`,
+  `CAP_CMDS`/`CAP_WORDS` or `W_MAX` in `adapter.c`.
+- **Wonder News on hardware** needs a real news file. Japanese news is assumed to be 202 bytes.
+- **More games on hardware:** English/European Emerald, FireRed, other languages. Use
+  `gift --sweep-serial` if a game never finds the distributor.
+- **Japanese Emerald's Mystery Event (ふしぎな できごと):**
+  - The menu appears only when unlocked at the Petalburg Poké Mart questionnaire (the phrase
+    「ふしぎ できごと わくわく ドキドキ」 is unverified), and only when no adapter answers.
+  - The Japanese language masks for `checkcompat` aren't known, so Japanese `.me3` files are
+    refused for now.
+  - Its もらいもの entry is something else: the Trainer Hill e-Reader (`ereader_screen.c`), a
+    different protocol.
+- **Unexplained:** straight after a successful run, a program upload sometimes stalled (sessions
+  16, 21). The retry handles it, and handing the link port back (RCNT/SIOCNT) may have cured it.
+  Session 22 was clean.
 
 ## Code facts
 
-- **Memory limit.** Each build of `adapter.c` must end, variables included, below `0x0203AE00`.
-  Above it are the firmware's log messages (MSG_AT), and from `0x0203AF00` its transfer state
-  (VARS). `programs.py` enforces this. There's no hardware divide, so no `%` or `/` on variables.
-- **Three builds of `adapter.c`:**
-  - `adapter`: everyday, 10,792 bytes, about 960 spare;
-  - `adapter_lab` (`-DLAB`, `--lab`): adds the flick tables, scope, capture and calibration, but
-    leaves out the sweep; 11,660 bytes;
-  - `adapter_probe` (`-DPROBE`, `--probe`): the 2 MHz probe.
-
-  `mutate4.py` rebuilds and swaps both the everyday and the lab images for each planted bug.
-- **Serial and language** come from the game's 0x16 broadcast:
-  - Japanese Emerald → 0x7F7F;
-  - anything else → 0x7F7D;
-  - `--serial HEX` overrides (poll 27).
-
-  The host's language follows the game. A word that equals our own last acknowledgement (an
-  echo after sleep) is ignored.
-- **Card checks** (`check_wc3`): the game's CRC-16 over the card and the RAM script, and the
-  0x33 marker.
-- **Wonder News** (`--wonder-news`; the everyday build only):
-  - the gift's size word has bit 16 set;
-  - the host offers hasNews and activity 22;
-  - the server steps are: game data → save-news script → news (ID 23) → the game's answer
-    (ID 19) → "received" or "had news" → ready to end.
-  - Japanese news is 202 bytes (inferred from the Japanese card's 18-byte text fields; unconfirmed),
-    and English news 444.
-- **Build sizes now:** `adapter` 11,264 bytes (about 500 spare); `adapter_lab` 11,740 (20 spare). If a
-  planted bug makes the lab build too big, `mutate4` tests the everyday build only.
-- **Build.** Clang 18 + lld. Run `firmware/embed_programs.py` after any change to `adapter.c`.
-- **Tests.**
-  - `tests/run_each.py --jobs=2`: 100 tests.
-  - `tests/mutate4.py`: 68 planted bugs. The kinds are `prog` (adapter.c), `ereader`
-    (ereader.c), `pc`, `fw` and `fw42`. For the adapter's planted bugs alone, run `mutate4.run("prog", name)`.
-  - The four firmware-build tests need Datel's 1.06 update file, which wasn't in the last
-    session's container. The rest can run from builds taken off the user's installed `.bin`
-    files (strip the 4-byte CRC header into `firmware/build/fw_v42.bin`, and so on).
-- **PC options.**
-  - `--sweep-serial`: 512-serial blocks, each offered twice, three hosts per answer.
-  - `--check-search`: four hosts per answer.
-  - `--find-serial [--deep]`: reads ROM into memory only.
-
-## Ideas for later (the user's wishes)
-
-1. **More games and languages** (simulator done; see docs/ROADMAP.md). English LeafGreen is confirmed
-   (session 23). What's left is hardware: a short run per remaining cartridge, with `--sweep-serial` if the game doesn't find the distributor.
-2. **Wonder News** (simulator done). What's left is a real news file and a hardware run.
-3. **Ruby/Sapphire Mystery Event (e-Reader)**, simulator done. The program is `ereader.c`; the
-   PC commands are `--mystery-event FILE` and `--ereader`; the notes are docs/EREADER.md. The user
-   has an AGB-005. What's left is a hardware run and a real English event file. Plan for the
-   first run:
-   - try the game on the purple plug (the game as master) first;
-   - if anything goes wrong, try the other end.
-
-   Details:
-   - Unlock it by saying "MYSTERY EVENT IS EXCITING" to the questionnaire.
-   - The game links over the standard link at 115 kbit/s (multi-player mode, needing SD), so a
-     GBA link cable (AGB-005) is required, not the MGB-010.
-   - Languages must match (`CheckLanguageMatch`).
-   - The DUO would play the e-Reader in a separate program, porting pokeruby's
-     `mystery_event_menu.c` and `link.c`.
-   - Prize: the Eon Ticket.
-4. **Clearer start-up on the PC (to do; the user's design).** Guide a strict order:
-   1. Before running anything: "Both GBAs should be switched off."
-   2. Run the command. Then: "Switch on the DUO's GBA now (leave the game's GBA off)."
-   3. A progress bar while the program uploads and the card loads: "Setting up the DUO's
-      GBA... don't switch on the game's GBA yet."
-   4. Only then: "Ready - now switch on the game's GBA and choose Mystery Gift."
-
-   It's the same for the e-Reader. Why: starting the game early caused both the e-Reader
-   message (the game found no adapter as Mystery Gift opened) and the stalled upload in
-   session 21. Session 22, started in the right order, ran twice back to back without trouble.
-5. **Japanese Emerald menus in the instructions (to do; the user's observations).**
-   - **The title menu** has four entries: つづきから はじめる (Continue), さいしょから はじめる
-     (New Game), the gift entry, and せっていを かえる (Options).
-   - **The gift entry shows whether the adapter is ready.** It reads ふしぎな もらいもの when the
-     game finds no Wireless Adapter. It reads **ふしぎな おくりもの** when the cable is connected
-     and the DUO is "Ready". So おくりもの on the title screen is the sign to go ahead. If it
-     says もらいもの, the game was started too early: restart it after "Ready".
-   - **The route:** ふしぎな おくりもの → ふしぎな カード → じゅしん スポット → よみこむ (receive),
-     then B back to the title menu.
-   - **What the decomp says** (pokeemerald `main_menu.c`; the English build has Mystery Events
-     switched off):
-     - The third entry is Mystery Gift when an adapter answers. Without one, it's the e-Reader
-       (`CB2_InitEReader`, `ereader_screen.c`), which reads **Trainer Hill e-Reader cards**.
-       That's a different protocol from Ruby's Mystery Event, and we haven't built it.
-     - A fourth entry, ふしぎな できごと (Mystery Event, `CB2_InitMysteryEventMenu`, the
-       Ruby-style menu that `ereader.c` speaks to), appears only once it's unlocked at the
-       questionnaire, **and** only when no adapter answers. The user's game shows four entries
-       in all, so it isn't unlocked.
-   - **Update** the README, the tool's prompts (tie into item 4) and the docs, with the above.
-6. **Where to enter the questionnaire phrases (to do; the user's research, 29 October).** For
-   the README and the docs. After entering a phrase, **save and restart**, so the new entry
-   appears on the title menu.
-   - **Ruby/Sapphire, Mystery Event:** the man by the PC in Petalburg City's Pokémon Center
-     (after beating Norman). The phrase is "MYSTERY EVENT IS EXCITING".
-   - **FireRed/LeafGreen, Mystery Gift:** the questionnaire in any Poké Mart. The phrase is
-     "LINK TOGETHER WITH ALL".
-   - **Emerald, Mystery Gift:** the Poké Mart questionnaire (the clipboard by the counter). The
-     phrase is "LINK TOGETHER WITH ALL". The Japanese Easy Chat words are still to be checked.
-     Emerald's man in the Petalburg Pokémon Center only takes your profile.
-   - **Japanese Emerald, Mystery Event (ふしぎな できごと):** the Petalburg Poké Mart questionnaire.
-     A Japanese walkthrough gives 「ふしぎ できごと わくわく ドキドキ」 (unverified). Overseas
-     Emerald has no Mystery Event.
-   - **Verify before publishing:**
-     - The research calls the Old Sea Map a Mystery Event card. But our `.wc3` is a Mystery Gift
-       Wonder Card, and it arrived over Mystery Gift (session 20). That it was only legitimately
-       given to Japanese Emerald stands.
-     - Check the Japanese phrases against a Japanese guide.
-   - **Sources the user gave:**
-     - Serebii, Ruby/Sapphire Mystery Event;
-     - SuperCheats, the Emerald Petalburg man and the Poké Mart survey;
-     - ポケモンWiki, エメラルド 攻略ページ;
-     - Project Pokémon, Old Sea Map.
-7. **One events tool, named for events (to do; agreed 29 October).** Do this with items 4–6,
-   after the current hardware tests.
-   - Rename `duo_wireless.py` to `duo_events.py`, with commands by event type: `gift --card`,
-     `news --news`, `event --event` (the e-Reader).
-   - Each command gives its own cable and menu instructions, through the shared guided start-up.
-   - Keep one file; split into modules only if more modes arrive (such as Japanese Emerald's
-     Trainer Hill e-Reader cards).
-   - Update the README, the tests and the lab runner to match.
-8. **Finish automatically (to do).** Once the game has saved the gift and closed the link
-   (Mystery Gift step 6, close agreed, `0x30`; or the e-Reader's 0x5FFF), stop by itself and say
-   so, rather than waiting for Ctrl+C.
-9. **Check that the card is for the right game (to do).** Today only the card's language is
-   checked, so an Emerald card would pass for LeafGreen even though its script is Emerald's. Find
-   out whether a `.wc3` (card or script) shows which game it's for. If it does, warn on a
-   mismatch, as the language check does.
-10. **Tidier tests (to do).**
-    - Without Datel's update file, the four firmware-build tests should be **skipped**, not
-      failed. `paths.build_file`'s `sys.exit` currently stops a whole `test_v4.py` run part-way.
-    - `adapter_lab` has only 20 bytes spare. Make room before the next lab feature.
-11. **A GitHub release, later (to do; ask first).** A zip of the two scripts plus short
-    instructions, so testers can try other games.
+- **Repository:** `fredreckless/ActionReplayMaxDuo-Pokemon-Toolkit`. The working clone was at
+  `/home/claude/v42-wt` (branch `v42-local`). Push with
+  `git push origin v42-local && git push origin v42-local:main`.
+- **Programs** (`firmware/programs/*.c`, clang 18 + lld; `firmware/programs.py`):
+  - `adapter` (everyday Mystery Gift), `adapter_lab` (`-DLAB`), `adapter_probe` (`-DPROBE`),
+    `ereader`.
+  - Everything, variables included, must end below `0x0203AE00` (`programs.py` asserts it). Above
+    that are the firmware's messages, and from `0x0203AF00` its transfer state.
+  - There's no hardware divide: no `/` or `%` on variables.
+  - **After any change to a program, run `python firmware/embed_programs.py`.** That refreshes
+    the copies embedded in `duo_events.py`, and a test checks them against a fresh build.
+- **Sizes:** `adapter` 11,264 bytes, `adapter_lab` 11,740, `ereader` about 5.2 KB.
+- **Program protocol** (v4.2 firmware):
+  - `0x23` RUN runs the staged image (`RKR1` header, CRC-checked);
+  - `0x2A` POLL with an argument (low byte selects; `idx << 8`);
+  - `0x2B` STOP;
+  - `0x2C` PUT loads a file a word at a time (poll 20 starts the load, poll 21 checks its CRC).
+  - The link to the PC strictly alternates: one PC packet, then one GBA packet.
+- **Mystery Gift facts:**
+  - the serial is chosen from the game's 0x16 broadcast: Japanese Emerald 0x7F7F, others 0x7F7D;
+  - card checks use the game's CRC-16 (init 0x1121, reflected polynomial 0x8408, inverted);
+  - a JP card is 0xA4 bytes, EN 0x14C;
+  - news is 202 bytes (JP, assumed) or 444 (EN);
+  - polls 20/21 load, 22 the link state (`mg_step` in bits 4–7), 26 check/sweep, 27 serial,
+    28 the news result.
+- **e-Reader facts:**
+  - SIO multi-player mode, 115,200 bit/s;
+  - handshake 0x8FFF (master) / 0xB9A0 (slave);
+  - commands of 8 words plus a checksum slot (nine transfers per cycle);
+  - `0x2222` link players, `0xBBBB` + size + id block header, `0x8888` + 7 words per chunk,
+    `0x5FFF` close;
+  - link type 0x5501;
+  - polls: 0 = state | master<<4 | sessions<<5 | transfers<<8; 1 = bad checksums; 2 = the game's
+    link type and language; 3 = the game's player bytes; 4–6 = the mismatch log; 7 = mismatches
+    by state; 8 = longest gap | events sent<<16.
+- **Tests:**
+  - `python tests/run_each.py --jobs=3`: every test in its own process, about 6 minutes here.
+  - `python tests/mutate4.py`: planted bugs. The `fw`/`fw42` kinds need Datel's untouched
+    firmware. Run the others with `mutate4.run(kind, name)`, or as tonight's sessions did (see
+    the git log).
+  - The models live in `tests/`: `hwsim.py` (the DUO; the multi-player link model with timing),
+    `rfu_game_model.py` (Mystery Gift client), `link_game_model.py` (Ruby's link layer and
+    Mystery Event menu), `mevent_model.py` (Ruby's Mystery Event script engine).
+- **Firmware builds:** reproducible from Datel's 1.06 update file
+  (`firmware/build_firmware.py FILE --all`): v4.1 has update CRC `A5303402`, v4.2 `DD59ED8A`.
+  The workspace's `firmware/build/` held taken-off images only, so four build tests skip.
 
 ## References (not in the repo)
 
-- `github.com/pret/pokeemerald`, `pret/pokefirered`, `pret/pokeruby`: librfu, link_rfu_2/3,
-  union_room, mystery_gift_*, AgbRfu_LinkManager.
-- GBATEK (SIO normal mode); afska's gba-link-connection docs; suloku's tools (`.wc3` layout).
+- `github.com/pret/pokeruby`: `mystery_event_menu.c`, `mystery_event_script.c`, `script.c`
+  (`RunScriptCommand`, `InitRamScript`), `link.c`, `data/script_cmd_table.inc`,
+  `include/macros/event.inc`, `include/constants/flags.h`. Raw files can be fetched with curl
+  from raw.githubusercontent.com; the GitHub API is blocked here.
+- `pret/pokeemerald`, `pret/pokefirered`: librfu, link_rfu, `mystery_gift_*`, `main_menu.c`,
+  `ereader_screen.c`.
+- GBATEK (SIO modes); suloku's tools (the `.wc3` layout); Project Pokémon's event gallery (the
+  user's files).

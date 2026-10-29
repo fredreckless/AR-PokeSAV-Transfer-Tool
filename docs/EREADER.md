@@ -84,44 +84,133 @@ receive a Mystery Event, as read from pret/pokeruby (`src/link.c`, `src/mystery_
     still works, so the menu can say whether two players are connected.
   - Pressing A makes it send 0x8FFF once, which brings the link up.
   - Then it sends `0x2222` to start the link-player exchange.
-- **Starting, when the game is a slave.** Pressing A does nothing. The master (the DUO) must send
-  0x8FFF and `0x2222` itself.
+- **Starting, when the game is a slave.** Pressing A does nothing. The master (the DUO) would
+  have to send 0x8FFF and `0x2222` itself. **But Ruby's Mystery Event menu never gets that far
+  as a slave:** see below.
 - **Closing.** Each side sends `0x5FFF`. A console closes the link once it has seen `0x5FFF`
   from every player. So the DUO must answer the game's `0x5FFF` with its own.
 
 ## What the Mystery Event menu does (Ruby)
 
 1. Sets the link type to 0x5501, opens the link, and shows "link standby".
-2. Waits for the link to be up, with exactly two players.
+2. Waits until it is **the link's master** with at least two players: `gLinkStatus & 0x20`
+   (`LINK_STAT_MASTER`) and a player count of two or more. Only then does it say "press A".
+   - And every frame: once connected (`gLinkStatus & 0x40`), **if it isn't master, it closes the
+     link and shows an error.**
+   - So **the game must be on the cable's master end**, and the e-Reader is the slave. That is
+     why session 24's runs with the DUO as master never got further. If the DUO comes up as
+     player 0, the tool now says to swap the cable's ends.
 3. When the player presses A, the master sends `0x2222`. Each side then sends its link-player
    block.
 4. **Checks.**
    - Every link player must carry the same link type (0x5501), or the exchange counts as failed.
    - The two players' **languages must match**.
 5. Waits for one more block from the other side: **the Mystery Event script itself**, received
-   into the shared buffer.
-6. Closes the link, runs the script, and saves if it succeeded.
+   into the shared buffer (`gSharedMem`, 0x7D4 bytes).
+6. Closes the link and runs the script from the start of that buffer
+   (`RunMysteryEventScript(gSharedMem)`). Then it clears the buffer.
+7. **Saves unless the status says otherwise:**
+
+   | Status | Message | Save |
+   |---|---|---|
+   | 0, "loaded OK" (the starting status) | the game's own success message | yes |
+   | 1, load error (a failed checksum or CRC command) | "loading error" | no |
+   | 2, success (set by gift commands, or `setstatus`) | the script's own message | yes |
+   | 3, failure (`checkcompat` failed, a full party) | "can't be used" | no |
+
+8. Shows the message, waits for A, and resets the game.
 
 ## The Mystery Event script
 
-- **What it is.** Bytecode for the game's Mystery Event script engine.
-- **What it checks.** It carries its own checks: a compatibility check of language and version
-  masks, and a checksum or CRC over its own data. A script that fails them says "This Mystery
-  Event can't be used", and nothing is saved.
-- **Our part.** The link only has to deliver the bytes intact.
+From pokeruby's `mystery_event_script.c` and `script.c`.
 
-## What the DUO will do
+- **The engine.** It runs commands until one *yields*, then carries on only while the script is
+  marked valid. A byte that isn't a command (17 of them, 0–16) stops it at once.
+- **The commands used here.** Arguments are little-endian and read byte by byte, so no alignment
+  is needed.
 
-- **Role.** Be the second player. It can be either the master or a slave; we'll support both,
-  following the cable.
+  | No. | Command | Arguments | Notes |
+  |---|---|---|---|
+  | 1 | `checkcompat` | base (u32), languages (u16), languages (u32), flags (u16), versions (u32) | Sets the script's base address for pointers. Valid only if both language fields have the game's bit (English 1<<1, German 1<<2), flags has 0x4, and versions has Ruby 1<<7 or Sapphire 1<<8. Otherwise status 3. Yields |
+  | 2 | `end` | | |
+  | 3 | `setmsg` | status (u8), text (pointer) | Shows the text if the status matches (0xFF: any) |
+  | 4 | `setstatus` | status (u8) | |
+  | 6 | `initramscript` | map group, map number, person (u8 each), start, end (pointers) | `InitRamScript`: stores the script for that person, with magic 0x33 and a byte-sum checksum |
+  | 11 | `setrecordmixinggift` | count, chance (u8 each), item (u16) | The item spreads by Record Mixing; zero fields clear it |
+  | 15 | `checksum` | sum (u32), start, end | Byte sum. On mismatch: invalid, status 1. Yields |
+  | 16 | `crc` | CRC-16 (u32), start, end | The game's CRC-16. On mismatch: invalid, status 1. Yields |
+
+  - **Pointers** are `word - base + (where the buffer is)`, with base from `checkcompat`.
+
+## Community files: `.me3` is the *saved* form (lab session 25)
+
+- **What a `.me3` holds** (1,012 bytes; checked against the Eon Ticket file and Ruby's code):
+
+  | Offset | Size | What |
+  |---|---|---|
+  | 0 | 4 | the RAM script's checksum: the byte sum of the next 1,000 bytes |
+  | 4 | 1 | magic 0x33 |
+  | 5 | 3 | map group, map number, person (the Eon Ticket: 8, 1, 1 = Norman in Petalburg City Gym) |
+  | 8 | 996 | the RAM script (a field script), zero-padded |
+  | 1004 | 4 | the Record Mixing gift's checksum: the byte sum of its data |
+  | 1008 | 4 | count, chance, item (u16) (the Eon Ticket: 1, 151, 275 = `ITEM_EON_TICKET`) |
+
+  That's the game's `RamScript` and the start of its `RecordMixingGift`, exactly as saved.
+- **Sent as it is**, the game reads 0xF0 as its first command, which isn't one. It stops at
+  once with status 0, shows its success message and **saves, having stored nothing.** That's
+  what sessions 24 and 25 did: the link worked, but the game can't have received the ticket.
+- **So the tool wraps a `.me3`** in the script that stores exactly its contents:
+
+  ```
+  checkcompat  base 0x02000000, English (or German) in both fields, flags 0x4, Ruby | Sapphire
+  checksum     byte sum of the RAM script, over the RAM script     (damage -> "loading error", no save)
+  initramscript  map group, map number, person, the RAM script
+  setrecordmixinggift  count, chance, item                        (if the file has a gift)
+  end
+  <the RAM script>
+  ```
+
+  - The status stays 0, so the game shows its own success message and saves.
+  - The language comes from the file's name ("(ENG)", "(GER)"). Japanese files are refused: the
+    Japanese masks aren't known.
+  - A model of Ruby's engine (`tests/mevent_model.py`, written from the decomp) checks that the
+    game would then store the file's own bytes, RAM script and gift alike. Locally, it does so
+    for the real Eon Ticket file too, which isn't in the repository.
+- **A file that already starts with `checkcompat`** is sent as it is, after reading its
+  compatibility fields.
+
+## What the DUO does
+
+- **Role.** The second player. It follows the cable, master or slave, but only the slave role
+  can work with Ruby's menu (above). As master, it paces exactly like Ruby's own master, which
+  is kept for other uses and tests.
 - **Handshake.** Answer it.
 - **On `0x2222`.** Send its link-player block, with link type 0x5501 and the game's language
   (read from the game's own block). Then send the event script, loaded from the PC, as one block.
 - **Plain mode.** With no event loaded, send a link-player block only. The game then times out
   harmlessly: a safe dry run.
 
-## Open questions, for the hardware session
+## On hardware so far
 
-- Which end of the AGB-005 the DUO should take. The plan is to support both.
-- The file format of community Mystery Event dumps. We'll accept the raw script, and check its
-  size and its own checksum command where we can.
+- **Session 24.** With the DUO as master, the link came up but nothing more happened. That's
+  explained by the menu's master rule. There were also checksum mismatches, partly from our
+  pacing, which was too fast and is now fixed, and possibly from a start race, now fixed with an
+  in-flight flag.
+- **Session 25.** With the ends swapped, the game was master.
+  - The link players were exchanged with 0 mismatches.
+  - The event block went across, twice, and the game closed the link. But the block was the raw
+    `.me3`, so the game stored nothing (above).
+  - A few mismatches were counted after the close. They were very likely the game opening the
+    link again, whose handshake words were counted as data. The program now follows the game
+    starting over, and doesn't count those.
+- **Diagnostics now reported at the end of a run:**
+  - where any mismatches happened, by stage;
+  - the first four mismatches, with their words;
+  - the longest time the DUO looked away from the link.
+
+## Open questions
+
+- Ruby's success message and the Eon Ticket itself. Next session: send the wrapped `.me3`, then
+  talk to Norman.
+- Japanese Mystery Event scripts (Japanese Emerald's ふしぎな できごと): the Japanese language
+  masks and the file formats.

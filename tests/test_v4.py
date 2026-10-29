@@ -8,7 +8,7 @@ reproduces every behaviour observed on the real DUO).
 
 Needs the firmware built first: python firmware/build_firmware.py PATH_TO_DATEL_1.06_UPDATE --all
 """
-import gc, io, contextlib, glob, json, os, random, struct, subprocess, sys, tempfile, threading, time, traceback, types, zlib
+import gc, io, contextlib, glob, json, os, random, shutil, struct, subprocess, sys, tempfile, threading, time, traceback, types, zlib
 import paths
 import hwsim, thumbcheck, maxduo_saves as M
 import duo_events as W
@@ -1108,7 +1108,7 @@ def adapter_symbol(name, program="adapter"):
 
 def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits=0, first_bit=False,
                     flick_window=None, wonder_card=None, check_search=False,
-                    sweep_serial=False, serial=None, wonder_news=None):
+                    sweep_serial=False, serial=None, wonder_news=None, stop_on_game=True, keep_going=False):
     hw, duo = run42()
     game = RFU.Game()
     if attach:
@@ -1117,9 +1117,9 @@ def adapter_session(script, seconds=20, attach=True, program="adapter", lag_bits
     r = quiet(W.adapter_trace, duo, types.SimpleNamespace(adapter_trace=seconds, adapter_probe=seconds,
                                                           wonder_card=wonder_card, check_search=check_search,
                                                           sweep_serial=sweep_serial, serial=serial,
-                                                          wonder_news=wonder_news),
+                                                          wonder_news=wonder_news, keep_going=keep_going),
               poll_s=0.2,
-              stop_when=(lambda: hw.lg_done) if attach else None, program=program)
+              stop_when=(lambda: hw.lg_done) if attach and stop_on_game else None, program=program)
     entries, st, counters = r[0][:3]
     hw.probe = r[0][3] if len(r[0]) > 3 else None
     hw.text = r[1]
@@ -1362,7 +1362,7 @@ def _():
 import link_game_model as LG
 
 
-def ereader_run(game, event=None, seconds=60):
+def ereader_run(game, event=None, seconds=60, stop_on_game=True):
     """The DUO's e-Reader program against a simulated Ruby on the GBA link cable."""
     hw, duo = run42()
     hw.attach_mp_game(game.run(), game_master=game.master)      # the cable: who has the purple plug
@@ -1370,7 +1370,7 @@ def ereader_run(game, event=None, seconds=60):
     if event is not None:
         path = event_file(event)
     r = quiet(W.ereader_session, duo, types.SimpleNamespace(ereader=seconds, mystery_event=path),
-              poll_s=0.2, stop_when=lambda: hw.lg_done)
+              poll_s=0.2, stop_when=(lambda: hw.lg_done) if stop_on_game else None)
     hw.text = r[1]
     assert duo.hello() == 0x104
     hw.stop(); clean(hw)                              # nothing written to any cartridge
@@ -1500,12 +1500,20 @@ def _():
         return a, b
     hw, duo = run42()
     hw.attach_mp_game(twice())
-    r = quiet(W.ereader_session, duo, types.SimpleNamespace(ereader=90, mystery_event=event_file(TEST_ME3)),
+    r = quiet(W.ereader_session, duo, types.SimpleNamespace(ereader=90, mystery_event=event_file(TEST_ME3), keep_going=True),
               poll_s=0.2, stop_when=lambda: hw.lg_done)
     hw.stop(); clean(hw)
     assert hw.lg_error is None and hw.lg_result == (TEST_EVENT, TEST_EVENT), (repr(hw.lg_error), r[1][-600:])
     assert "opened the link again" in r[1] and "Mystery Events sent: 2" in r[1], r[1]
     assert r[0]["bad_checksums"] == 0, r[1]
+
+
+@test("e-Reader: the tool stops by itself only once the game has closed the link and gone quiet")
+def _():
+    game = LG.RubyMysteryEvent(master=True)
+    hw, report = ereader_run(game, TEST_ME3, stop_on_game=False)
+    assert hw.lg_error is None and hw.lg_done and hw.lg_result == TEST_EVENT, (repr(hw.lg_error), hw.text[-500:])
+    assert "Finished: the game has received the event" in hw.text and "your Dad (Norman) in Petalburg City Gym" in hw.text, hw.text
 
 
 @test("e-Reader: with no event loaded only link players are exchanged (a dry run); oversize files are refused")
@@ -1650,6 +1658,48 @@ def _():
     assert child.dropped > 20 and client.result == RFU.CLI_MSG_CARD_RECEIVED, (child.dropped, client.result)
     assert client.saved_card == card and client.saved_ram_script == script
     assert W.adapter_trace.last_link["resent"] >= child.dropped - 1, (W.adapter_trace.last_link, child.dropped)
+
+
+@test("finishing: the tool stops by itself once the game has the card and has closed the link; --keep-going carries on")
+def _():
+    path, card, script = test_wc3()
+    hw, game, trace, st, counters = adapter_session(gift_script, first_bit=True, seconds=120, wonder_card=path,
+                                                    stop_on_game=False)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.errors)
+    child, client = hw.lg_result
+    assert client.result == RFU.CLI_MSG_CARD_RECEIVED and client.saved_card == card
+    assert "Finished: the game has received the Wonder Card and closed the link." in hw.text, hw.text[-600:]
+    t0 = time.time()
+    hw, game, trace, st, counters = adapter_session(gift_script, first_bit=True, seconds=12, wonder_card=path,
+                                                    stop_on_game=False, keep_going=True)
+    assert hw.lg_done and "Finished" not in hw.text and time.time() - t0 >= 12, hw.text[-300:]
+
+
+@test("guided start-up: both GBAs off, the DUO's on, progress bars, then 'Ready' with each game's menu; a card named for another game is flagged")
+def _():
+    path, card, script = test_wc3()
+    named = os.path.join(tempfile.mkdtemp(), "FL - Item Test (JPN).wc3")      # FireRed/LeafGreen, says its name
+    shutil.copy(path, named)
+    hw, duo = run42()
+    game = RFU.Game()
+    hw.attach_link_game(gift_script(game), first_bit=True)
+    args = types.SimpleNamespace(command="gift", wait=5, seconds=120, card=named, serial=None, keep_going=False,
+                                 sweep_serial=False, check_search=False, lab=False)
+    _, text = quiet(W.run, duo, args)
+    hw.stop(); clean(hw)
+    assert hw.lg_done and hw.lg_error is None, repr(hw.lg_error)
+    order = ["Before you start: both GBAs should be switched off.", "MGB-010",
+             "leave the game's GBA off", "already on", "Setting up the DUO's GBA", "100%",
+             "Loading the Wonder Card", "Ready. Now switch on the game's GBA",
+             "ふしぎな おくりもの (fushigi na okurimono)", "ふしぎな もらいもの", "LINK TOGETHER WITH ALL",
+             "the file's name says it's for FireRed/LeafGreen, but the game is Japanese Emerald", "Finished"]
+    at = 0
+    for item in order:
+        k = text.find(item, at)
+        assert k >= 0, (item, text[at:at + 400])
+        at = k
+    assert W.file_games("E - Item Old Sea Map (JPN).wc3") == ("Emerald",) and W.file_games("my card.wc3") is None
+    assert W.file_games("FL - Item AuroraTicket (ENG) (UK).wc3") == ("FireRed", "LeafGreen")
 
 
 @test("distributor: without a Wonder Card the game is told there is nothing to send, and the link closes tidily")

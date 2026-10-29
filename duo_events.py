@@ -944,7 +944,7 @@ def ereader_session(duo, args, poll_s=0.3, stop_when=None):
             print(f"  Mystery Event not loaded ({e}); only link players will be exchanged (a dry run)")
     say_ready("event")
     finish = event is not None and not getattr(args, "keep_going", False)
-    last, t0, report, session, warned = None, time.time(), {}, 0, False
+    last, t0, report, session, warned, quiet_since = None, time.time(), {}, 0, False, None
     try:
         while time.time() - t0 < seconds:
             st = program_poll(duo, 0)
@@ -976,7 +976,15 @@ def ereader_session(duo, args, poll_s=0.3, stop_when=None):
                 last = state
             if stop_when and stop_when():
                 break
-            if finish and state == len(EREADER_STATES) - 1:     # the game has the event and closed the link
+            # finished once the game has closed the link AND gone quiet: "closed" is set when the
+            # game's 0x5FFF arrives, before ours has gone out, and stopping then would leave the
+            # game waiting for our half of the close
+            if finish and state == len(EREADER_STATES) - 1:
+                if quiet_since is None or quiet_since[1] != st >> 8:
+                    quiet_since = (time.time(), st >> 8)
+            else:
+                quiet_since = None
+            if quiet_since and time.time() - quiet_since[0] >= 1.0:
                 print("  Finished: the game has received the event and closed the link. It now runs it and saves:")
                 print("  wait for its message, then press A." + (f" After that: {hint}." if hint else ""))
                 break

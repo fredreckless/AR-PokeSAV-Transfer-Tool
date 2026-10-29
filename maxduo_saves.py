@@ -821,7 +821,7 @@ KNOWN_FIRMWARE = {
     0x99C72FF9: "Reckless v3.1 (fast, strictly alternating transfers, save-type detection, verbose log, lab)",
     0xD1003397: "Reckless v4 (restart can occasionally land in the menu - use v4.1)",
     0xA5303402: "Reckless v4.1 (v3.1 + reliable restart from the PC, Datel's original look)",
-    0xDD59ED8A: "Reckless v4.2 (v4.1 + runs this project's programs from RAM: see duo_wireless.py)",
+    0xDD59ED8A: "Reckless v4.2 (v4.1 + runs this project's programs from RAM: see duo_events.py)",
 }
 
 

@@ -1,11 +1,13 @@
 # ActionReplayMaxDuo-Pokemon-Toolkit
 
-**Back up your Game Boy Advance Pokémon saves to a Windows 10/11 PC, and receive Mystery Gift Wonder Cards, using a Datel Action Replay MAX DUO.**
+**Back up your Game Boy Advance Pokémon saves to a Windows 10/11 PC, and receive Mystery Gift and Mystery Event distributions, using a Datel Action Replay MAX DUO.**
 
 The MAX DUO was only ever able to back up DS saves, and Datel's drivers stopped working long ago. This project gives it a second life. One small firmware update for the DUO works with two Python tools:
 
 - **`maxduo_saves.py`** copies a GBA cartridge's save to your PC as a normal `.sav` file, which you can open in PKHeX or an emulator. It's tested on Pokémon Ruby, Sapphire, FireRed and LeafGreen. A full 128 KB save takes about 50 seconds and is double-checked: the GBA and the PC each compute a checksum, and they must agree.
-- **`duo_wireless.py`** turns the DUO's GBA into a **GBA Wireless Adapter with a Wonder Card distributor in range**, so a Pokémon game on a second GBA can receive a Mystery Gift Wonder Card from your own `.wc3` file. On real hardware, it has delivered the 2005 Old Sea Map card to a Japanese Pokémon Emerald and the Aurora Ticket to an English LeafGreen ([below](#mystery-gift-wonder-cards)).
+- **`duo_events.py`** has the DUO's GBA play the hardware a distribution used, so a Pokémon game on a second GBA receives the event through its own menus and saves it itself:
+  - **Mystery Gift**, playing a GBA Wireless Adapter with a Wonder Card distributor in range. On real hardware it has delivered the 2005 Old Sea Map to a Japanese Emerald and the Aurora Ticket to an English LeafGreen ([below](#mystery-gift-wonder-cards-and-wonder-news)).
+  - **Mystery Event**, playing the Card e-Reader+ for Ruby and Sapphire. It links up and sends events on real hardware; the first complete gift is next to try ([below](#mystery-event-the-e-reader-route)).
 
 > Not affiliated with or endorsed by Datel or Nintendo. "Action Replay" is a trademark of Datel. Use at your own risk; see [Is it safe?](#is-it-safe)
 
@@ -99,62 +101,77 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 | `--help` | Everything else |
 
 
-## Mystery Gift: Wonder Cards
+## Mystery Gift: Wonder Cards and Wonder News
 
-`duo_wireless.py` is the second tool. It needs firmware v4.2, and `maxduo_saves.py` in the same folder (it shares the USB code). The DUO's GBA plays a GBA Wireless Adapter over a link cable, with a Wonder Card distributor "in range". The game on the second GBA goes through Nintendo's real Mystery Gift exchange and saves the card itself.
+`duo_events.py` is the second tool. It needs firmware v4.2, and `maxduo_saves.py` in the same folder (it shares the USB code). For Mystery Gift, the DUO's GBA plays a GBA Wireless Adapter over a link cable, with a Wonder Card distributor "in range". The game on the second GBA goes through Nintendo's real Mystery Gift exchange and saves the card itself.
 
-**What works so far.**
-- **Japanese Pokémon Emerald (BPEJ), on real hardware.** The game finds the distributor, connects, receives the Wonder Card and its script, saves them and disconnects cleanly. For example, the Old Sea Map card has been delivered, and the item collected from the Pokémon Center.
-- **The Japanese game's distributor serial is 0x7F7F**, not the 0x7F7D in the English decomp. `--sweep-serial` found it.
-- **Other games and languages** (English and European Emerald, FireRed and LeafGreen) use the same Mystery Gift protocol. The distributor reads the game's language and version from its first broadcast, and picks the serial itself: 0x7F7F for Japanese Emerald, and 0x7F7D (from the decomps) for the rest. These work in the simulator, including the larger international cards. On real hardware, English LeafGreen took the full-size Aurora Ticket card first time, using serial 0x7F7D. The other games and languages haven't been tried yet. If a game doesn't find the distributor, `--sweep-serial` finds its serial in about six minutes, and `--serial` then uses it. **Testers welcome.**
+**What works on real hardware.**
+
+| Game | Distributor serial | Result |
+|---|---|---|
+| Japanese Emerald | 0x7F7F (found with `--sweep-serial`) | Old Sea Map (item collected) and MysticTicket received |
+| English LeafGreen | 0x7F7D (from the decomps) | The full-size Aurora Ticket card received, first time |
+
+The tool reads the game's language and version from its first broadcast and chooses the serial itself. English and European Emerald, FireRed, and other languages use the same protocol and work in the simulator, but haven't been tried on hardware yet. If a game never finds the distributor, `gift --sweep-serial` finds its serial in about six minutes, and `gift --serial XXXX` then uses it. **Testers welcome.**
 
 **You will need:**
 - Two GBAs: the DUO's, and one for the game.
 - A cross-wired Game Boy / Game Boy Color link cable. A Nintendo MGB-010 has been used. GBA link cables aren't cross-wired, so they won't work here.
-- Your own `.wc3` file for your game and language. None is included.
+- Your own `.wc3` file for your game and language. None is included. Project Pokémon's file names start with the game ("E - " Emerald, "FL - " FireRed/LeafGreen); the tool warns if that doesn't match the game it finds.
+- **Mystery Gift unlocked in the game.** In FireRed, LeafGreen and Emerald, enter **LINK TOGETHER WITH ALL** at the questionnaire in a Poké Mart, then save and restart: MYSTERY GIFT appears on the title menu.
 
 **Receiving a card:**
-1. **Back up your save first** with `maxduo_saves.py`. The game keeps one Wonder Card, and a new one replaces the old one, together with its script. Collect any item from the old card first.
-2. Put the game in the second GBA, connect the cable, and switch the DUO's GBA on to USB SERVER MODE.
-3. Run `python duo_wireless.py --trace --wonder-card "YOUR CARD.wc3"`. Wait until it says "Wonder Card loaded" and "Ready". (If the DUO misses part of the upload, which can happen straight after an earlier run, the tool waits about 16 s and sends it again.) It also checks the card's and script's checksums, as the game would, and warns if the card's language doesn't match the game's.
-4. On the game, choose **Mystery Gift → Wonder Cards → Wireless** (ふしぎな おくりもの → ふしぎな カード → じゅしん スポット). Japanese Emerald also has a separate Mystery Event (ふしぎな できごと) menu, which waits for an e-Reader; it isn't this one.
-5. When the game says the card has been saved and the link has ended, press Ctrl+C on the PC. Then collect the item, as the card describes: in Emerald, upstairs in any Pokémon Center.
+1. **Back up your save first** with `maxduo_saves.py`. The game keeps one Wonder Card and one script: a new card replaces both, so collect the item from the old one first.
+2. **Both GBAs off.** Put the game in the second GBA and connect the cable.
+3. **Run** `python duo_events.py gift --card "YOUR CARD.wc3"` and switch on the DUO's GBA when it asks. Leave the game's GBA off.
+4. **Wait for "Ready".** Progress bars show the DUO's GBA being set up and the card loading. (If the DUO misses part of the upload, the tool waits about 16 s and sends it again.) The card's and script's checksums are checked, as the game would.
+5. **Now switch on the game** and follow the menu the tool shows:
+   - FireRed, LeafGreen, English or European Emerald: **MYSTERY GIFT → WONDER CARDS → WIRELESS COMMUNICATION**.
+   - Japanese Emerald: **ふしぎな おくりもの → ふしぎな カード → じゅしん スポット → よみこむ**, then B back to the title menu. The title menu shows ふしぎな おくりもの only when the game finds the adapter. If it shows ふしぎな もらいもの (the e-Reader), the game was switched on too early: switch it off and on again.
+6. **The tool stops by itself** once the game has the card and has closed the link (`--keep-going` keeps it listening). Then collect the item as the card describes: in Emerald, upstairs in any Pokémon Center.
 
 | Command | What it does |
 |---|---|
-| `python duo_wireless.py --trace --wonder-card FILE.wc3` | Offers the Wonder Card from your `.wc3` file over Mystery Gift, and lists every adapter command the game sends ([docs/DISTRIBUTOR.md](docs/DISTRIBUTOR.md)). Nothing from the file is kept |
-| `python duo_wireless.py --trace --wonder-news FILE` | Offers Wonder News instead (your own file: the bare news, or the save's form with its CRC in front). On the game: Mystery Gift → Wonder News → Wireless. If it already has the same news, it keeps its own and says so |
-| `python duo_wireless.py --trace` | The same, with no card: the distributor tells the game it has nothing to send |
-| `python duo_wireless.py --trace --sweep-serial` | Offers every distributor serial number in turn until the game connects to one (about 6 minutes). Use it for a game or language not tried yet |
-| `python duo_wireless.py --trace --serial 7F7D ...` | Use this distributor serial rather than the one chosen for the game |
-| `python duo_wireless.py --trace --lab ...` | The lab build: also reports flick tuning, a link-port scope and the game's first data commands |
-| `python duo_wireless.py --trace --check-search` | Link check: the game restarts its search after every answer only if our answers arrive intact |
-| `python duo_wireless.py --find-serial [--deep]` | Read-only search of the cartridge in the DUO for the distributor serial. `--deep` reads the ROM into memory (never to disk) |
-| `python duo_wireless.py --test` | Detection only: answers a Pokémon game's Wireless Adapter check ([docs/WIRELESS.md](docs/WIRELESS.md)) |
-| `python duo_wireless.py --probe` | Lab: the 2 MHz answer-encoding probe |
+| `python duo_events.py gift --card FILE.wc3` | Offers the Wonder Card from your `.wc3` file over Mystery Gift, and lists every adapter command the game sends ([docs/DISTRIBUTOR.md](docs/DISTRIBUTOR.md)). Nothing from the file is kept |
+| `python duo_events.py news --news FILE` | Offers Wonder News instead (your own file: the bare news, or the save's form with its CRC in front). On the game: Mystery Gift → Wonder News → Wireless. If it already has the same news, it keeps its own and says so |
+| `python duo_events.py gift` | No card: the distributor tells the game it has nothing to send |
+| `python duo_events.py gift --sweep-serial` | Offers every distributor serial number in turn until the game connects to one (about 6 minutes). For a game or language not tried yet |
+| `python duo_events.py gift --serial 7F7D --card ...` | Use this distributor serial rather than the one chosen for the game |
+| `python duo_events.py gift --lab ...` | The lab build: also reports flick tuning, a link-port scope and the game's first data commands |
+| `python duo_events.py gift --check-search` | Link check: the game restarts its search after every answer only if our answers arrive intact |
+| `python duo_events.py find-serial [--deep]` | Read-only search of the cartridge in the DUO for the distributor serial. `--deep` reads the ROM into memory (never to disk) |
+| `python duo_events.py adapter-test` | Detection only: answers a Pokémon game's Wireless Adapter check ([docs/WIRELESS.md](docs/WIRELESS.md)) |
+| `python duo_events.py probe` | Lab: the 2 MHz answer-encoding probe |
 
-The DUO writes nothing to either cartridge. The only write is the game saving the card it received, as it would at a real distribution.
+`--seconds N` sets how long to run (default 600), and `--wait N` how long to wait for the DUO's GBA. The old `duo_wireless.py` options still work: `duo_wireless.py` is now a small stub that passes them on and shows the new command.
 
-## Mystery Event: the e-Reader route (experimental)
+The DUO writes nothing to either cartridge. The only write is the game saving what it received, as it would at a real distribution.
 
-Ruby and Sapphire (and Japanese Emerald) receive their events through **Mystery Event**, from the Card e-Reader+ over an ordinary GBA link cable. `duo_wireless.py` can have the DUO's GBA play the e-Reader:
+## Mystery Event: the e-Reader route
+
+Ruby and Sapphire received their events through **Mystery Event**, from the Card e-Reader+ over an ordinary GBA link cable. The DUO's GBA can play the e-Reader:
 
 ```
-python duo_wireless.py --mystery-event "YOUR EVENT.bin"
+python duo_events.py event --event "YOUR EVENT.me3"
+python duo_events.py event                      (a dry run: link players only)
 ```
 
 **You will need:**
-- a Nintendo **GBA** link cable (AGB-005). Game Boy and Game Boy Color cables lack the SD line this mode needs;
-- your own Mystery Event script for your game and language.
+- a **GBA** link cable. Game Boy and Game Boy Color cables lack the SD line this mode needs. Unofficial cables often have two identical ends.
+- your own event file for your game and language: a Mystery Event script, or a saved event (`.me3`, as Project Pokémon has them). A `.me3` is what the game *stores* after an event, not what the e-Reader sent, so the tool wraps it in the script that makes the game store exactly that ([docs/EREADER.md](docs/EREADER.md)).
+- **Mystery Event unlocked.** Tell the man by the PC in **Petalburg City's Pokémon Center** "**MYSTERY EVENT IS EXCITING**" (after beating Norman), then save and restart: MYSTERY EVENT appears on the title menu.
 
-**On the game:**
-1. Unlock Mystery Event: tell the questionnaire man in a Pokémon Center "MYSTERY EVENT IS EXCITING".
-2. From the title menu, choose **MYSTERY EVENT**.
-3. Press A when the game asks.
+**Which end of the cable.** The game must be the link's **master**: Ruby's MYSTERY EVENT menu only carries on as master. Which end makes a GBA master depends on the cable (on Nintendo's own, the small purple plug). You don't need to know in advance: if the DUO comes up as player 0, the tool says so, and you switch both GBAs off and swap the ends.
 
-Either end of the cable works: the DUO follows whichever role the cable gives it. It copies the game's link type and language into its own link-player details, so the game's checks agree. It then sends the event, and the game runs it and saves. `--ereader` alone is a dry run, with link players only.
+**Sending an event:**
+1. **Back up your save first.** The game saves after the event.
+2. **Both GBAs off**, cable connected. Run the command and switch on the DUO's GBA when asked.
+3. **Wait for "Ready"**, then switch on the game, choose **MYSTERY EVENT**, and press A when it asks.
+4. The tool stops by itself once the game has the event and has closed the link. The game then runs it, saves, and shows its message. Press A, and the tool tells you where to go: for the Eon Ticket, to your Dad in Petalburg City Gym.
 
-**Status:** this works in the simulator, including both cable ends, and is waiting for its first hardware session. See [docs/EREADER.md](docs/EREADER.md).
+The DUO copies the game's link type and language into its own link-player details, so the game's checks agree. If the game opens the link again (for another event), the DUO starts over with it (with `--keep-going`).
+
+**Status:** on real hardware the link comes up and an event goes across (lab sessions 24 and 25). The first runs sent a `.me3` as it was, which the game accepts without storing anything; the tool now wraps it, and that is the next thing to try on hardware. See [docs/EREADER.md](docs/EREADER.md).
 
 ## If something goes wrong
 
@@ -174,8 +191,8 @@ This repository holds the whole project, not just the finished tool.
 
 | Folder | What's inside |
 |---|---|
-| `maxduo_saves.py`, `duo_wireless.py`, `lab_runner.py` | The save tool, the Mystery Gift tool, and a runner for queued read-only lab jobs (handy from Thonny) |
-| [`firmware/`](firmware/) | The build scripts that patch Datel's firmware, step by step from v1 to v4.2. They contain all the GBA (ARM7 Thumb) assembly we wrote. `programs/adapter.c` is the Wireless Adapter and distributor, in C. `history/` has the original v3, whose transfers stalled on real hardware |
+| `maxduo_saves.py`, `duo_events.py`, `lab_runner.py` | The save tool, the events tool (Mystery Gift and Mystery Event; `duo_wireless.py` is a stub for its old options), and a runner for queued read-only lab jobs (handy from Thonny) |
+| [`firmware/`](firmware/) | The build scripts that patch Datel's firmware, step by step from v1 to v4.2. They contain all the GBA (ARM7 Thumb) assembly we wrote. `programs/adapter.c` is the Wireless Adapter and distributor, and `programs/ereader.c` the e-Reader, in C. `history/` has the original v3, whose transfers stalled on real hardware |
 | [`tests/`](tests/) | The simulator (Datel's real firmware running in an ARM emulator, wrapped in a model of the DUO's hardware), the test suite, and the planted-bug checker. `history/` holds the v3 and v3.1 suites |
 | [`lab/`](lab/) | Every experiment run on the real DUO, session by session, with the scripts, the complete output log and the conclusions |
 | [`docs/`](docs/) | How it works, the hardware (with board photos), the USB protocol, the findings and the project history |
@@ -187,10 +204,10 @@ This repository holds the whole project, not just the finished tool.
 pip install -r requirements.txt
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE --all
 python tests/run_each.py      # about 100 tests, each in its own process; around 15 minutes
-python tests/mutate4.py       # plants 64 known bugs; each must be caught
+python tests/mutate4.py       # plants known bugs; each must be caught
 ```
 
-The adapter program (`firmware/programs/adapter.c`) is built with clang and lld (LLVM 18). You only need them to rebuild it: `duo_wireless.py` carries a copy (refresh it with `python firmware/embed_programs.py`), which a test checks against a fresh build.
+The GBA programs (`firmware/programs/*.c`) are built with clang and lld (LLVM 18). You only need them to rebuild them: `duo_events.py` carries copies (refresh it with `python firmware/embed_programs.py`), which a test checks against a fresh build.
 
 The firmware build is reproducible: the same input always gives the same v4.1, update CRC `A5303402`, and v4.2, update CRC `DD59ED8A`. The tests use synthetic saves and ROMs, so they need no game data.
 

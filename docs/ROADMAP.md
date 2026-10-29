@@ -1,4 +1,4 @@
-# Roadmap: the events tool (`duo_wireless.py`)
+# Roadmap: the events tool (`duo_events.py`)
 
 Each stage builds on the last. The cheapest and most useful steps come first. Every stage goes
 through the simulator (with a planted bug for each new behaviour) before it touches real hardware.
@@ -69,7 +69,7 @@ After receiving news, the delivery man gives berries.
 
 **Needs:** a real Wonder News file for the game and language, and one hardware run.
 
-## Stage 3: Mystery Event for Ruby and Sapphire (the e-Reader route; simulator done, 29 October 2026; first hardware run in lab session 24)
+## Stage 3: Mystery Event for Ruby and Sapphire (the e-Reader route; link and block transfer on hardware, sessions 24–25; the first real gift is next)
 
 Done in the simulator:
 - `firmware/programs/ereader.c` (4 KB) plays the e-Reader in either cable role.
@@ -77,7 +77,15 @@ Done in the simulator:
 - The simulator models the four-player link mode (`attach_mp_game`).
 - Three tests (game as master, game as slave, dry run) and seven planted bugs.
 
-Still to come: a hardware run with your AGB-005, and a real English Mystery Event file.
+On hardware (sessions 24–25):
+- With the game as master, link players were exchanged with 0 mismatches, and a 1,012-byte
+  block went across.
+- Ruby's menu needs the game to be master; the tool now says to swap the ends otherwise.
+- The `.me3` file is the game's *saved* form: sent raw, the game stores nothing. The tool now
+  wraps it in a Mystery Event script that makes the game store exactly its contents, checked
+  with a model of Ruby's engine (`tests/mevent_model.py`).
+
+Still to come: send the wrapped Eon Ticket, and collect it from Norman in Petalburg City Gym.
 
 - **The DUO plays the e-Reader** on the standard link (two-player mode at 115 kbit/s), as a
   separate GBA program.
@@ -89,6 +97,16 @@ Still to come: a hardware run with your AGB-005, and a real English Mystery Even
 - **Needs** a GBA link cable (AGB-005), because two-player mode uses the SD line, which Game Boy
   and Game Boy Color cables don't carry.
 - **First goal:** the English Eon Ticket, from carefully checked data.
+
+## Tidying done on 30 October
+
+- **One events tool**, `duo_events.py`, with `gift`, `news` and `event` commands.
+  `duo_wireless.py` is a stub that translates the old options.
+- **A guided start-up.** Both GBAs off; the DUO's on; progress bars; "Ready", then the game, with
+  each game's menu and unlock phrase.
+- **It finishes by itself** when the game has the gift.
+- **It warns** when a card's file name names another game.
+- **Missing Datel builds** skip tests rather than failing them.
 
 ## Throughout
 
