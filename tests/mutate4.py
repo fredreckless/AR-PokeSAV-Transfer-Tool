@@ -148,16 +148,16 @@ def run(kind, name):
             finally:
                 programs._HERE = saved
         assert any(good[b] != bad[b] for b in builds), name
-        tool = open(os.path.join(paths.ROOT, "duo_wireless.py")).read()
+        tool = open(os.path.join(paths.ROOT, "duo_events.py")).read()
         for b in builds:
             assert tool.count(good[b]) == 1, b
             tool = tool.replace(good[b], bad[b])
-        open(os.path.join(work, "duo_wireless.py"), "w").write(tool)
+        open(os.path.join(work, "duo_events.py"), "w").write(tool)
         shutil.copy(os.path.join(paths.ROOT, "maxduo_saves.py"), work)
         env = dict(os.environ, MAXDUO_TOOL_DIR=work)
     else:
         old, new, pick = PC_MUTANTS[name]
-        tools = {f: open(os.path.join(paths.ROOT, f)).read() for f in ("maxduo_saves.py", "duo_wireless.py")}
+        tools = {f: open(os.path.join(paths.ROOT, f)).read() for f in ("maxduo_saves.py", "duo_events.py")}
         if old == "ADAPTER_IMAGE":                     # rebuild the embedded program with a wrong ID (valid CRC)
             sys.path.insert(0, paths.FIRMWARE)
             import programs

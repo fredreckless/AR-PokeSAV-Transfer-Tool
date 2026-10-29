@@ -11,7 +11,7 @@ Needs the firmware built first: python firmware/build_firmware.py PATH_TO_DATEL_
 import gc, io, contextlib, glob, json, os, random, struct, subprocess, sys, tempfile, threading, time, traceback, types, zlib
 import paths
 import hwsim, thumbcheck, maxduo_saves as M
-import duo_wireless as W
+import duo_events as W
 
 FW = open(os.environ.get("V3_FW") or paths.build_file("fw_v4.bin"), "rb").read()
 OFFICIAL = paths.read_build("fw.bin")
@@ -28,6 +28,15 @@ RESULTS = []
 
 class Skip(Exception):
     """A test that needs an optional file which isn't present."""
+
+
+def need_untouched_official():
+    """Rebuild tests start from Datel's own 1.06 firmware, whose padding is empty (0xFF). The
+    workspace's fw.bin isn't always that (the update file isn't in the repository)."""
+    import build_patch as BP
+    if not all(x == 0xFF for x in OFFICIAL[BP.PAD_START - BP.BASE:BP.PAD_END - BP.BASE]):
+        raise Skip("fw.bin here isn't Datel's untouched 1.06 firmware (its padding isn't empty); "
+                   "build from the update file first")
 LIVE = []
 M.SHORT_TIMEOUT = 800        # keep the real ratio: DUO waits ~15 s, PC ~5 s (scaled here)
 M.BUSY_WAIT_S = 3            # the DUO's 15 s give-up time is 1.8 s in the simulator
@@ -80,6 +89,7 @@ def lab_read_ops(n, start=SAVE, wake=True, mapping=0x0101):
 # ===================================================================== build
 @test("build: v4 rebuilds byte-for-byte from source (reproducible)")
 def _():
+    need_untouched_official()
     work = tempfile.mkdtemp()
     open(os.path.join(work, "fw.bin"), "wb").write(OFFICIAL)
     out = subprocess.run([sys.executable, "-c", "import build_v4; build_v4.build()"], cwd=work, capture_output=True, text=True,
@@ -936,6 +946,7 @@ def run42(**kw):
 
 @test("v4.2 build: only command slot 0x23, the INFO reply and Datel's padding differ from v4.1; reproducible")
 def _():
+    need_untouched_official()
     diff = [i for i in range(len(FW)) if FW42[i] != FW[i]]
     outside = sorted({0x08000000 + (i & ~3) for i in diff if not 0x1E7C2 <= i < 0x1FD90})
     assert outside == [0x080074A8 + 4 * (0x23 - 2)], [hex(x) for x in outside]
@@ -948,12 +959,25 @@ def _():
     assert open(os.path.join(work, "fw_v42.bin"), "rb").read() == FW42
 
 
-@test("two tools: the save tool has no wireless options; duo_wireless.py has them and needs the save tool beside it")
+@test("two tools: the save tool has no event options; duo_events.py has gift/news/event, needs the save tool beside it, and duo_wireless.py's old options still work")
 def _():
     saves = subprocess.run([sys.executable, os.path.join(paths.ROOT, "maxduo_saves.py"), "--help"], capture_output=True, text=True)
-    wireless = subprocess.run([sys.executable, os.path.join(paths.ROOT, "duo_wireless.py"), "--help"], capture_output=True, text=True)
+    events = subprocess.run([sys.executable, os.path.join(paths.ROOT, "duo_events.py"), "--help"], capture_output=True, text=True)
     assert saves.returncode == 0 and "adapter" not in saves.stdout.lower() and "wonder" not in saves.stdout.lower(), saves.stdout
-    assert wireless.returncode == 0 and all(f in wireless.stdout for f in ("--test", "--trace", "--wonder-card", "--probe"))
+    assert events.returncode == 0 and all(c in events.stdout for c in ("gift", "news", "event", "find-serial")), events.stdout
+    gift = subprocess.run([sys.executable, os.path.join(paths.ROOT, "duo_events.py"), "gift", "--help"], capture_output=True, text=True)
+    assert all(f in gift.stdout for f in ("--card", "--serial", "--sweep-serial", "--keep-going")), gift.stdout
+    old = subprocess.run([sys.executable, os.path.join(paths.ROOT, "duo_wireless.py"), "--trace", "--wonder-card", "x.wc3",
+                          "--help"], capture_output=True, text=True)
+    assert old.returncode == 0 and "duo_events.py gift --card x.wc3" in old.stdout and "--card" in old.stdout, old.stdout
+    for legacy, new in ((["--trace", "--wonder-card", "c.wc3", "--serial", "7F7F"], ["gift", "--card", "c.wc3", "--serial", "7F7F"]),
+                        (["--trace", "--wonder-news", "n.bin"], ["news", "--news", "n.bin"]),
+                        (["--mystery-event", "e.me3"], ["event", "--event", "e.me3"]),
+                        (["--ereader", "120"], ["event", "--seconds", "120"]),
+                        (["--test"], ["adapter-test"]), (["--probe"], ["probe"]),
+                        (["--find-serial", "--deep"], ["find-serial", "--deep"]),
+                        (["--trace", "--sweep-serial"], ["gift", "--sweep-serial"])):
+        assert W.translate_legacy(legacy) == new, (legacy, W.translate_legacy(legacy))
     assert W.SAFE_COMMANDS is M.SAFE_COMMANDS and W.PROG_PUT in M.SAFE_COMMANDS   # one shared allow-list
 
 
@@ -1829,7 +1853,7 @@ if __name__ == "__main__":
             LIVE.clear()
             passed += 1
             print(f"[PASS] {name}  ({time.time() - t:.0f}s)", flush=True)
-        except Skip as e:
+        except (Skip, paths.MissingBuild) as e:
             skipped += 1
             for hw in LIVE:
                 if hw.thread.is_alive():
