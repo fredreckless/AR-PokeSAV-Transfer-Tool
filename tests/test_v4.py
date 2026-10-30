@@ -13,12 +13,17 @@ import paths
 import hwsim, thumbcheck, maxduo_saves as M
 import duo_events as W
 
-FW = open(os.environ.get("V3_FW") or paths.build_file("fw_v4.bin"), "rb").read()
-OFFICIAL = paths.read_build("fw.bin")
-LABFW = paths.read_build("fw_lab.bin")
-OLD_V3 = paths.read_build("fw_v3_original.bin", required=False)   # the first v3, whose transfers stalled
-V31 = paths.read_build("fw_v3.bin")                                  # v3.1
-FW42 = open(os.environ.get("V42_FW") or paths.build_file("fw_v42.bin"), "rb").read()    # v4.2
+MISSING_BUILD = None          # set when a firmware image isn't built here: tests that error are then skipped
+try:
+    FW = open(os.environ.get("V3_FW") or paths.build_file("fw_v4.bin"), "rb").read()
+    OFFICIAL = paths.read_build("fw.bin")
+    LABFW = paths.read_build("fw_lab.bin")
+    OLD_V3 = paths.read_build("fw_v3_original.bin", required=False)   # the first v3, whose transfers stalled
+    V31 = paths.read_build("fw_v3.bin")                                  # v3.1
+    FW42 = open(os.environ.get("V42_FW") or paths.build_file("fw_v42.bin"), "rb").read()    # v4.2
+except paths.MissingBuild as e:
+    MISSING_BUILD = e
+    FW = OFFICIAL = LABFW = OLD_V3 = V31 = FW42 = None
 import fixtures
 RUBY = fixtures.make_gen3_save("May", 12345, save_no=337)          # synthetic Ruby save
 GAME = hwsim.make_game_rom()
@@ -1911,10 +1916,15 @@ if __name__ == "__main__":
             LIVE.clear()
             print(f"[SKIP] {name}  ({e})", flush=True)
         except Exception as e:
-            failed += 1
             for hw in LIVE:
                 if hw.thread.is_alive():
                     hw.stop()
+            if MISSING_BUILD:      # without the firmware a test can't tell a real failure from a missing image
+                skipped += 1
+                LIVE.clear()
+                print(f"[SKIP] {name}  ({MISSING_BUILD})", flush=True)
+                continue
+            failed += 1
             print(f"[FAIL] {name}\n       {type(e).__name__}: {str(e)[:600]}", flush=True)
             if not isinstance(e, AssertionError):
                 traceback.print_exc(limit=3)

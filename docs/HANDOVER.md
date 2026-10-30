@@ -23,8 +23,17 @@ to save the event itself. Routes that write the save directly are the user's dec
 ## Ground rules (from the user; keep them)
 
 - **Pushing:** standing permission to push. Keep `main` and `v42-local` identical, and push both
-  together after the test suite and the planted bugs pass. Any *other* GitHub change (settings,
-  releases, issues) needs asking first. That includes the release on the to-do list.
+  together. Any *other* GitHub change (settings, releases, issues) needs asking first. That
+  includes the release on the to-do list.
+- **Tiered testing** (agreed 30 October; `python tests/check.py`):
+  - `quick` (about 50 s) after each small change while working;
+  - `changed` (the tests and planted bugs for the files changed since `origin/main`) before
+    calling a piece of work done;
+  - `full` (every test, plus the planted bugs for what changed) **before pushing a code change**;
+    `full --all-bugs` when the tests themselves or `mutate4.py` change;
+  - nothing for documentation-only changes (`*.md`, `lab/`, `docs/`).
+- **No Mystery Gift hardware runs for now:** the user's GBA link cable is fitted for the e-Reader
+  route and is very tight to remove. Plan hardware tests around the e-Reader cable.
 - **Never write cartridge saves** from our code. Leave the DUO's button, the AT switch and the
   clock alone. Never send flash erase/program commands (0x80/0xA0).
 - **The user installs firmware themselves** (typing UPDATE). Nothing tonight needs new firmware.
@@ -52,8 +61,8 @@ Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
 - **The user chooses what to work on next.** Don't start new features unasked; the ideas
   discussed on 30 October (Enigma Berries from `.ecb`, ribbons, e-Card trainers, a trade
   distributor) are in the roadmap's goal table.
-- Not yet checked on hardware: the Eon Ticket's Record Mixing gift; a quick Mystery Gift run
-  (`gift --card "FL - Item AuroraTicket (ENG) (UK).wc3"`) through the new guided start-up.
+- Not yet checked on hardware: the Eon Ticket's Record Mixing gift; Mystery Gift through the new
+  guided start-up (waiting: the cable stays fitted for the e-Reader route).
 - The PC's copies of `duo_events.py`, `duo_wireless.py`, `maxduo_saves.py` and this file matched
   `main` (SHA-1) on 30 October; this file has changed since, so copy it across again.
 
@@ -186,16 +195,21 @@ Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
     link type and language; 3 = the game's player bytes; 4–6 = the mismatch log; 7 = mismatches
     by state; 8 = longest gap | events sent<<16.
 - **Tests:**
-  - `python tests/run_each.py --jobs=3`: every test in its own process, about 6 minutes here.
-  - `python tests/mutate4.py`: planted bugs. The `fw`/`fw42` kinds need Datel's untouched
-    firmware. Run the others with `mutate4.run(kind, name)`, or as tonight's sessions did (see
-    the git log).
+  - `python tests/check.py quick|changed|full|what`: the tiers (see the ground rules). The
+    workspace has 2 cores; the runners default to one job per core (3 made tests time out).
+  - `python tests/run_each.py [FILTER]`: every test (or those matching) in its own process, about
+    6.5 minutes for all 106 here.
+  - `python tests/mutate4.py [KIND ...]`: planted bugs, all or by kind (`fw`, `fw42`, `prog`,
+    `ereader`, `pc`). The `fw`/`fw42` kinds need Datel's untouched firmware (`fw.bin`).
+  - Without the firmware built, tests that need it are reported as skipped, and the rest run.
   - The models live in `tests/`: `hwsim.py` (the DUO; the multi-player link model with timing),
     `rfu_game_model.py` (Mystery Gift client), `link_game_model.py` (Ruby's link layer and
     Mystery Event menu), `mevent_model.py` (Ruby's Mystery Event script engine).
 - **Firmware builds:** reproducible from Datel's 1.06 update file
   (`firmware/build_firmware.py FILE --all`): v4.1 has update CRC `A5303402`, v4.2 `DD59ED8A`.
-  The workspace's `firmware/build/` held taken-off images only, so four build tests skip.
+  **Each new chat's workspace starts without them:** stage Datel's update file from the user's
+  PC (`ActionReplay\Datel\us_update_v1_06\us_update_v1_06\us_update_v1_06.bin`) and build
+  first. With it, all 106 tests pass and none skip (30 October).
 
 ## References (not in the repo)
 

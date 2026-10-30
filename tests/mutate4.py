@@ -1,5 +1,5 @@
 """Planted bugs: each must make at least one test fail (a check on the tests themselves).
-    python mutate4.py                 run them all (slow: each runs part of the suite)
+    python mutate4.py [KIND ...]      run them all, or the kinds named (fw, fw42, prog, ereader, pc)
     python mutate4.py fw  "<name>"    one firmware mutant, rebuilt from build_v4.py
     python mutate4.py pc  "<name>"    one tool mutant"""
 import os, re, shutil, subprocess, sys
@@ -196,17 +196,35 @@ def run(kind, name):
     return caught
 
 
+KINDS = {"fw": FW_MUTANTS, "fw42": FW42_MUTANTS, "prog": PROG_MUTANTS, "ereader": EREADER_MUTANTS, "pc": PC_MUTANTS}
+
+
+def runnable_kinds():
+    """The fw and fw42 kinds rebuild from Datel's untouched firmware; leave them out without it."""
+    import paths
+    if paths.build_file("fw.bin", required=False):
+        return list(KINDS)
+    return [k for k in KINDS if k not in ("fw", "fw42")]
+
+
+def run_many(kinds=None, jobs=None):
+    """Run every planted bug of the given kinds (default: all that can run here). True if all were caught."""
+    import concurrent.futures as cf
+    kinds = [k for k in (kinds or runnable_kinds()) if k in runnable_kinds()]
+    todo = [(k, n) for k in kinds for n in KINDS[k]]
+    jobs = jobs or max(1, os.cpu_count() or 2)
+    print(f"{len(todo)} planted bugs ({', '.join(kinds)}), {jobs} at a time", flush=True)
+    with cf.ThreadPoolExecutor(max_workers=jobs) as pool:
+        ok = all(list(pool.map(lambda kn: run(*kn), todo)))
+    print("every planted bug was caught" if ok else "SOME PLANTED BUGS WERE MISSED", flush=True)
+    return ok
+
+
 if __name__ == "__main__":
     if len(sys.argv) == 3 and not sys.argv[2].startswith("--"):
         ok = run(sys.argv[1], sys.argv[2])
     else:
-        import concurrent.futures as cf
-        jobs = next((int(a.split("=", 1)[1]) for a in sys.argv[1:] if a.startswith("--jobs=")),
-                    (os.cpu_count() or 2) * 2)
-        todo = ([("fw", n) for n in FW_MUTANTS] + [("fw42", n) for n in FW42_MUTANTS]
-                + [("prog", n) for n in PROG_MUTANTS] + [("ereader", n) for n in EREADER_MUTANTS]
-                + [("pc", n) for n in PC_MUTANTS])
-        with cf.ThreadPoolExecutor(max_workers=jobs) as pool:
-            ok = all(list(pool.map(lambda kn: run(*kn), todo)))
-        print("every planted bug was caught" if ok else "SOME PLANTED BUGS WERE MISSED")
+        jobs = next((int(a.split("=", 1)[1]) for a in sys.argv[1:] if a.startswith("--jobs=")), None)
+        kinds = [a for a in sys.argv[1:] if not a.startswith("--")] or None
+        ok = run_many(kinds, jobs)
     sys.exit(0 if ok else 1)
