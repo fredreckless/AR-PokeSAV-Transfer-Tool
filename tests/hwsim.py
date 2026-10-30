@@ -770,7 +770,7 @@ class Hw:
         self.d2h.put(None)
 
     # ------------------------------------------------------------ link port, multi-player mode
-    def attach_mp_game(self, gen, game_master=True, blocks_per_line=25, xfer_blocks=125, slave_latency=240):
+    def attach_mp_game(self, gen, game_master=True, blocks_per_line=25, xfer_blocks=125, slave_latency=240, race_window=0):
         """A second GBA in the four-player link mode (SIOCNT multi-player, 115 kbit/s), running a
         game's link layer (tests/link_game_model.py) - the e-Reader route. Every transfer moves
         one 16-bit word from each console at once: each loads SIOMLT_SEND, the master starts it,
@@ -781,7 +781,9 @@ class Hw:
         Timing, as on hardware (lab session 24): a transfer takes about 5 scanlines (xfer_blocks),
         and a game that is slave needs time after each transfer before its next word is loaded
         (slave_latency, ~0.6 ms here; Ruby's own master allows 0.75 ms). A transfer the DUO starts
-        sooner carries the game's stale word, and the game misses it (counted in mp_missed)."""
+        sooner carries the game's stale word, and the game misses it (counted in mp_missed).
+        race_window > 0 (the DUO as master): a transfer due within that many blocks finishes at the
+        moment the DUO reads SIOCNT - the worst moment, between its look at IF and at the busy bit."""
         self.mp = gen
         self.mp_master, self.lg_bpl, self.mp_x = game_master, blocks_per_line, xfer_blocks
         self.blocks = 0
@@ -792,6 +794,7 @@ class Hw:
         self.mp_words = []                    # (player 0 word, player 1 word) per transfer
         self.mp_latency, self.mp_ready_at, self.mp_wire_word, self.mp_missed = slave_latency, 0, 0xFFFF, 0
         self.mp_start_blocks, self.mp_frame_blocks = [], blocks_per_line * 228
+        self.mp_race_window, self.mp_races = race_window, 0
         self.lg_result = self.lg_error = None
         self.lg_done = False
         self.mu.hook_add(UC_HOOK_MEM_READ, self.mp_on_read, begin=0x04000006, end=0x04000007)
@@ -815,6 +818,12 @@ class Hw:
         elif addr in (0x04000202, 0x04000203):
             mu.mem_write(0x04000202, struct.pack("<H", self.mp_if))
         else:                                              # SI: 0 on the master's plug; SD: ready
+            op = self.mp_op
+            if (self.mp_race_window and op is not None and op[0] == "mp_slave" and self.mp_duo_start is not None
+                    and self.blocks >= self.mp_duo_start - self.mp_race_window):
+                self.mp_duo_start = self.blocks            # finish it now, just as SIOCNT is read
+                self.mp_races += 1
+                self.mp_slave_step()
             c = self.mp_cnt() & ~0xC | (4 if self.mp_master else 0) | 8   # the DUO's SI: 1 unless it's master
             mu.mem_write(0x04000128, struct.pack("<H", c))
 
@@ -863,6 +872,18 @@ class Hw:
             self.mp_ready_at = self.blocks + self.mp_latency
             self.mp_deadline = self.blocks + op[2]
 
+    def mp_slave_step(self):
+        """A DUO-started transfer completes (the game is the slave). True if the game took its word."""
+        self.mp_duo_start = None
+        if self.mp_duo_started >= self.mp_ready_at:
+            self.mp_wire_word = self.mp_game_word
+        else:                                       # started too soon: the game wasn't ready
+            self.mp_transfer(self.mp_wire_word)
+            self.mp_missed += 1
+            return False
+        self.mp_resume(self.mp_transfer(self.mp_wire_word))
+        return True
+
     def mp_on_block(self, mu, addr, size, _):
         self.blocks += 1
         for _ in range(16):
@@ -884,14 +905,9 @@ class Hw:
                 self.mp_resume(self.mp_transfer(op[1])); continue
             if k == "mp_slave":                      # the game, as slave, waits for the DUO's transfer
                 if self.mp_duo_start is not None and self.blocks >= self.mp_duo_start:
-                    self.mp_duo_start = None
-                    if self.mp_duo_started >= self.mp_ready_at:
-                        self.mp_wire_word = self.mp_game_word
-                    else:                                   # started too soon: the game wasn't ready
-                        self.mp_transfer(self.mp_wire_word)
-                        self.mp_missed += 1
-                        return
-                    self.mp_resume(self.mp_transfer(self.mp_wire_word)); continue
+                    if self.mp_slave_step():
+                        continue
+                    return
                 if self.blocks >= self.mp_deadline:
                     self.mp_resume(None); continue
                 return

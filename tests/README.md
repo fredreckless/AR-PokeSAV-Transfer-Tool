@@ -7,6 +7,7 @@
   - the 8-bit save bus;
   - the Actel header overlay and the DUO's mirrored flash;
   - power-on and restart through Datel's real start-up code.
+  - the GBA link cable's four-player mode, with optional adversarial timing (`race_window`): a transfer finishes at the very moment the DUO reads SIOCNT, so start races show up every time rather than by luck.
 
   Any write that could change a save is recorded as a violation and fails the test.
 - **`check.py`** runs the tests in tiers: `quick` (a fast spread across every area, about a minute), `changed` (the tests and planted bugs for the files changed since `origin/main`), `full` (everything, plus the planted bugs for what changed) and `what` (just say what `changed` would run). The tables at its top say which tests and planted bugs each file needs.

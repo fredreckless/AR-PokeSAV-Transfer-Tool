@@ -801,6 +801,9 @@ RS_PEOPLE = {(8, 1, 1): "your Dad (Norman) in Petalburg City Gym"}
 
 def event_hint(raw):
     """Where to go in the game after a saved event (.me3) has been stored: its RAM script's person."""
+    if len(raw) == ECB_SIZE:
+        return ("talk to your Dad (Norman) in Petalburg City Gym after you've beaten him: he gives the "
+                f"{gen3_text(raw[:7])} BERRY (not if your bag or PC already holds an e-Reader berry)")
     try:
         me3, _ = parse_me3(raw)
     except ValueError:
@@ -871,6 +874,70 @@ def build_event_script(me3, language="English", versions=("Ruby", "Sapphire")):
     return bytes(out)
 
 
+# ---------------------------------------------------------------- Enigma Berries (.ecb)
+# A community ".ecb" is, like a .me3, the game's *saved* form: Ruby/Sapphire's whole EnigmaBerry
+# record (pokeruby global.berry.h, 0x530 bytes): the berry (name, firmness, size, yields, two
+# description pointers, growth time, flavours, smoothness), its 6x6-tile picture and palette, two
+# 45-byte descriptions, the item and hold effects, and a byte-sum checksum of everything before it
+# taken with the two pointers set to 0 (berry.c GetEnigmaBerryChecksum). The pointers in a file are
+# whatever the saving game had there; SetEnigmaBerry points them at the descriptions anyway.
+# It goes as: checkcompat, checksum, setenigmaberry (command 7), end. The game then gives its
+# "berry" message, sets VAR_ENIGMA_BERRY_AVAILABLE, and Norman hands over the berry after his battle.
+MEV_SETENIGMABERRY = 7
+ECB_SIZE, ECB_CHECKSUM_AT, ECB_POINTERS = 0x530, 0x52C, slice(0x0C, 0x14)
+ECB_FLAVOURS = ("spicy", "dry", "sweet", "bitter", "sour")
+GEN3_EN_TEXT = {0x00: " ", 0xAB: "!", 0xAC: "?", 0xAD: ".", 0xAE: "-", 0xB0: "...", 0xB1: '"', 0xB2: '"',
+                0xB3: "'", 0xB4: "'", 0xB8: ",", 0xBA: "/", 0xF0: ":"}
+GEN3_EN_TEXT.update({0xBB + i: chr(65 + i) for i in range(26)})
+GEN3_EN_TEXT.update({0xD5 + i: chr(97 + i) for i in range(26)})
+GEN3_EN_TEXT.update({0xA1 + i: str(i) for i in range(10)})
+
+
+def gen3_text(raw):
+    """English Gen 3 text up to its 0xFF end mark ("?" for anything else)."""
+    return "".join(GEN3_EN_TEXT.get(b, "?") for b in raw.split(b"\xFF")[0])
+
+
+def ecb_checksum(data):
+    rec = bytearray(data[:ECB_CHECKSUM_AT])
+    rec[ECB_POINTERS] = bytes(8)
+    return sum(rec)
+
+
+def parse_ecb(data):
+    """A saved Enigma Berry (.ecb): returns (fields, problems). Raises ValueError if it isn't one."""
+    if len(data) != ECB_SIZE:
+        raise ValueError(f"not a saved Enigma Berry: {len(data)} bytes, not {ECB_SIZE}")
+    problems = []
+    stored = int.from_bytes(data[ECB_CHECKSUM_AT:ECB_CHECKSUM_AT + 4], "little")
+    if stored != ecb_checksum(data):
+        problems.append(f"the berry's checksum is {stored:#x}, but its bytes add up to {ecb_checksum(data):#x}")
+    if data[0x14] == 0:
+        problems.append("its growth time is 0, so the game would count it as no berry")
+    if data[0x0A] == 0:
+        problems.append("its largest yield is 0, so the game would count it as no berry")
+    flavours = [f"{n} {v}" for n, v in zip(ECB_FLAVOURS, data[0x15:0x1A]) if v]
+    return dict(name=gen3_text(data[:7]), flavours=flavours, hold_effect=data[0x528]), problems
+
+
+def build_berry_script(berry, language="English", versions=("Ruby", "Sapphire")):
+    """The Mystery Event script that makes the game store exactly the berry a .ecb holds."""
+    lang_mask = MEV_LANGUAGE_MASKS[language]
+    ver_mask = 0
+    for v in versions:
+        ver_mask |= MEV_VERSIONS[v]
+    rec = bytearray(berry)
+    rec[ECB_POINTERS] = bytes(8)                  # the saving game's addresses: meaningless here
+    head_len = 17 + 13 + 5 + 1                    # checkcompat, checksum, setenigmaberry, end
+    start = MEV_BASE + head_len
+    out = bytearray([MEV_CHECKCOMPAT]) + struct.pack("<IHIHI", MEV_BASE, lang_mask, lang_mask, 0x4, ver_mask)
+    out += bytes([MEV_CHECKSUM]) + struct.pack("<iII", sum(rec), start, start + len(rec))
+    out += bytes([MEV_SETENIGMABERRY]) + struct.pack("<I", start)
+    out += bytes([MEV_END])
+    assert len(out) == head_len
+    return bytes(out + rec)
+
+
 def describe_event_script(script):
     """Read a Mystery Event script's compatibility fields: (languages, versions, problems)."""
     if len(script) < 17 or script[0] != MEV_CHECKCOMPAT:
@@ -897,8 +964,17 @@ def prepare_event(data, path=""):
         langs, vers, problems = describe_event_script(data)
         return data, (f"a Mystery Event script for {'/'.join(vers) or 'no known version'}, "
                       f"{'/'.join(langs) or 'no known language'}"), problems
-    me3, problems = parse_me3(data)
     language = file_language(path) or "English"
+    if len(data) == ECB_SIZE:
+        berry, problems = parse_ecb(data)
+        if language not in MEV_LANGUAGE_MASKS:
+            raise ValueError(f"the berry is for {language} games; Mystery Event scripts are only known for "
+                             "English and German Ruby/Sapphire")
+        script = build_berry_script(data, language)
+        text = (f"a saved Enigma Berry (.ecb): the {berry['name']} BERRY ({', '.join(berry['flavours']) or 'no flavour'}); "
+                f"sent as a Mystery Event script for {language} games that stores exactly it ({len(script)} bytes)")
+        return script, text, problems
+    me3, problems = parse_me3(data)
     if language not in MEV_LANGUAGE_MASKS:
         raise ValueError(f"the file is for {language} games; Mystery Event scripts are only known for "
                          "English and German Ruby/Sapphire")

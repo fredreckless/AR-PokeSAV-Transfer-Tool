@@ -61,8 +61,13 @@ Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
 - **The user chooses what to work on next.** Don't start new features unasked; the ideas
   discussed on 30 October (Enigma Berries from `.ecb`, ribbons, e-Card trainers, a trade
   distributor) are in the roadmap's goal table.
+- **Next hardware test: an Enigma Berry** (Stage 4), e.g.
+  `python duo_events.py event --event "08-K001 RS - Pumkin Berry (USA).ecb"`, then Norman.
+  The user's berry files are in `EventsGallery\Released\Gen 3\ENG\e-Card Berries`.
 - Not yet checked on hardware: the Eon Ticket's Record Mixing gift; Mystery Gift through the new
   guided start-up (waiting: the cable stays fitted for the e-Reader route).
+- **The user's folder:** `tidy_folder.bat` (30 October) moves the older files into `old\` when run;
+  it leaves `EventsGallery`, `EventsGallery-master`, `Datel`, `saves` and the tools alone.
 - The PC's copies of `duo_events.py`, `duo_wireless.py`, `maxduo_saves.py` and this file matched
   `main` (SHA-1) on 30 October; this file has changed since, so copy it across again.
 

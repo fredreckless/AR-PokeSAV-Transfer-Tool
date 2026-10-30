@@ -18,7 +18,7 @@ repository.
 | `.wc3` Wonder Cards (68) | Mystery Gift, as the distributions sent them | Japanese Emerald and English LeafGreen on hardware; other games and languages next (Stage 1) |
 | Wonder News | The same route | Simulator only; the gallery has no Gen 3 news files yet (Stage 2) |
 | `.me3` Mystery Events (13, all the Eon Ticket) | e-Reader to Ruby/Sapphire | Working on hardware: English Ruby received the Eon Ticket (lab session 26) |
-| `.ecb` e-Card berries (18) | e-Reader Mystery Event (`setenigmaberry`) | Not started; builds on Stage 3 |
+| `.ecb` e-Card berries (18) | e-Reader Mystery Event (`setenigmaberry`) | English: simulator done, hardware next (Stage 4); Japanese waits for the language masks |
 | e-Card `.raw` scans (R/S trainers and promos; Emerald and FRLG trainers, Japanese) | Decode the dot codes and do what the e-Reader did | Not started. Ruby/Sapphire cards fit the Stage 3 route; Emerald's Trainer Hill uses its own protocol (`ereader_screen.c`); Japanese cards need the `checkcompat` language masks |
 | `.pk3` Pokémon (about 1,000) | Varies by event; check each one | Not started |
 
@@ -129,6 +129,17 @@ Still to come: the Record Mixing gift on hardware, Sapphire, and other languages
 - **Needs** a GBA link cable (AGB-005), because two-player mode uses the SD line, which Game Boy
   and Game Boy Color cables don't carry.
 - **First goal:** the English Eon Ticket, from carefully checked data.
+
+## Stage 4: Enigma Berries (simulator done, 30 October 2026; hardware next)
+
+- A `.ecb` is the saved `EnigmaBerry` record (1,328 bytes; docs/EREADER.md). The tool checks it
+  (checksum with the pointers as 0, growth time, yield) and wraps it: `checkcompat`, `checksum`,
+  `setenigmaberry`, `end`.
+- The model of Ruby's engine (`tests/mevent_model.py`) now carries out `setenigmaberry` and the
+  game's validity check. Two tests and three planted bugs.
+- Checked locally with the six English e-Card berries: each stored exactly, in Ruby and Sapphire.
+- **On hardware:** send one, then talk to Norman after his battle. He won't give one while the bag
+  or PC holds an e-Reader berry already.
 
 ## Tidying done on 30 October
 

@@ -6,7 +6,9 @@ does and reports what the game would store and show:
     status, saved, store = run(buffer, language="English", version="Ruby")
 
 `store` holds the save fields an event can change here: the RAM script block (checksum + 1000
-bytes, as in a .me3) and the Record Mixing gift (checksum + 12 bytes). `saved` is whether the menu
+bytes, as in a .me3), the Record Mixing gift (checksum + 12 bytes), and the Enigma Berry (0x530
+bytes, as in a .ecb, with `berry_valid` and `berry_available` for berry.c IsEnigmaBerryValid and
+VAR_ENIGMA_BERRY_AVAILABLE). Pass `berry=` to start from a game that already holds one. `saved` is whether the menu
 then writes the save (it does for status 0 "loaded OK" and 2 "success").
 """
 import struct
@@ -16,6 +18,20 @@ LANGUAGE_MASK = {"English": 1 << 1, "German": 1 << 2}
 VERSION_MASK = {"Ruby": 1 << 7, "Sapphire": 1 << 8}
 N_COMMANDS = 17                            # nop .. crc
 BUFFER = 0x7D4                             # gSharedMem, cleared to this size around each event
+BERRY_SIZE, BERRY_CHECKSUM_AT = 0x530, 0x52C
+SAVE_BERRY_DESC1, SAVE_BERRY_DESC2 = 0x02026B44, 0x02026B71   # stand-ins for the save's description addresses (the checksum skips them)
+
+
+def berry_checksum(rec):
+    """berry.c GetEnigmaBerryChecksum: a byte sum up to the checksum, the two pointers taken as 0."""
+    r = bytearray(rec[:BERRY_CHECKSUM_AT])
+    r[0x0C:0x14] = bytes(8)
+    return sum(r)
+
+
+def berry_valid(rec):
+    """berry.c IsEnigmaBerryValid."""
+    return bool(rec[0x14] and rec[0x0A]) and berry_checksum(rec) == int.from_bytes(rec[BERRY_CHECKSUM_AT:BERRY_CHECKSUM_AT + 4], "little")
 
 
 class Unsupported(Exception):
@@ -32,7 +48,7 @@ def crc16(data):
 
 
 class Engine:
-    def __init__(self, buffer, language, version):
+    def __init__(self, buffer, language, version, berry=None):
         self.buf = bytes(buffer[:BUFFER]).ljust(BUFFER, b"\0")
         self.lang_mask, self.ver_mask = LANGUAGE_MASK[language], VERSION_MASK[version]
         self.ptr, self.offset, self.base = 0, 0, 0     # mScriptBase = the buffer's own start
@@ -40,6 +56,8 @@ class Engine:
         self.message = None
         self.ram_script = bytearray(4 + 1000)
         self.gift = bytearray(4 + 12)
+        self.berry = bytearray(berry or bytes(BERRY_SIZE))
+        self.berry_available = False
         self.trace = []
 
     # ScriptReadByte/Halfword/Word: little-endian, byte by byte
@@ -58,6 +76,8 @@ class Engine:
         return (self.word() - self.offset + self.base) & 0xFFFFFFFF
 
     def span(self, start, end):
+        if end is None:                   # a fixed-size record: the berry
+            end = start + BERRY_SIZE
         if not (0 <= start <= end <= BUFFER):
             raise Unsupported(f"a pointer outside the received buffer ({start:#x}..{end:#x})")
         return self.buf[start:end]
@@ -115,6 +135,26 @@ class Engine:
             self.ram_script[0:4] = sum(self.ram_script[4:]).to_bytes(4, "little")
         return False
 
+    def cmd_7(self):                              # setenigmaberry
+        had = berry_valid(self.berry)
+        old_name = bytes(self.berry[:7])
+        rec = self.span(self.addr(), None)
+        self.berry[:] = rec                                          # SetEnigmaBerry: copy 0x530 bytes
+        self.berry[0x0C:0x10] = SAVE_BERRY_DESC1.to_bytes(4, "little")   # ...then point at its descriptions
+        self.berry[0x10:0x14] = SAVE_BERRY_DESC2.to_bytes(4, "little")
+        if not had:
+            self.message = "berry"
+        elif old_name.split(b"\xFF")[0] != bytes(self.berry[:7]).split(b"\xFF")[0]:
+            self.message = "berry transform"
+        else:
+            self.message = "berry obtained"
+        self.status = SUCCESS
+        if berry_valid(self.berry):
+            self.berry_available = True                              # VarSet(VAR_ENIGMA_BERRY_AVAILABLE, 1)
+        else:
+            self.status = LOAD_ERROR
+        return False
+
     def cmd_11(self):                             # setrecordmixinggift
         unk, quantity, item = self.byte(), self.byte(), self.half()
         self.gift[:] = bytes(len(self.gift))
@@ -143,10 +183,11 @@ class Engine:
         raise AttributeError(name)
 
 
-def run(buffer, language="English", version="Ruby"):
-    e = Engine(buffer, language, version)
+def run(buffer, language="English", version="Ruby", berry=None):
+    e = Engine(buffer, language, version, berry)
     while e.run_command() and e.valid:            # RunMysteryEventScriptCommand
         pass
     saved = e.status in (LOAD_OK, SUCCESS)         # GetEventLoadMessage returns 0 -> Save_WriteData
     return e.status, saved, dict(ram_script=bytes(e.ram_script), gift=bytes(e.gift), message=e.message,
-                                 trace=e.trace)
+                                 trace=e.trace, berry=bytes(e.berry), berry_valid=berry_valid(e.berry),
+                                 berry_available=e.berry_available)

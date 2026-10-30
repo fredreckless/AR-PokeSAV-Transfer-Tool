@@ -1367,10 +1367,10 @@ def _():
 import link_game_model as LG
 
 
-def ereader_run(game, event=None, seconds=60, stop_on_game=True):
+def ereader_run(game, event=None, seconds=60, stop_on_game=True, race_window=0):
     """The DUO's e-Reader program against a simulated Ruby on the GBA link cable."""
     hw, duo = run42()
-    hw.attach_mp_game(game.run(), game_master=game.master)      # the cable: who has the purple plug
+    hw.attach_mp_game(game.run(), game_master=game.master, race_window=race_window)   # the cable: who has the purple plug
     path = None
     if event is not None:
         path = event_file(event)
@@ -1447,6 +1447,90 @@ def _():
         pass
 
 
+def gen3(text):
+    """English Gen 3 text (capitals, small letters, digits and spaces), with its 0xFF end mark."""
+    out = bytearray()
+    for c in text:
+        out.append(0 if c == " " else 0xBB + ord(c) - 65 if c.isupper() else 0xD5 + ord(c) - 97 if c.islower() else 0xA1 + int(c))
+    return bytes(out) + b"\xff"
+
+
+def test_ecb(name="TESTER", flavours=(0, 20, 0, 0, 30), pointers=0x02028D50):
+    """A made-up saved Enigma Berry in the .ecb layout (pokeruby's EnigmaBerry record). Like a real
+    file, its description pointers hold the saving game's addresses, which the checksum leaves out.
+    The picture and texts are nonsense - no Nintendo data."""
+    rec = bytearray(W.ECB_SIZE)
+    rec[0:7] = gen3(name)[:7].ljust(7, b"\xff")
+    rec[7], rec[8:10], rec[0x0A], rec[0x0B] = 3, (52).to_bytes(2, "little"), 4, 2      # firmness, size, yields
+    rec[0x0C:0x14] = struct.pack("<II", pointers, pointers + 45)
+    rec[0x14], rec[0x15:0x1A], rec[0x1A] = 12, bytes(flavours), 50                      # growth, flavours, smoothness
+    rec[0x1B:0x49C] = bytes((i * 37 + 11) & 0xFF for i in range(0x49C - 0x1B))           # picture
+    rec[0x49C:0x4BC] = bytes(range(32))                                                  # palette
+    rec[0x4BC:0x4BC + 16] = gen3("A test berry").ljust(16, b"\0")
+    rec[0x4E9:0x4E9 + 16] = gen3("Made up here").ljust(16, b"\0")
+    rec[0x528], rec[0x529] = 6, 0
+    rec[0x52C:0x530] = W.ecb_checksum(rec).to_bytes(4, "little")
+    assert len(rec) == W.ECB_SIZE
+    return bytes(rec)
+
+
+TEST_ECB = test_ecb()
+
+
+@test("Enigma Berry files: a .ecb is wrapped so Ruby stores exactly the berry, Norman can give it, and a second berry replaces the first; damage, empty berries and Japanese files are refused")
+def _():
+    script, text, problems = W.prepare_event(TEST_ECB, "x RS - Tester Berry (USA).ecb")
+    assert not problems and "TESTER BERRY" in text and "dry 20, sour 30" in text, (text, problems)
+    assert script[0] == W.MEV_CHECKCOMPAT and len(script) == 36 + W.ECB_SIZE <= W.MEV_MAX
+    for version in ("Ruby", "Sapphire"):
+        status, saved, store = ME.run(script, "English", version)
+        assert (status, saved) == (ME.SUCCESS, True), (status, store["trace"])
+        assert store["trace"] == [W.MEV_CHECKCOMPAT, W.MEV_CHECKSUM, W.MEV_SETENIGMABERRY, W.MEV_END], store["trace"]
+        b = store["berry"]
+        assert b[:0x0C] == TEST_ECB[:0x0C] and b[0x14:] == TEST_ECB[0x14:], version   # all but the pointers
+        assert store["berry_valid"] and store["berry_available"] and store["message"] == "berry", store
+    assert ME.run(script, "German", "Ruby")[:2] == (ME.FAILURE, False)               # the game refuses it
+    # a second berry replaces the first ("transform"); the same one again is "obtained"
+    first = ME.run(script)[2]["berry"]
+    other = W.prepare_event(test_ecb("OTHER", (10, 10, 10, 10, 10)), "y (ENG).ecb")[0]
+    assert ME.run(other, berry=first)[2]["message"] == "berry transform"
+    assert ME.run(script, berry=first)[2]["message"] == "berry obtained"
+    # damage on the way: the checksum command gives "loading error" and no save
+    bad = bytearray(script); bad[200] ^= 0x10
+    assert ME.run(bytes(bad))[:2] == (ME.LOAD_ERROR, False)
+    # the pointers really don't count: another game's addresses still pass the file's checks
+    assert not W.parse_ecb(test_ecb(pointers=0x02031000))[1]
+    # the file's own checks
+    damaged = bytearray(TEST_ECB); damaged[0x300] ^= 1
+    assert "checksum" in " ".join(W.prepare_event(bytes(damaged), "x.ecb")[2])
+    empty = bytearray(TEST_ECB); empty[0x14] = 0
+    empty[0x52C:0x530] = W.ecb_checksum(empty).to_bytes(4, "little")
+    assert "growth time" in " ".join(W.prepare_event(bytes(empty), "x.ecb")[2])
+    try:
+        W.prepare_event(TEST_ECB, "x (JPN).ecb"); raise AssertionError("Japanese berry accepted")
+    except ValueError as e:
+        assert "Japanese" in str(e), e
+    assert "Norman" in W.event_hint(TEST_ECB) and "TESTER BERRY" in W.event_hint(TEST_ECB)
+    try:
+        quiet(W.load_event, None, event_file(bytes(damaged), "x (ENG).ecb")); raise AssertionError("damaged berry sent")
+    except ValueError:
+        pass
+
+
+@test("e-Reader: an Enigma Berry (.ecb) goes across the link cable and Ruby stores it; the tool says to see Norman")
+def _():
+    game = LG.RubyMysteryEvent(master=True)
+    hw, report = ereader_run(game, TEST_ECB)
+    expected = W.prepare_event(TEST_ECB, "x (ENG).ecb")[0]
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.log, hw.text[-600:])
+    assert hw.lg_result == expected, (len(hw.lg_result or b""), hw.text[-400:])
+    status, saved, store = ME.run(hw.lg_result, "English", "Ruby")
+    assert (status, saved) == (ME.SUCCESS, True) and store["berry_valid"] and store["berry_available"], store["trace"]
+    assert report["bad_checksums"] == 0, report
+    for line in ("TESTER BERRY", "Mystery Event loaded", "sent the Mystery Event", "the game closed the link", "Norman"):
+        assert line in hw.text, (line, hw.text[-1500:])
+
+
 @test("e-Reader: Ruby as master (purple plug) - handshake, link players, the event arrives intact, the link closes")
 def _():
     game = LG.RubyMysteryEvent(master=True)
@@ -1464,11 +1548,13 @@ def _():
         assert line in hw.text, (line, hw.text)
 
 
-@test("e-Reader: the DUO as master (pacing check against a game's link layer) - it starts the transfers and the handshake; a Japanese game gets a Japanese partner")
+@test("e-Reader: the DUO as master (pacing check against a game's link layer, with transfers finishing at the worst moment) - it starts the transfers and the handshake; a Japanese game gets a Japanese partner")
 def _():
     game = LG.RubyMysteryEvent(master=False, language=LG.LANG_JAPANESE, menu_rules=False)
     small = test_me3(script_len=250)
-    hw, report = ereader_run(game, small)
+    # with adversarial timing: transfers finish just as the DUO looks at the busy bit (the start race)
+    hw, report = ereader_run(game, small, race_window=12)
+    assert hw.mp_races > 50, hw.mp_races
     assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.log, hw.text[-600:])
     assert hw.lg_result == W.prepare_event(small, "x (ENG).me3")[0]
     assert game.link_players[0]["language"] == LG.LANG_JAPANESE and "the DUO is player 0" in hw.text, hw.text

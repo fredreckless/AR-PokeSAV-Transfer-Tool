@@ -179,6 +179,45 @@ From pokeruby's `mystery_event_script.c` and `script.c`.
 - **A file that already starts with `checkcompat`** is sent as it is, after reading its
   compatibility fields.
 
+## Community files: `.ecb` is the saved Enigma Berry (30 October)
+
+- **What a `.ecb` holds** (1,328 bytes; checked against the six English e-Card berries and
+  pokeruby's `global.berry.h` and `berry.c`): Ruby's whole `EnigmaBerry` record, exactly as the
+  game keeps it in its save.
+
+  | Offset | Field |
+  |---|---|
+  | 0x000 | name (7 bytes), firmness, size, largest and smallest yield |
+  | 0x00C | two description pointers: the *saving game's* addresses, meaningless elsewhere |
+  | 0x014 | growth time, five flavours (spicy, dry, sweet, bitter, sour), smoothness |
+  | 0x01B | picture (6×6 tiles, 4 bits per pixel), then the 16-colour palette at 0x49C |
+  | 0x4BC | two descriptions, 45 bytes each |
+  | 0x516 | item effect (18 bytes), hold effect, its parameter |
+  | 0x52C | checksum: the byte sum of everything before it, **taken with the two pointers as 0** |
+
+- **How the game takes a berry.** `setenigmaberry` (command 7) copies 0x530 bytes from the
+  received buffer into the save and points the two description pointers at the descriptions.
+  It then checks the berry (`IsEnigmaBerryValid`: a growth time, a largest yield and the
+  checksum). If it's good, the status is 2 ("success") and `VAR_ENIGMA_BERRY_AVAILABLE` is set;
+  if not, "loading error". The message depends on what the save held: a first berry, a different
+  one (it replaces the old), or the same one again.
+- **So the tool wraps a `.ecb`** like this, with the pointers cleared:
+
+  ```
+  checkcompat     as for a .me3
+  checksum        byte sum of the berry record, over the berry record
+  setenigmaberry  the berry record
+  end
+  <the berry record>                                          (1,364 bytes in all)
+  ```
+
+- **In the game.** The berry isn't in the bag yet. **Norman gives it in Petalburg City Gym**, after
+  his battle, unless the bag or PC already holds an e-Reader berry. It appears under its own name
+  (for example PUMKIN BERRY), and grows like any other berry.
+- **Checked locally** with the six English e-Card berries (not in the repository): for each, in
+  Ruby and Sapphire, the model stores every byte except the two pointers and counts the berry as
+  valid. Japanese berries are refused for now, like Japanese `.me3` files.
+
 ## What the DUO does
 
 - **Role.** The second player. It follows the cable, master or slave, but only the slave role
@@ -191,6 +230,9 @@ From pokeruby's `mystery_event_script.c` and `script.c`.
   harmlessly: a safe dry run.
 
 ## On hardware so far
+
+- **Session 26.** The wrapped Eon Ticket went across with 0 mismatches, Ruby saved it, and Norman
+  gave the ticket. The e-Reader route works end to end.
 
 - **Session 24.** With the DUO as master, the link came up but nothing more happened. That's
   explained by the menu's master rule. There were also checksum mismatches, partly from our
@@ -210,7 +252,8 @@ From pokeruby's `mystery_event_script.c` and `script.c`.
 
 ## Open questions
 
-- Ruby's success message and the Eon Ticket itself. Next session: send the wrapped `.me3`, then
-  talk to Norman.
+- ~~Ruby's success message and the Eon Ticket itself.~~ Done: the wrapped Eon Ticket arrived and
+  Norman gave it (lab session 26).
+- The Enigma Berry on hardware: send a `.ecb`, then see Norman.
 - Japanese Mystery Event scripts (Japanese Emerald's ふしぎな できごと): the Japanese language
   masks and the file formats.

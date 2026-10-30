@@ -153,12 +153,13 @@ Ruby and Sapphire received their events through **Mystery Event**, from the Card
 
 ```
 python duo_events.py event --event "YOUR EVENT.me3"
+python duo_events.py event --event "YOUR BERRY.ecb"     (an e-Reader Enigma Berry)
 python duo_events.py event                      (a dry run: link players only)
 ```
 
 **You will need:**
 - a **GBA** link cable. Game Boy and Game Boy Color cables lack the SD line this mode needs. Unofficial cables often have two identical ends.
-- your own event file for your game and language: a Mystery Event script, or a saved event (`.me3`, as Project Pokémon has them). A `.me3` is what the game *stores* after an event, not what the e-Reader sent, so the tool wraps it in the script that makes the game store exactly that ([docs/EREADER.md](docs/EREADER.md)).
+- your own event file for your game and language: a Mystery Event script, a saved event (`.me3`), or a saved Enigma Berry (`.ecb`), as Project Pokémon has them. These are what the game *stores*, not what the e-Reader sent, so the tool wraps each in the script that makes the game store exactly that ([docs/EREADER.md](docs/EREADER.md)). English and German files only, for now.
 - **Mystery Event unlocked.** Tell the man by the PC in **Petalburg City's Pokémon Center** "**MYSTERY EVENT IS EXCITING**" (after beating Norman), then save and restart: MYSTERY EVENT appears on the title menu.
 
 **Which end of the cable.** The game must be the link's **master**: Ruby's MYSTERY EVENT menu only carries on as master. Which end makes a GBA master depends on the cable (on Nintendo's own, the small purple plug). You don't need to know in advance: if the DUO comes up as player 0, the tool says so, and you switch both GBAs off and swap the ends.
@@ -167,11 +168,11 @@ python duo_events.py event                      (a dry run: link players only)
 1. **Back up your save first.** The game saves after the event.
 2. **Both GBAs off**, cable connected. Run the command and switch on the DUO's GBA when asked.
 3. **Wait for "Ready"**, then switch on the game, choose **MYSTERY EVENT**, and press A when it asks.
-4. The tool stops by itself once the game has the event and has closed the link. The game then runs it, saves, and shows its message. Press A, and the tool tells you where to go: for the Eon Ticket, to your Dad in Petalburg City Gym.
+4. The tool stops by itself once the game has the event and has closed the link. The game then runs it, saves, and shows its message. Press A, and the tool tells you where to go: for the Eon Ticket or an Enigma Berry, to your Dad in Petalburg City Gym (a berry comes after you've beaten him).
 
 The DUO copies the game's link type and language into its own link-player details, so the game's checks agree. If the game opens the link again (for another event), the DUO starts over with it (with `--keep-going`).
 
-**Status:** on real hardware the link comes up and an event goes across (lab sessions 24 and 25). The first runs sent a `.me3` as it was, which the game accepts without storing anything; the tool now wraps it, and that is the next thing to try on hardware. See [docs/EREADER.md](docs/EREADER.md).
+**Status:** English Ruby received the Eon Ticket on real hardware, and Norman gave it (lab session 26). Enigma Berries work in the simulator and with a model of Ruby's engine; hardware is next. See [docs/EREADER.md](docs/EREADER.md).
 
 ## If something goes wrong
 

@@ -92,6 +92,9 @@ PC_MUTANTS = {
     "adapter test never stops the program": ("    finally:\n        word = program_poll(duo, 1)\n        st = program_stop(duo)\n", "    finally:\n        word = st = 0\n", "adapter test"),
     "adapter program answers with the wrong ID": ("ADAPTER_IMAGE", "ADAPTER_IMAGE_WRONG_ID", "adapter test: answers"),
     "Wonder Card's RAM script read from the wrong place": ("    script = data[4 + size + 0x50 + 4:4 + size + 0x50 + 4 + 1000]", "    script = data[4 + size + 0x50:4 + size + 0x50 + 1000]", "Mystery Gift delivers"),
+    "berry sent with initramscript's command number": ("MEV_SETENIGMABERRY = 7", "MEV_SETENIGMABERRY = 6", "Enigma Berry"),
+    "berry's checksum taken before the pointers are cleared": ("struct.pack(\"<iII\", sum(rec), start, start + len(rec))", "struct.pack(\"<iII\", sum(berry), start, start + len(rec))", "Enigma Berry"),
+    "berry file check counts the description pointers": ("    rec = bytearray(data[:ECB_CHECKSUM_AT])\n    rec[ECB_POINTERS] = bytes(8)\n", "    rec = bytearray(data[:ECB_CHECKSUM_AT])\n", "Enigma Berry files"),
     "known game table ignored": ("    known = KNOWN_SAVE_GAMES.get(info[\"code\"][:3])\n    if forced:", "    known = None\n    if forced:", "known games"),
 }
 
