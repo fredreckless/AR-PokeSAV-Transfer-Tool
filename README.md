@@ -87,7 +87,7 @@ Back up as often as you like: an identical save is never stored twice. The tool 
 - **Datel's own delete and overwrite commands are blocked outright,** including DeleteFile (0x1C). Another GBA Action Replay tool sends that command at start-up, and on a MAX DUO it would delete a stored file. More on that in [the protocol notes](docs/PROTOCOL.md#a-warning-about-other-tools).
 - **The wireless tool reads and writes nothing on either cartridge.** When you receive a Wonder Card, the game saves it itself, as at a real distribution. That's why backing up first is worth it.
 - **The firmware update is the one step that writes,** and only to the DUO itself, never to your games. It asks you to type `UPDATE` first, and it uses Datel's own update process. You can go back to Datel's official firmware the same way.
-- **Every change is tested before real hardware.** That means about 100 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
+- **Every change is tested before real hardware.** That means about 106 automated tests against a simulator of the DUO, plus "planted bugs" that check the tests themselves catch mistakes. Then it is confirmed on a real DUO: 21 saves in a row came out byte-for-byte identical.
 
 ## Other things it can do
 
@@ -203,7 +203,7 @@ This repository holds the whole project, not just the finished tool.
 ```
 pip install -r requirements.txt
 python firmware/build_firmware.py PATH\TO\DATELS_1.06_UPDATE_FILE --all
-python tests/run_each.py      # about 100 tests, each in its own process; around 15 minutes
+python tests/run_each.py      # about 106 tests, each in its own process; around 10-15 minutes
 python tests/mutate4.py       # plants known bugs; each must be caught
 ```
 

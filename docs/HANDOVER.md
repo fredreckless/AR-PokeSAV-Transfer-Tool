@@ -47,9 +47,10 @@ Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
 
 1. **Ask what Ruby showed after sessions 25's runs 3–4.** A success message is expected, but
    nothing was stored: the file was sent raw (see "The `.me3` discovery" below).
-2. **Copy the new files to the user's PC** if the overnight session didn't (it should have; check
-   the SHA-1s): `duo_events.py`, `duo_wireless.py` (now a stub), `HANDOVER.md`.
-   `maxduo_saves.py` changed one string only.
+2. **Copy the new files to the user's PC.** The overnight session couldn't: the PC was off the
+   bridge. They were attached to the chat instead. Copy `duo_events.py`, `duo_wireless.py` (now
+   a stub) and `maxduo_saves.py` (one string changed) into the ActionReplay folder, keep
+   `HANDOVER.md` with them, and check the SHA-1s against `main`.
 3. **The test to run: the wrapped Eon Ticket.**
    1. **Back up Ruby's save first** with `maxduo_saves.py`.
    2. **The game must be on the cable's master end.** The user's cable has two identical black
@@ -139,7 +140,9 @@ Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
     firmware, now **skip** instead of failing;
   - new tests: `.me3` files, the master advice, two events per session, connect retry, upload
     retry;
-  - about 106 tests; planted bugs in `tests/mutate4.py`.
+  - **Final run:** 106 tests, 97 passed and 6 skipped (no Datel builds). Three timed out in the
+    simulator under heavy load, and passed when re-run alone. 79 planted bugs: the 72 that can
+    run here (`prog`, `ereader`, `pc`) were all caught.
 - **Docs:** README (new commands, per-game menus, unlock phrases, cable notes), docs/EREADER.md
   (menu statuses, script commands, the `.me3` layout and wrapping), ROADMAP, and lab notes for
   sessions 21–25.
