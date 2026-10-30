@@ -7,7 +7,7 @@ The MAX DUO was only ever able to back up DS saves, and Datel's drivers stopped 
 - **`maxduo_saves.py`** copies a GBA cartridge's save to your PC as a normal `.sav` file, which you can open in PKHeX or an emulator. It's tested on Pokémon Ruby, Sapphire, FireRed and LeafGreen. A full 128 KB save takes about 50 seconds and is double-checked: the GBA and the PC each compute a checksum, and they must agree.
 - **`duo_events.py`** has the DUO's GBA play the hardware a distribution used, so a Pokémon game on a second GBA receives the event through its own menus and saves it itself:
   - **Mystery Gift**, playing a GBA Wireless Adapter with a Wonder Card distributor in range. On real hardware it has delivered the 2005 Old Sea Map to a Japanese Emerald and the Aurora Ticket to an English LeafGreen ([below](#mystery-gift-wonder-cards-and-wonder-news)).
-  - **Mystery Event**, playing the Card e-Reader+ for Ruby and Sapphire. It links up and sends events on real hardware; the first complete gift is next to try ([below](#mystery-event-the-e-reader-route)).
+  - **Mystery Event**, playing the Card e-Reader+ for Ruby and Sapphire. It works end to end on real hardware: English Ruby received the Eon Ticket (lab session 26) ([below](#mystery-event-the-e-reader-route)).
 
 > Not affiliated with or endorsed by Datel or Nintendo. "Action Replay" is a trademark of Datel. Use at your own risk; see [Is it safe?](#is-it-safe)
 

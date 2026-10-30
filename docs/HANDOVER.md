@@ -13,8 +13,12 @@ custom firmware, **Reckless v4.2**, serves two Python tools:
   then receives the event through its own menus and saves it itself.
 
 Mystery Gift works on real hardware for **Japanese Emerald** and **English LeafGreen**. The
-**e-Reader route** (Mystery Event, Ruby/Sapphire) links up and moves an event block on hardware.
-The first *real* event (the Eon Ticket, now wrapped properly) is the next test.
+**e-Reader route** (Mystery Event, Ruby/Sapphire) works end to end on hardware: English Ruby
+received the wrapped Eon Ticket and Norman gave it (lab session 26, 30 October).
+
+**The project's goal** (agreed 30 October; see docs/ROADMAP.md): support every Gen 3 Project
+Pokémon file meant for a GBA Pokémon game, by its authentic route, wherever that leaves the game
+to save the event itself. Routes that write the save directly are the user's decision.
 
 ## Ground rules (from the user; keep them)
 
@@ -39,42 +43,19 @@ The first *real* event (the Eon Ticket, now wrapped properly) is the next test.
 | Mystery Gift, Japanese Emerald | Old Sea Map and MysticTicket received; serial 0x7F7F chosen automatically | sessions 16–22 |
 | Mystery Gift, English LeafGreen | Aurora Ticket (full-size card) received first time; serial 0x7F7D | session 23 |
 | Wonder News | simulator only (needs a real news file) | — |
-| e-Reader → Ruby | link players exchanged (0 mismatches) and a 1,012-byte block sent, with the game as master; the game stored nothing (see below) | sessions 24–25 |
+| e-Reader → Ruby | Eon Ticket received (wrapped `.me3`, 342 bytes, 0 mismatches) and collected from Norman | sessions 24–26 |
 
 Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
 
-## What to do first in the morning
+## What to do next
 
-1. **Ask what Ruby showed after sessions 25's runs 3–4.** A success message is expected, but
-   nothing was stored: the file was sent raw (see "The `.me3` discovery" below).
-2. **Copy the new files to the user's PC.** The overnight session couldn't: the PC was off the
-   bridge. They were attached to the chat instead. Copy `duo_events.py`, `duo_wireless.py` (now
-   a stub) and `maxduo_saves.py` (one string changed) into the ActionReplay folder, keep
-   `HANDOVER.md` with them, and check the SHA-1s against `main`.
-3. **The test to run: the wrapped Eon Ticket.**
-   1. **Back up Ruby's save first** with `maxduo_saves.py`.
-   2. **The game must be on the cable's master end.** The user's cable has two identical black
-      ends. The master end is the one the DUO had when the trace said "the DUO is player 0"
-      (session 25, run 1). In runs 2–4 the ends were swapped, which is right.
-   3. Run `python duo_events.py event --event "RS - Item Eon Ticket (ENG) (UK).me3"`. Then
-      follow the guided start-up: both GBAs off, the DUO's on, wait for "Ready", the game on,
-      MYSTERY EVENT, A.
-   4. **Expect:** link players, "sent the Mystery Event", "the game closed the link", then
-      "Finished". On the game: its success message and a save.
-   5. **Then, in the game:** go to **Petalburg City Gym and talk to Norman.** The RAM script
-      (disassembled locally) does the following:
-      - if you already have the Eon Ticket (bag or PC), or **flag 0xCE
-        (`FLAG_ENCOUNTERED_LATIAS_OR_LATIOS`) is set**, he says his usual line;
-      - otherwise, he speaks; if the bag has room, he gives item 275 (Eon Ticket) and sets
-        `FLAG_SYS_HAS_EON_TICKET` (0x853); if not, a "bag full" message.
-      - The ticket also spreads by Record Mixing (the gift: count 1, chance 151).
-   6. **If it fails**, the end of the trace now shows where any checksum mismatches were, the
-      first four with their words, and the DUO's longest look away from the link.
-4. **A quick check of the new start-up with a Mystery Gift**, for example
-   `python duo_events.py gift --card "FL - Item AuroraTicket (ENG) (UK).wc3"` on LeafGreen.
-   - Expect: progress bars, "Ready. Now switch on the game's GBA", the menu path, and "Finished"
-     by itself after the card arrives.
-   - The game keeps one card at a time, so collect the item first.
+- **The user chooses what to work on next.** Don't start new features unasked; the ideas
+  discussed on 30 October (Enigma Berries from `.ecb`, ribbons, e-Card trainers, a trade
+  distributor) are in the roadmap's goal table.
+- Not yet checked on hardware: the Eon Ticket's Record Mixing gift; a quick Mystery Gift run
+  (`gift --card "FL - Item AuroraTicket (ENG) (UK).wc3"`) through the new guided start-up.
+- The PC's copies of `duo_events.py`, `duo_wireless.py`, `maxduo_saves.py` and this file matched
+  `main` (SHA-1) on 30 October; this file has changed since, so copy it across again.
 
 ## The `.me3` discovery (session 25; details in docs/EREADER.md)
 

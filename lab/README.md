@@ -46,6 +46,7 @@ python lab_runner.py                                                     # run t
 | 29 Oct, 21:20 | session 23 | **English LeafGreen** | Aurora Ticket (full-size 332-byte card) received first time; game recognised, serial 0x7F7D confirmed ([details](sessions/session23/README.md)) |
 | 29 Oct, 21:55 | session 24 | e-Reader dry run (Ruby) | Handshake and link up on hardware for the first time, the DUO as master; then 45% checksum mismatches, no link players. Our master was paced too fast: now paced like Ruby's ([details](sessions/session24/README.md)) |
 | 29 Oct, 23:00 | session 25 | **e-Reader: link players, an event block** | Game as master: link players exchanged with 0 mismatches, a 1,012-byte block sent and the link closed. The `.me3` turned out to be the saved form, so the game stored nothing; the tool now wraps it. Ruby's menu needs to be master ([details](sessions/session25/README.md)) |
+| 30 Oct, afternoon | session 26 | **Eon Ticket from Norman** | The wrapped `.me3` (342 bytes) sent with the game as master: 0 mismatches, the game closed the link and saved, and Norman gave the Eon Ticket. The e-Reader route works end to end ([details](sessions/session26/README.md)) |
 
 Experiments deliberately **not** done:
 - two GBA packets in a row, which would hang the GBA;

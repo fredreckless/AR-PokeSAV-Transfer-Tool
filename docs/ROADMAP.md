@@ -17,7 +17,7 @@ repository.
 |---|---|---|
 | `.wc3` Wonder Cards (68) | Mystery Gift, as the distributions sent them | Japanese Emerald and English LeafGreen on hardware; other games and languages next (Stage 1) |
 | Wonder News | The same route | Simulator only; the gallery has no Gen 3 news files yet (Stage 2) |
-| `.me3` Mystery Events (13, all the Eon Ticket) | e-Reader to Ruby/Sapphire | Wrapped; the first hardware run is next (Stage 3) |
+| `.me3` Mystery Events (13, all the Eon Ticket) | e-Reader to Ruby/Sapphire | Working on hardware: English Ruby received the Eon Ticket (lab session 26) |
 | `.ecb` e-Card berries (18) | e-Reader Mystery Event (`setenigmaberry`) | Not started; builds on Stage 3 |
 | e-Card `.raw` scans (R/S trainers and promos; Emerald and FRLG trainers, Japanese) | Decode the dot codes and do what the e-Reader did | Not started. Ruby/Sapphire cards fit the Stage 3 route; Emerald's Trainer Hill uses its own protocol (`ereader_screen.c`); Japanese cards need the `checkcompat` language masks |
 | `.pk3` Pokémon (about 1,000) | Varies by event; check each one | Not started |
@@ -98,7 +98,7 @@ After receiving news, the delivery man gives berries.
 
 **Needs:** a real Wonder News file for the game and language, and one hardware run.
 
-## Stage 3: Mystery Event for Ruby and Sapphire (the e-Reader route; link and block transfer on hardware, sessions 24–25; the first real gift is next)
+## Stage 3: Mystery Event for Ruby and Sapphire (the e-Reader route; done on hardware: the Eon Ticket, session 26)
 
 Done in the simulator:
 - `firmware/programs/ereader.c` (4 KB) plays the e-Reader in either cable role.
@@ -114,7 +114,10 @@ On hardware (sessions 24–25):
   wraps it in a Mystery Event script that makes the game store exactly its contents, checked
   with a model of Ruby's engine (`tests/mevent_model.py`).
 
-Still to come: send the wrapped Eon Ticket, and collect it from Norman in Petalburg City Gym.
+On hardware (session 26): the wrapped Eon Ticket went across with 0 mismatches, Ruby saved it,
+and Norman gave the ticket in Petalburg City Gym.
+
+Still to come: the Record Mixing gift on hardware, Sapphire, and other languages.
 
 - **The DUO plays the e-Reader** on the standard link (two-player mode at 115 kbit/s), as a
   separate GBA program.
