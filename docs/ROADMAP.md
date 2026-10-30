@@ -3,6 +3,35 @@
 Each stage builds on the last. The cheapest and most useful steps come first. Every stage goes
 through the simulator (with a planted bug for each new behaviour) before it touches real hardware.
 
+## The goal (agreed 30 October 2026)
+
+> Support every Gen 3 Project Pokémon file meant for a GBA Pokémon game, by the route it
+> originally came by, wherever that route leaves the game to save the event itself. Where it
+> doesn't, offer the nearest route that does, and say so.
+
+The files are those in Project Pokémon's events gallery (`projectpokemon/EventsGallery`,
+`Released/Gen 3` and `Unreleased/Gen 3`). They stay on the user's PC and never enter this
+repository.
+
+| Files | Authentic route | Where we are |
+|---|---|---|
+| `.wc3` Wonder Cards (68) | Mystery Gift, as the distributions sent them | Japanese Emerald and English LeafGreen on hardware; other games and languages next (Stage 1) |
+| Wonder News | The same route | Simulator only; the gallery has no Gen 3 news files yet (Stage 2) |
+| `.me3` Mystery Events (13, all the Eon Ticket) | e-Reader to Ruby/Sapphire | Wrapped; the first hardware run is next (Stage 3) |
+| `.ecb` e-Card berries (18) | e-Reader Mystery Event (`setenigmaberry`) | Not started; builds on Stage 3 |
+| e-Card `.raw` scans (R/S trainers and promos; Emerald and FRLG trainers, Japanese) | Decode the dot codes and do what the e-Reader did | Not started. Ruby/Sapphire cards fit the Stage 3 route; Emerald's Trainer Hill uses its own protocol (`ereader_screen.c`); Japanese cards need the `checkcompat` language masks |
+| `.pk3` Pokémon (about 1,000) | Varies by event; check each one | Not started |
+
+**Out of scope:** files meant for other games or for the GameCube (the Channel, Colosseum and
+Pinball e-Cards; Pokémon from GameCube bonus discs).
+
+**Routes that write the save directly.** Some original routes (many Pokémon distributions, as
+far as we know, and the Berry Glitch Fixing Program) sent a program over the cable that wrote
+the save itself, without the game's menus. That conflicts with the rule that our code never
+writes cartridge saves. **The user decides** how to handle these; until then, the nearest route
+that leaves the game in charge (for Pokémon, a trade through the game's own Trade Centre) is the
+one to plan for, labelled as such.
+
 ## Stage 0: Make room and tidy up (done, 29 October 2026)
 
 - **Free up memory.** Move the lab instrumentation (flick tables, link scope, command capture,
