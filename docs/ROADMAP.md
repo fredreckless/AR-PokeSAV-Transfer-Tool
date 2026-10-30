@@ -18,8 +18,8 @@ repository.
 | `.wc3` Wonder Cards (68) | Mystery Gift, as the distributions sent them | Japanese Emerald and English LeafGreen on hardware; other games and languages next (Stage 1) |
 | Wonder News | The same route | Simulator only; the gallery has no Gen 3 news files yet (Stage 2) |
 | `.me3` Mystery Events (13, all the Eon Ticket) | e-Reader to Ruby/Sapphire | Working on hardware: English Ruby received the Eon Ticket (lab session 26) |
-| `.ecb` e-Card berries (18) | e-Reader Mystery Event (`setenigmaberry`) | English: working on hardware, the PUMKIN BERRY (lab session 27); Japanese waits for the language masks |
-| e-Card `.raw` scans (R/S trainers and promos; Emerald and FRLG trainers, Japanese) | Decode the dot codes and do what the e-Reader did | Not started. Ruby/Sapphire cards fit the Stage 3 route; Emerald's Trainer Hill uses its own protocol (`ereader_screen.c`); Japanese cards need the `checkcompat` language masks |
+| `.ecb` e-Card berries (18) | e-Reader Mystery Event (`setenigmaberry`) | English: working on hardware, the PUMKIN BERRY (lab session 27); Japanese: simulator done (Stage 7) |
+| e-Card `.raw` scans (R/S trainers and promos; Emerald and FRLG trainers, Japanese) | Decode the dot codes and do what the e-Reader did | Ruby/Sapphire: all 186 cards decode and pass the model, English and Japanese (Stages 6–7); hardware next. Emerald's Trainer Hill and the FireRed/LeafGreen cards use another protocol (Stage 8). The Berry Glitch Fixing Program is refused (it writes the save) |
 | `.pk3` Pokémon (about 1,000) | Varies by event; check each one | Not started |
 
 **Out of scope:** files meant for other games or for the GameCube (the Channel, Colosseum and
@@ -142,6 +142,44 @@ Still to come: the Record Mixing gift on hardware, Sapphire, and other languages
   it. He won't give one while the bag or PC holds an e-Reader berry already.
 - **Found on the way:** the "player 0" report can be wrong (session 27). To fix: decide the role
   from SIOCNT's player ID after each transfer, not from SI.
+
+## Stage 5: Wonder Cards for every game (waiting)
+
+Check all 68 `.wc3` files with the tool's own checks, then hardware runs on the cartridges to
+hand. **Waiting:** the user's cable stays fitted for the e-Reader route for now.
+
+## Stage 6: e-Card scans (simulator done, 31 October 2026; hardware next)
+
+- `duo_events.py` reads `.raw` strips: blocks, interleaved Reed-Solomon codewords (parity
+  checked), strip headers and titles, strips joined, vpk0 unpacked; then it finds the card's own
+  Mystery Event script and sends it as the e-Reader did (docs/EREADER.md).
+- All 186 Ruby/Sapphire cards in the gallery decode (berries, Battle-e trainers, the US Eon
+  Ticket, the Japanese Decoration Present); the model accepts each in its own language, every
+  trainer passes the game's checksum, and the berries and the Eon Ticket match the community's
+  saved files byte for byte.
+- The model now carries out `addtrainer` (the game's own check) and records `runscript`.
+- Two tests (with made-up cards built by `tests/ecard_fixtures.py`) and five planted bugs.
+- **On hardware:** send a trainer card, e.g. `08-A001 RS - Cool Trainer Devin (USA).raw`, then
+  visit the old man's house in Mossdeep City.
+
+## Stage 7: Japanese Ruby and Sapphire (simulator done, 31 October 2026)
+
+- The Japanese language mask is **0x0001**, read from Nintendo's own Japanese cards. Japanese
+  `.me3` and `.ecb` files are wrapped with it; Japanese cards go as they are.
+- The tool warns at link-up when the event's language isn't the game's.
+- The guided start-up gives the Japanese menu (ふしぎな できごと). The Japanese unlock phrase is
+  still unconfirmed.
+- **Needs** a Japanese Ruby or Sapphire for a hardware run.
+
+## Stage 8: The other e-Reader protocols (Japanese; not started)
+
+Emerald's Trainer Hill (`ereader_screen.c`) and the FireRed/LeafGreen e-Cards: a different link
+protocol, so a new GBA program.
+
+## Stage 9: Pokémon (`.pk3`; not started)
+
+First, how each event was given out; then the user's decision on routes that write the save;
+then a trade distributor through the game's own Trade Centre.
 
 ## Tidying done on 30 October
 

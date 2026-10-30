@@ -154,13 +154,19 @@ Ruby and Sapphire received their events through **Mystery Event**, from the Card
 ```
 python duo_events.py event --event "YOUR EVENT.me3"
 python duo_events.py event --event "YOUR BERRY.ecb"     (an e-Reader Enigma Berry)
+python duo_events.py event --event "YOUR CARD.raw"      (an e-Card scan, sent as the e-Reader sent it)
 python duo_events.py event                      (a dry run: link players only)
 ```
 
 **You will need:**
 - a **GBA** link cable. Game Boy and Game Boy Color cables lack the SD line this mode needs. Unofficial cables often have two identical ends.
-- your own event file for your game and language: a Mystery Event script, a saved event (`.me3`), or a saved Enigma Berry (`.ecb`), as Project Pokémon has them. These are what the game *stores*, not what the e-Reader sent, so the tool wraps each in the script that makes the game store exactly that ([docs/EREADER.md](docs/EREADER.md)). English and German files only, for now.
-- **Mystery Event unlocked.** Tell the man by the PC in **Petalburg City's Pokémon Center** "**MYSTERY EVENT IS EXCITING**" (after beating Norman), then save and restart: MYSTERY EVENT appears on the title menu.
+- your own event file for your game and language, as Project Pokémon has them:
+  - an **e-Card scan** (`.raw`): the tool reads the dot code (checking its error correction), unpacks the card and sends the card's own Mystery Event, exactly as the e-Reader did. For a card of several strips, give any one of them; the others are found beside it. Berries, Battle-e trainers and promos all work;
+  - a saved event (`.me3`) or a saved Enigma Berry (`.ecb`): these are what the game *stores*, not what the e-Reader sent, so the tool wraps each in the script that makes the game store exactly that;
+  - or a Mystery Event script.
+
+  Japanese, English and German games ([docs/EREADER.md](docs/EREADER.md)).
+- **Mystery Event unlocked.** Tell the man by the PC in **Petalburg City's Pokémon Center** "**MYSTERY EVENT IS EXCITING**" (after beating Norman), then save and restart: MYSTERY EVENT appears on the title menu (ふしぎな できごと in Japanese).
 
 **Which end of the cable.** The game must be the link's **master**: Ruby's MYSTERY EVENT menu only carries on as master. Which end makes a GBA master depends on the cable (on Nintendo's own, the small purple plug). You don't need to know in advance: if the DUO comes up as player 0, the tool says so, and you switch both GBAs off and swap the ends.
 
@@ -168,11 +174,11 @@ python duo_events.py event                      (a dry run: link players only)
 1. **Back up your save first.** The game saves after the event.
 2. **Both GBAs off**, cable connected. Run the command and switch on the DUO's GBA when asked.
 3. **Wait for "Ready"**, then switch on the game, choose **MYSTERY EVENT**, and press A when it asks.
-4. The tool stops by itself once the game has the event and has closed the link. The game then runs it, saves, and shows its message. Press A, and the tool tells you where to go: for the Eon Ticket or an Enigma Berry, to your Dad in Petalburg City Gym (a berry comes after you've beaten him).
+4. The tool stops by itself once the game has the event and has closed the link. The game then runs it, saves, and shows its message. Press A, and the tool tells you where to go: for the Eon Ticket or an Enigma Berry, to your Dad in Petalburg City Gym (a berry comes after you've beaten him); for an e-Card trainer, to the old man's house in Mossdeep City.
 
 The DUO copies the game's link type and language into its own link-player details, so the game's checks agree. If the game opens the link again (for another event), the DUO starts over with it (with `--keep-going`).
 
-**Status:** English Ruby received the Eon Ticket on real hardware, and Norman gave it (lab session 26). The PUMKIN BERRY, an e-Reader Enigma Berry, followed (lab session 27). See [docs/EREADER.md](docs/EREADER.md).
+**Status:** English Ruby received the Eon Ticket on real hardware, and Norman gave it (lab session 26). The PUMKIN BERRY, an e-Reader Enigma Berry, followed (lab session 27). e-Card scans and Japanese games work in the simulator and with a model of Ruby's engine, checked against every Ruby/Sapphire card in Project Pokémon's gallery; hardware is next. See [docs/EREADER.md](docs/EREADER.md).
 
 ## If something goes wrong
 
@@ -227,7 +233,7 @@ The firmware build is reproducible: the same input always gives the same v4.1, u
 
 ## Credits
 
-Developed by fredreckless, working with Claude (Anthropic). Thanks to earlier Action Replay researchers whose work pointed the way: Parasyte (Kodewerx) and [kirschju/gameshark-gba-tooling](https://github.com/kirschju/gameshark-gba-tooling). Also thanks to GBATEK, devkitPro and the Unicorn, Keystone and Capstone projects.
+Developed by fredreckless, working with Claude (Anthropic). Thanks to earlier Action Replay researchers whose work pointed the way: Parasyte (Kodewerx) and [kirschju/gameshark-gba-tooling](https://github.com/kirschju/gameshark-gba-tooling). Also thanks to GBATEK, devkitPro and the Unicorn, Keystone and Capstone projects; to mGBA, whose e-Reader code documents the dot-code layout; and to tehzz's `vpk0` crate, which documents the vpk0 format.
 
 ## Licence
 

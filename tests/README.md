@@ -14,7 +14,7 @@
 - **`test_v4.py`** is the test suite, 106 tests. Run `python run_each.py` to put each test in its own process: the emulator library can crash after very many simulated DUOs in one process. Without the firmware built, the tests that need it are skipped.
 - **`mutate4.py`** plants known bugs one at a time (in the firmware builds, the GBA programs and the PC tools) and checks a test catches each one. `python mutate4.py [KIND ...]` runs all of them or the kinds named (`fw`, `fw42`, `prog`, `ereader`, `pc`).
 - **`emu_*.py`** are the earlier emulator tests (v1, v2, the lab, and firmware updates), still run by the suite.
-- **`fixtures.py`** builds synthetic Pokémon Gen 3 saves, so no real save is needed. **`logo_correction.py`** derives the checksum corrections for the DUO's header overlay.
+- **`fixtures.py`** builds synthetic Pokémon Gen 3 saves, so no real save is needed. **`ecard_fixtures.py`** builds made-up e-Cards (a program, vpk0-compressed, cut into Reed-Solomon-coded strips), the reverse of the tool's card reader. **`logo_correction.py`** derives the checksum corrections for the DUO's header overlay.
 - **`history/`** holds the v3 / v3.1 suites, kept for the record.
 
 Build first with `python firmware/build_firmware.py PATH_TO_DATEL_1.06_UPDATE --all`.

@@ -26,7 +26,7 @@ ALL = "ALL"
 MYSTERY_GIFT = ["wireless adapter", "distributor", "serial sweep", "find serial", "every game", "Wonder News",
                 "search check", "finishing", "guided start-up", "2 MHz probe", "card checks",
                 "v4.2 adapter test", "adapter program", "v4.2 programs"]
-EREADER = ["e-Reader", "Mystery Event files", "v4.2 programs", "guided start-up"]
+EREADER = ["e-Reader", "e-Card", "Mystery Event files", "Enigma Berry", "v4.2 programs", "guided start-up"]
 EVENTS_TOOL = MYSTERY_GIFT + EREADER + ["two tools", "v4.2 run", "connect"]
 
 # Which tests a changed file needs, first match wins. ALL for anything shared; [] for documentation.
@@ -43,6 +43,7 @@ AREAS = [
     ("tests/rfu_game_model.py", MYSTERY_GIFT),
     ("tests/link_game_model.py", EREADER),
     ("tests/mevent_model.py", EREADER),
+    ("tests/ecard_fixtures.py", EREADER),
     ("tests/check.py", []), ("tests/run_each.py", []), ("tests/history/*", []),
     ("*", ALL),                      # maxduo_saves.py, the firmware builds, hwsim, test_v4.py, fixtures...
 ]
@@ -57,7 +58,8 @@ BUG_KINDS = [
     ("firmware/build_*.py", ["fw", "fw42"]),
     ("duo_events.py", ["pc"]), ("maxduo_saves.py", ["pc"]),
     ("tests/rfu_game_model.py", ["prog"]),
-    ("tests/link_game_model.py", ["ereader"]), ("tests/mevent_model.py", ["ereader"]),
+    ("tests/link_game_model.py", ["ereader"]), ("tests/mevent_model.py", ["ereader", "pc"]),
+    ("tests/ecard_fixtures.py", ["pc"]),
     ("tests/test_v4.py", ALL), ("tests/hwsim.py", ALL), ("tests/fixtures.py", ALL),
     ("tests/mutate4.py", ALL),       # a changed or new planted bug should be run
 ]
@@ -82,6 +84,7 @@ QUICK = [
     "wireless adapter: Emerald's Mystery Gift search",
     "distributor: link players exchanged",
     "e-Reader: Ruby as master",
+    "e-Card scans:",
 ]
 
 

@@ -63,9 +63,20 @@ Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
   distributor) are in the roadmap's goal table.
 - **Enigma Berries work on hardware** (session 27: the PUMKIN BERRY from Norman). The user's
   berry files are in `EventsGallery\Released\Gen 3\ENG\e-Card Berries`.
-- **A known false alarm:** the e-Reader trace can say "the DUO is player 0" and advise swapping
-  the cable when the game really is master (session 27). The fix, if the user wants it: decide
-  the role in `ereader.c` from SIOCNT's player ID (bits 4-5) after each transfer, not from SI.
+- **Fixed overnight (30–31 October):** the false "the DUO is player 0" (session 27). `ereader.c`
+  now takes its role from SIOCNT's player ID after each transfer.
+- **Stages 6 and 7 done in the simulator (overnight):** e-Card `.raw` scans and Japanese
+  Ruby/Sapphire. **Next hardware test:** a trainer card, e.g.
+  `python duo_events.py event --event "EventsGallery\Released\Gen 3\ENG\e-Card .raws\Ruby & Sapphire\Trainers\08-A001 RS - Cool Trainer Devin (USA).raw"`,
+  then the old man's house in Mossdeep City. Any e-Reader trainer already in the save is replaced.
+- **Copy to the PC:** the PC was asleep at the end of the overnight session, so its
+  `duo_events.py` and `HANDOVER.md` are older than `main`. Copy them across (and check SHA-1s)
+  before the next hardware test.
+- **Also overnight:** the `finishing` test's `--keep-going` check now runs 45 s (12 s let a
+  planted bug through once under load).
+- **For the user to decide:** the Berry Glitch Fixing Program cards are refused (an e-Reader
+  program that writes the save itself), and so would be any card that turns on the clock reset
+  (`enableresetrtc`; none of the gallery's does).
 - Not yet checked on hardware: the Eon Ticket's Record Mixing gift; Mystery Gift through the new
   guided start-up (waiting: the cable stays fitted for the e-Reader route).
 - **The user's folder:** `tidy_folder.bat` (30 October) moves the older files into `old\` when run;

@@ -96,6 +96,11 @@ PC_MUTANTS = {
     "berry sent with initramscript's command number": ("MEV_SETENIGMABERRY = 7", "MEV_SETENIGMABERRY = 6", "Enigma Berry"),
     "berry's checksum taken before the pointers are cleared": ("struct.pack(\"<iII\", sum(rec), start, start + len(rec))", "struct.pack(\"<iII\", sum(berry), start, start + len(rec))", "Enigma Berry"),
     "berry file check counts the description pointers": ("    rec = bytearray(data[:ECB_CHECKSUM_AT])\n    rec[ECB_POINTERS] = bytes(8)\n", "    rec = bytearray(data[:ECB_CHECKSUM_AT])\n", "Enigma Berry files"),
+    "card strips joined without skipping the later strips' titles": ("        card += data[CARD_TITLE:]\n", "        card += data[CARD_TITLE:] if not card else data\n", "e-Card scans"),
+    "card strips' Reed-Solomon parity never checked": ("    damaged = [i for i, c in enumerate(cw) if rs_parity(c[:48]) != bytes(c[48:])]", "    damaged = []", "e-Card scans"),
+    "vpk0 one-sample distances (method 1) off by four": ("else (m << 2) - 8", "else (m << 2) - 4", "e-Card"),
+    "Japanese Mystery Events get the English mask": ('MEV_LANGUAGE_MASKS = {"Japanese": 1 << 0,', 'MEV_LANGUAGE_MASKS = {"Japanese": 1 << 1,', "Mystery Event files"),
+    "a card's trainer record cut four bytes short": ("EREADER_TRAINER_SIZE = 0xBC", "EREADER_TRAINER_SIZE = 0xB8", "e-Card scans"),
     "known game table ignored": ("    known = KNOWN_SAVE_GAMES.get(info[\"code\"][:3])\n    if forced:", "    known = None\n    if forced:", "known games"),
 }
 

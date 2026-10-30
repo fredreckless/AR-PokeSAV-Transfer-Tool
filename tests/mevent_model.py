@@ -14,11 +14,18 @@ then writes the save (it does for status 0 "loaded OK" and 2 "success").
 import struct
 
 LOAD_OK, LOAD_ERROR, SUCCESS, FAILURE, STATUS_FF = 0, 1, 2, 3, 0xFF
-LANGUAGE_MASK = {"English": 1 << 1, "German": 1 << 2}
+LANGUAGE_MASK = {"Japanese": 1 << 0, "English": 1 << 1, "German": 1 << 2}
 VERSION_MASK = {"Ruby": 1 << 7, "Sapphire": 1 << 8}
 N_COMMANDS = 17                            # nop .. crc
 BUFFER = 0x7D4                             # gSharedMem, cleared to this size around each event
 BERRY_SIZE, BERRY_CHECKSUM_AT = 0x530, 0x52C
+TRAINER_SIZE = 0xBC                        # BattleTowerEReaderTrainer: 46 words, then their sum
+
+
+def trainer_valid(rec):
+    """battle_tower.c ValidateEReaderTrainer: not all zero, and the word sum matches."""
+    words = struct.unpack("<47I", bytes(rec))
+    return any(words[:46]) and sum(words[:46]) & 0xFFFFFFFF == words[46]
 SAVE_BERRY_DESC1, SAVE_BERRY_DESC2 = 0x02026B44, 0x02026B71   # stand-ins for the save's description addresses (the checksum skips them)
 
 
@@ -58,6 +65,8 @@ class Engine:
         self.gift = bytearray(4 + 12)
         self.berry = bytearray(berry or bytes(BERRY_SIZE))
         self.berry_available = False
+        self.trainer = bytearray(TRAINER_SIZE)
+        self.scripts_run = []
         self.trace = []
 
     # ScriptReadByte/Halfword/Word: little-endian, byte by byte
@@ -75,9 +84,9 @@ class Engine:
     def addr(self):                       # ScriptReadWord(ctx) - mOffset + mScriptBase
         return (self.word() - self.offset + self.base) & 0xFFFFFFFF
 
-    def span(self, start, end):
-        if end is None:                   # a fixed-size record: the berry
-            end = start + BERRY_SIZE
+    def span(self, start, end, size=BERRY_SIZE):
+        if end is None:                   # a fixed-size record: the berry, or a trainer
+            end = start + size
         if not (0 <= start <= end <= BUFFER):
             raise Unsupported(f"a pointer outside the received buffer ({start:#x}..{end:#x})")
         return self.buf[start:end]
@@ -155,6 +164,17 @@ class Engine:
             self.status = LOAD_ERROR
         return False
 
+    def cmd_5(self):                              # runscript: an ordinary script, run at once
+        self.scripts_run.append(self.addr())      # (not modelled further: recorded)
+        return False
+
+    def cmd_13(self):                             # addtrainer
+        self.trainer[:] = self.span(self.addr(), None, TRAINER_SIZE)
+        if not trainer_valid(self.trainer):       # ValidateEReaderTrainer clears a bad one
+            self.trainer[:] = bytes(TRAINER_SIZE)
+        self.message, self.status = "new trainer", SUCCESS
+        return False
+
     def cmd_11(self):                             # setrecordmixinggift
         unk, quantity, item = self.byte(), self.byte(), self.half()
         self.gift[:] = bytes(len(self.gift))
@@ -190,4 +210,5 @@ def run(buffer, language="English", version="Ruby", berry=None):
     saved = e.status in (LOAD_OK, SUCCESS)         # GetEventLoadMessage returns 0 -> Save_WriteData
     return e.status, saved, dict(ram_script=bytes(e.ram_script), gift=bytes(e.gift), message=e.message,
                                  trace=e.trace, berry=bytes(e.berry), berry_valid=berry_valid(e.berry),
-                                 berry_available=e.berry_available)
+                                 berry_available=e.berry_available, trainer=bytes(e.trainer),
+                                 trainer_valid=trainer_valid(e.trainer), scripts_run=e.scripts_run)

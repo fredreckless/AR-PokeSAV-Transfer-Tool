@@ -1367,11 +1367,11 @@ def _():
 import link_game_model as LG
 
 
-def ereader_run(game, event=None, seconds=60, stop_on_game=True, race_window=0, si_flicker=0):
-    """The DUO's e-Reader program against a simulated Ruby on the GBA link cable."""
+def ereader_run(game, event=None, seconds=60, stop_on_game=True, race_window=0, si_flicker=0, path=None):
+    """The DUO's e-Reader program against a simulated Ruby on the GBA link cable. `path` sends an
+    existing file (an e-Card's strips) instead of `event`."""
     hw, duo = run42()
     hw.attach_mp_game(game.run(), game_master=game.master, race_window=race_window, si_flicker=si_flicker)   # the cable
-    path = None
     if event is not None:
         path = event_file(event)
     r = quiet(W.ereader_session, duo, types.SimpleNamespace(ereader=seconds, mystery_event=path),
@@ -1430,12 +1430,15 @@ def _():
     assert "Record Mixing" in " ".join(W.prepare_event(bytes(damaged), "x.me3")[2])
     for data, name, word in ((bytes(300), "x.bin", "not a saved Mystery Event"),
                              (bytes([0x10]) + bytes(1011), "x.me3", "not a saved Mystery Event"),
-                             (TEST_ME3, "x (JPN).me3", "Japanese")):
+                             (TEST_ME3, "x (FRE).me3", "French")):
         try:
             W.prepare_event(data, name); raise AssertionError(f"{name} accepted")
         except ValueError as e:
             assert word in str(e), e
     assert W.prepare_event(TEST_ME3, "x (GER).me3")[0][5] == 4               # German mask (1 << 2)
+    jp = W.prepare_event(TEST_ME3, "x (JPN).me3")[0]                           # Japanese: 0x0001, as on
+    assert jp[5] == 1 and ME.run(jp, "Japanese")[:2] == (ME.LOAD_OK, True)      # Nintendo's own cards
+    assert ME.run(jp, "English")[:2] == (ME.FAILURE, False)
     # a script that's already a Mystery Event script goes as it is, after its own checks
     assert W.prepare_event(TEST_EVENT, "x.bin")[0] == TEST_EVENT
     wrong = bytearray(TEST_EVENT); wrong[11] = 0
@@ -1477,7 +1480,7 @@ def test_ecb(name="TESTER", flavours=(0, 20, 0, 0, 30), pointers=0x02028D50):
 TEST_ECB = test_ecb()
 
 
-@test("Enigma Berry files: a .ecb is wrapped so Ruby stores exactly the berry, Norman can give it, and a second berry replaces the first; damage, empty berries and Japanese files are refused")
+@test("Enigma Berry files: a .ecb is wrapped so Ruby stores exactly the berry, Norman can give it, and a second berry replaces the first; damage and empty berries are refused; Japanese berries get the Japanese mask")
 def _():
     script, text, problems = W.prepare_event(TEST_ECB, "x RS - Tester Berry (USA).ecb")
     assert not problems and "TESTER BERRY" in text and "dry 20, sour 30" in text, (text, problems)
@@ -1506,10 +1509,12 @@ def _():
     empty = bytearray(TEST_ECB); empty[0x14] = 0
     empty[0x52C:0x530] = W.ecb_checksum(empty).to_bytes(4, "little")
     assert "growth time" in " ".join(W.prepare_event(bytes(empty), "x.ecb")[2])
+    jp, text, _ = W.prepare_event(TEST_ECB, "x (JPN).ecb")
+    assert jp[5] == 1 and ME.run(jp, "Japanese")[2]["berry_valid"] and "Japanese-named" in text, text
     try:
-        W.prepare_event(TEST_ECB, "x (JPN).ecb"); raise AssertionError("Japanese berry accepted")
+        W.prepare_event(TEST_ECB, "x (ITA).ecb"); raise AssertionError("Italian berry accepted")
     except ValueError as e:
-        assert "Japanese" in str(e), e
+        assert "Italian" in str(e), e
     assert "Norman" in W.event_hint(TEST_ECB) and "TESTER BERRY" in W.event_hint(TEST_ECB)
     try:
         quiet(W.load_event, None, event_file(bytes(damaged), "x (ENG).ecb")); raise AssertionError("damaged berry sent")
@@ -1529,6 +1534,88 @@ def _():
     assert report["bad_checksums"] == 0, report
     for line in ("TESTER BERRY", "Mystery Event loaded", "sent the Mystery Event", "the game closed the link", "Norman"):
         assert line in hw.text, (line, hw.text[-1500:])
+
+
+import ecard_fixtures as EC
+
+
+def card_files(strips, name="08-X001 RS - Test Trainer (USA)"):
+    """Write a made-up card's strips as the gallery names them."""
+    folder = tempfile.mkdtemp()
+    paths = []
+    for i, strip in enumerate(strips):
+        n = f"{name} (Strip {i + 1}).raw" if len(strips) > 1 else f"{name}.raw"
+        paths.append(os.path.join(folder, n))
+        open(paths[-1], "wb").write(strip)
+    return paths
+
+
+TEST_TRAINER = EC.test_trainer()
+
+
+@test("e-Card scans: strips decode (Reed-Solomon checked, vpk0 both ways, two strips joined after their titles) and the card's own Mystery Event goes as it is; damaged strips, e-Reader programs and clock cards are refused")
+def _():
+    # a trainer card, as the real English ones: checkcompat, addtrainer, end
+    script = EC.trainer_script(TEST_TRAINER, "English")
+    for method, before in ((0, 400), (1, 400), (1, 3500)):              # the last needs two strips
+        paths = card_files(EC.make_card(script, method, before))
+        assert (len(paths) > 1) == (before > 3000), len(paths)
+        for p in paths:                                                  # any strip finds the others
+            sent, text, problems, hint = W.prepare_card(p)
+            assert sent == script and not problems, (text, problems)
+            assert "English" in text and "addtrainer" in text and f"{len(paths)} strip" in text, text
+            assert "Mossdeep" in hint, hint
+        for version in ("Ruby", "Sapphire"):
+            status, saved, store = ME.run(sent, "English", version)
+            assert (status, saved) == (ME.SUCCESS, True) and store["trainer"] == TEST_TRAINER, store["trace"]
+        assert ME.run(sent, "Japanese")[:2] == (ME.FAILURE, False)
+    # a berry card: the berry follows the script, as on the real cards
+    berry_script = bytes(W.build_berry_script(TEST_ECB))
+    sent = W.prepare_card(card_files(EC.make_card(berry_script))[0])[0]
+    assert sent == berry_script and ME.run(sent)[2]["berry_valid"]
+    # a damaged strip: one byte changed -> its codeword fails, and nothing is sent
+    strip = bytearray(EC.make_card(script)[0]); strip[104 * 5 + 40] ^= 0x10
+    s, text, problems, hint = W.prepare_card(card_files([bytes(strip)])[0])
+    assert s is None and "Reed-Solomon" in " ".join(problems), problems
+    # a program for the e-Reader itself (no vpk0), a card with no Mystery Event, a wrong size
+    for card, word in ((EC.make_strip(b"\x10\x00" + bytes(300)), "programs for the e-Reader"),
+                       (EC.make_card(bytes(500))[0], "no Mystery Event"),
+                       (bytes(2000), "not an e-Reader strip")):
+        try:
+            W.prepare_card(card_files([card])[0]); raise AssertionError(f"accepted ({word})")
+        except ValueError as e:
+            assert word in str(e), e
+    # a card that would turn on the clock reset is refused (this tool leaves clocks alone)
+    clock = script[:17] + bytes([14, W.MEV_END])                     # checkcompat, enableresetrtc, end
+    assert "clock" in " ".join(W.prepare_card(card_files(EC.make_card(clock))[0])[2])
+    # damage inside the compressed program is caught too
+    bad = bytearray(EC.vpk0_encode(b"ABCABCABC" * 20)); bad[13] ^= 0xFF
+    try:
+        W.vpk0_decode(bytes(bad)); raise AssertionError("damaged vpk0 accepted")
+    except ValueError:
+        pass
+
+
+@test("e-Card trainer on the link cable: a Japanese card (initramscript, addtrainer) goes to a Japanese Ruby, which stores the trainer; the tool points to Mossdeep")
+def _():
+    script = EC.trainer_script(TEST_TRAINER, "Japanese", ram_script=bytes(range(1, 60)))
+    paths = card_files(EC.make_card(script, method=1), "08-A001 RS - Test Trainer (JPN)")
+    game = LG.RubyMysteryEvent(master=True, language=LG.LANG_JAPANESE)
+    hw, report = ereader_run(game, path=paths[0])
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.log, hw.text[-600:])
+    assert hw.lg_result == script, (len(hw.lg_result or b""), hw.text[-400:])
+    status, saved, store = ME.run(hw.lg_result, "Japanese", "Ruby")
+    assert (status, saved) == (ME.SUCCESS, True) and store["trainer_valid"], store["trace"]
+    assert store["ram_script"][4:8] == bytes([0x33, 25, 4, 1]), store["ram_script"][:8].hex()
+    assert report["bad_checksums"] == 0 and report["game_language"] == 1, report
+    for line in ("an e-Card", "Japanese", "Japanese", "sent the Mystery Event", "Mossdeep"):
+        assert line in hw.text, (line, hw.text[-1500:])
+    assert "can't be used" not in hw.text
+    # the same card with an English Ruby: the tool says at once that the game will refuse it
+    game = LG.RubyMysteryEvent(master=True)
+    hw, report = ereader_run(game, path=paths[0])
+    assert "The event is for Japanese games, so this English game will say it can't be used" in hw.text, hw.text[-900:]
+    assert ME.run(hw.lg_result, "English")[:2] == (ME.FAILURE, False)
 
 
 @test("e-Reader: Ruby as master (purple plug) - handshake, link players, the event arrives intact, the link closes")
@@ -1771,10 +1858,13 @@ def _():
     child, client = hw.lg_result
     assert client.result == RFU.CLI_MSG_CARD_RECEIVED and client.saved_card == card
     assert "Finished: the game has received the Wonder Card and closed the link." in hw.text, hw.text[-600:]
+    # --keep-going: the game is done within a few seconds, and the tool must still be running at the
+    # end of its 45 (a tool that stopped would stop soon after the game; 45 s leaves room for a
+    # loaded machine, where 12 s once let a planted bug through)
     t0 = time.time()
-    hw, game, trace, st, counters = adapter_session(gift_script, first_bit=True, seconds=12, wonder_card=path,
+    hw, game, trace, st, counters = adapter_session(gift_script, first_bit=True, seconds=45, wonder_card=path,
                                                     stop_on_game=False, keep_going=True)
-    assert hw.lg_done and "Finished" not in hw.text and time.time() - t0 >= 12, hw.text[-300:]
+    assert hw.lg_done and "Finished" not in hw.text and time.time() - t0 >= 45, hw.text[-300:]
 
 
 @test("guided start-up: both GBAs off, the DUO's on, progress bars, then 'Ready' with each game's menu; a card named for another game is flagged")

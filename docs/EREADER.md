@@ -218,10 +218,64 @@ From pokeruby's `mystery_event_script.c` and `script.c`.
   Ruby and Sapphire, the model stores every byte except the two pointers and counts the berry as
   valid. Japanese berries are refused for now, like Japanese `.me3` files.
 
+## e-Card scans (`.raw`): the cards themselves (Stage 6, 30–31 October)
+
+A `.raw` is one dot-code strip as the e-Reader reads it. Read back to front:
+
+1. **Blocks.** A long strip is 2,912 bytes: 28 blocks of 104 bytes (a short one, 1,872: 18
+   blocks). Each block is a 2-byte block header, then 102 bytes of one stream.
+2. **Codewords.** The stream interleaves Reed-Solomon codewords, 44 on a long strip (28 on a
+   short): byte 0 of every codeword, then byte 1, and so on. Each codeword is 48 data bytes and
+   16 parity bytes (GF(256), polynomial 0x187, the parity as mGBA's `_eReaderReedSolomon` writes
+   it). The tool **checks** every codeword's parity and refuses a damaged strip; it doesn't try
+   to correct one.
+3. **The strip.** The codewords' data, in order: a 48-byte strip header (with `NINTENDO`), a
+   33-byte title, then the strip's share of the card.
+4. **The card.** The strips' shares joined in order ("(Strip 1)", "(Strip 2)": each strip has
+   its own header and title, which are skipped): a 2-byte length, then a **vpk0**-compressed
+   e-Reader program (HAL's LZ: literal bytes and copies, whose distances and lengths have their
+   bit widths in two small Huffman trees; methods 0 and 1 differ in how distances are coded).
+5. **The Mystery Event.** For Ruby and Sapphire cards, the program carries the Mystery Event
+   script the e-Reader sends, word for word: it starts with `checkcompat` and the base
+   0x02000000. The tool finds it, walks its commands to see how far its pointers reach, and
+   sends exactly that. No wrapping: **the card's own script, as the e-Reader sent it.**
+
+**What the gallery's Ruby/Sapphire cards hold** (all decoded locally; none is in the repository):
+
+| Cards | Script | In the game |
+|---|---|---|
+| 6 English and 12 Japanese berries | `checkcompat setenigmaberry end` | Norman gives the berry |
+| 54 English and 112 Japanese trainers | `checkcompat addtrainer end` (Japanese: `initramscript` first) | the old man's house in Mossdeep City (pret: `MossdeepCity_GameCorner`): "A TRAINER named … is visiting my home" |
+| the US Eon Ticket | `checkcompat crc initramscript setrecordmixinggift runscript end` | Norman; it stores exactly what the US e-Card `.me3` holds |
+| the Japanese Decoration Present (2 strips) | `checkcompat crc runscript end` | its script runs at once |
+| the Berry Glitch Fixing Program (2 cards) | none: an e-Reader program of its own | **refused**: it writes the save itself |
+
+- **Checked with the model** (`tests/mevent_model.py`, which now also carries out `addtrainer`
+  and records `runscript`): every card, in Ruby and Sapphire, is accepted in its own language
+  and refused in the other; every trainer passes the game's own checksum; the berries match the
+  `.ecb` files, and the US Eon Ticket card matches the US e-Card `.me3` byte for byte.
+- **Refused on purpose:** a card that would turn on the clock reset (`enableresetrtc`), since
+  this tool leaves clocks alone; none of the gallery's Ruby/Sapphire cards does.
+- **Sources:** the strip layout and parity from mGBA (`src/gba/cart/ereader.c`); vpk0 from the
+  `vpk0` crate (tehzz/vpk0); both re-implemented here.
+
+## Japanese Ruby and Sapphire (Stage 7)
+
+- **The language masks, from the cards.** `checkcompat`'s two language fields are **0x0001** on
+  every Japanese card and **0x0002** on every English one (German, 0x0004, is from pokeruby). So
+  Japanese `.me3` and `.ecb` files are now wrapped with 0x0001, and Japanese cards go as they are.
+- **The tool warns at link-up** when an event's language isn't the game's, since the game would
+  only say it can't be used.
+- **Menus.** The Japanese title menu says ふしぎな できごと (fushigi na dekigoto). It's unlocked the
+  same way as in English, with a Japanese phrase whose words this project hasn't confirmed.
+- **Not yet on hardware**: there's no Japanese Ruby or Sapphire here.
+
 ## What the DUO does
 
 - **Role.** The second player. It follows the cable, master or slave, but only the slave role
-  can work with Ruby's menu (above). As master, it paces exactly like Ruby's own master, which
+  can work with Ruby's menu (above). It knows its role from the player number the GBA writes into
+  SIOCNT (bits 4-5) after each transfer; before the first, from SI staying low. (One look at SI
+  isn't enough: the other GBA drives it during transfers, which gave session 27's false "player 0".) As master, it paces exactly like Ruby's own master, which
   is kept for other uses and tests.
 - **Handshake.** Answer it.
 - **On `0x2222`.** Send its link-player block, with link type 0x5501 and the game's language
@@ -230,6 +284,9 @@ From pokeruby's `mystery_event_script.c` and `script.c`.
   harmlessly: a safe dry run.
 
 ## On hardware so far
+
+- **Session 27.** The PUMKIN BERRY (a wrapped `.ecb`) went across with 0 mismatches, and Norman
+  gave it. The trace's "player 0" was wrong (see *Role* above; fixed since).
 
 - **Session 26.** The wrapped Eon Ticket went across with 0 mismatches, Ruby saved it, and Norman
   gave the ticket. The e-Reader route works end to end.
@@ -254,6 +311,9 @@ From pokeruby's `mystery_event_script.c` and `script.c`.
 
 - ~~Ruby's success message and the Eon Ticket itself.~~ Done: the wrapped Eon Ticket arrived and
   Norman gave it (lab session 26).
-- The Enigma Berry on hardware: send a `.ecb`, then see Norman.
-- Japanese Mystery Event scripts (Japanese Emerald's ふしぎな できごと): the Japanese language
-  masks and the file formats.
+- ~~The Enigma Berry on hardware.~~ Done (lab session 27).
+- ~~The Japanese language masks.~~ 0x0001, read from the Japanese cards (above).
+- An e-Card trainer on hardware: send one, then visit Mossdeep.
+- Japanese Emerald's ふしぎな できごと and Trainer Hill (`ereader_screen.c`): another protocol
+  (Stage 8).
+- The Japanese unlock phrase for Ruby and Sapphire.

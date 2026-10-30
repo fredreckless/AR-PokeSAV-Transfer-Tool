@@ -19,6 +19,7 @@ See README.md, docs/DISTRIBUTOR.md and docs/EREADER.md.
 """
 import argparse
 import os
+import re
 import struct
 import sys
 import time
@@ -789,7 +790,8 @@ EREADER_STATES = ("waiting for the game", "handshaking", "link up", "got the gam
 MEV_NOP, MEV_CHECKCOMPAT, MEV_END, MEV_SETMSG, MEV_SETSTATUS = 0, 1, 2, 3, 4
 MEV_INITRAMSCRIPT, MEV_SETRECORDMIXINGGIFT, MEV_CHECKSUM, MEV_CRC = 6, 11, 15, 16
 MEV_BASE = 0x02000000                   # the address our scripts are written for (checkcompat's word)
-MEV_LANGUAGE_MASKS = {"English": 1 << 1, "German": 1 << 2}   # pokeruby LANGUAGE_MASK per build
+MEV_LANGUAGE_MASKS = {"Japanese": 1 << 0, "English": 1 << 1, "German": 1 << 2}   # Japanese and English as on
+                                        # Nintendo's own e-Cards (decoded, Stage 6); German from pokeruby
 MEV_VERSIONS = {"Ruby": 1 << 7, "Sapphire": 1 << 8}          # pokeruby VERSION_MASK
 MEV_MAX = 2004                          # the game's receive buffer (cleared for 0x7D4 bytes)
 RAM_SCRIPT_MAGIC, RAM_SCRIPT_DATA, RAM_SCRIPT_MAX = 0x33, 1000, 995
@@ -938,6 +940,221 @@ def build_berry_script(berry, language="English", versions=("Ruby", "Sapphire"))
     return bytes(out + rec)
 
 
+# ---------------------------------------------------------------- e-Card scans (.raw): Stage 6
+# A ".raw" is one dot-code strip as the e-Reader reads it (2,912 bytes for a long strip: 28 blocks
+# of 104 bytes; 1,872 for a short one: 18 blocks). Each block is a 2-byte block header and 102
+# bytes of one stream that interleaves Reed-Solomon codewords (44 on a long strip, 28 on a short):
+# byte k of every codeword, then byte k+1, and so on. A codeword is 48 data bytes and 16 parity
+# bytes (GF(256), polynomial 0x187; parity as mGBA's _eReaderReedSolomon writes it). The data,
+# codeword after codeword, is the strip: a 48-byte strip header ("NINTENDO" inside), then a
+# 33-byte title, then the strip's share of the card. Joined in strip order, the card is a 2-byte
+# length and a vpk0-compressed e-Reader program (HAL's LZ with Huffman-coded sizes). For Ruby and
+# Sapphire cards, that program carries the Mystery Event script the e-Reader sends, unchanged:
+# checkcompat (with the card's real language mask: 0x0001 Japanese, 0x0002 English), then e.g.
+# setenigmaberry, addtrainer, initramscript, crc, runscript. The tool sends that script as it is.
+CARD_STRIPS = {2912: (28, 44), 1872: (18, 28)}        # file size: (blocks, codewords)
+CARD_HEADER, CARD_TITLE = 48, 33
+EREADER_TRAINER_SIZE = 0xBC                            # pokeruby BattleTowerEReaderTrainer
+MEV_COMMANDS = {0: ("nop", 0), 1: ("checkcompat", 16), 2: ("end", 0), 3: ("setmsg", 5), 4: ("setstatus", 1),
+                5: ("runscript", 4), 6: ("initramscript", 11), 7: ("setenigmaberry", 4), 8: ("giveribbon", 2),
+                9: ("givenationaldex", 0), 10: ("addrareword", 1), 11: ("setrecordmixinggift", 4),
+                12: ("givepokemon", 4), 13: ("addtrainer", 4), 14: ("enableresetrtc", 0), 15: ("checksum", 12),
+                16: ("crc", 12)}
+_GF_EXP, _GF_LOG = [0] * 256, [0xFF] * 256
+_x = 1
+for _i in range(255):
+    _GF_EXP[_i], _GF_LOG[_x] = _x, _i
+    _x = _x << 1 ^ (0x187 if _x & 0x80 else 0)
+_RS_GEN = (0x00, 0x4B, 0xEB, 0xD5, 0xEF, 0x4C, 0x71, 0x00, 0xF4, 0x00, 0x71, 0x4C, 0xEF, 0xD5, 0xEB, 0x4B)
+
+
+def rs_parity(data48):
+    """The 16 parity bytes of a 48-byte codeword, as the e-Reader's dot codes carry them."""
+    buf = [0] * 64
+    for i in range(48):
+        buf[63 - i] = data48[i]
+    for i in range(48):
+        z = _GF_LOG[buf[63 - i] ^ buf[15]]
+        for j in range(15, -1, -1):
+            x = buf[j - 1] if j else 0
+            if z != 0xFF:
+                y = _RS_GEN[j] + z
+                x ^= _GF_EXP[y - 0xFF if y >= 0xFF else y]
+            buf[j] = x
+    return bytes(~buf[15 - i] & 0xFF for i in range(16))
+
+
+def read_strip(raw):
+    """One .raw strip -> (its data, after the strip header: title and card bytes; damaged codewords)."""
+    if len(raw) not in CARD_STRIPS:
+        raise ValueError(f"not an e-Reader strip: {len(raw)} bytes, not 2912 (long) or 1872 (short)")
+    blocks, words = CARD_STRIPS[len(raw)]
+    stream = b"".join(raw[i * 104 + 2:i * 104 + 104] for i in range(blocks))
+    cw = [bytearray(64) for _ in range(words)]
+    for k in range(64 * words):
+        cw[k % words][k // words] = stream[k]
+    damaged = [i for i, c in enumerate(cw) if rs_parity(c[:48]) != bytes(c[48:])]
+    data = b"".join(bytes(c[:48]) for c in cw)
+    if not damaged and b"NINTENDO" not in data[:CARD_HEADER]:
+        raise ValueError("not an e-Reader strip: its header has no NINTENDO mark")
+    return data[CARD_HEADER:], damaged
+
+
+def vpk0_decode(blob):
+    """HAL's vpk0: a 9-byte header (magic, size, method), two Huffman trees of bit widths, then
+    literal bytes (flag 0) and copies (flag 1: a coded distance back, a coded length)."""
+    if blob[:4] != b"vpk0":
+        raise ValueError("the card holds no vpk0-compressed program")
+    size, method, pos = int.from_bytes(blob[4:8], "big"), blob[8], [72]
+    if method not in (0, 1):
+        raise ValueError(f"unknown vpk0 method {method}")
+
+    def bits(n):
+        v = 0
+        for _ in range(n):
+            if pos[0] >> 3 >= len(blob):
+                raise ValueError("the compressed program ends early")
+            v = v << 1 | blob[pos[0] >> 3] >> (7 - (pos[0] & 7)) & 1
+            pos[0] += 1
+        return v
+
+    def tree():
+        nodes, stack = [], []
+        while True:
+            if bits(1):
+                if len(stack) < 2:
+                    return nodes
+                right, left = stack.pop(), stack.pop()
+                nodes.append((left, right))
+            else:
+                nodes.append(bits(8))
+            stack.append(len(nodes) - 1)
+
+    def value(t):
+        if not t:
+            return 0
+        i = len(t) - 1
+        while isinstance(t[i], tuple):
+            i = t[i][bits(1)]
+        return bits(t[i])
+    offsets, lengths = tree(), tree()
+    out = bytearray()
+    while len(out) < size:
+        if not bits(1):
+            out.append(bits(8))
+            continue
+        m = value(offsets)
+        if method == 1:
+            back = (m + 1 + (value(offsets) << 2)) - 8 if m < 3 else (m << 2) - 8
+        else:
+            back = m
+        n = value(lengths)
+        if not 0 < back <= len(out):
+            raise ValueError("the compressed program is damaged (a copy from before its start)")
+        for _ in range(n):
+            out.append(out[-back])
+    return bytes(out[:size])
+
+
+def card_strip_paths(path):
+    """A card's strips: this file, or all its "(Strip N)" siblings in order."""
+    m = re.search(r" \(Strip (\d+)\)", os.path.basename(path))
+    if not m:
+        return [path]
+    folder = os.path.dirname(path) or "."
+    stem = os.path.basename(path)[:m.start()]
+    found = {}
+    for name in os.listdir(folder):
+        mm = re.search(r" \(Strip (\d+)\)", name)
+        if mm and name[:mm.start()] == stem and name.lower().endswith(".raw"):
+            found[int(mm.group(1))] = os.path.join(folder, name)
+    return [found[k] for k in sorted(found)]
+
+
+def mev_script_extent(prog, start):
+    """How many bytes, from checkcompat, the game needs: up to `end` and everything the commands
+    point at (the base is checkcompat's own word). Returns (size, command names)."""
+    base = struct.unpack_from("<I", prog, start + 1)[0]
+    p, names, reach, open_ended = start, [], start, False
+    while p < len(prog):
+        c = prog[p]
+        if c not in MEV_COMMANDS:
+            raise ValueError(f"the card's script has an unknown command {c:#04x}")
+        name, n = MEV_COMMANDS[c]
+        names.append(name)
+        args = prog[p + 1:p + 1 + n]
+        p += 1 + n
+        reach = max(reach, p)
+
+        def at(off):
+            return start + struct.unpack_from("<I", args, off)[0] - base
+        if name == "setmsg":
+            a = at(1)
+            reach = max(reach, prog.index(b"\xFF", a) + 1 if b"\xFF" in prog[a:] else len(prog))
+        elif name == "initramscript":
+            reach = max(reach, at(7))
+        elif name in ("checksum", "crc"):
+            reach = max(reach, at(8))
+        elif name == "setenigmaberry":
+            reach = max(reach, at(0) + ECB_SIZE)
+        elif name == "addtrainer":
+            reach = max(reach, at(0) + EREADER_TRAINER_SIZE)
+        elif name == "givepokemon":
+            reach = max(reach, at(0) + 100 + 36)          # a Pokemon, then its mail
+        elif name == "runscript":
+            open_ended = True                             # an ordinary script: its length isn't stated
+        if name == "end":
+            break
+    if open_ended:
+        reach = max(reach, min(len(prog), start + MEV_MAX))
+    return reach - start, names
+
+
+def read_card(path):
+    """An e-Card (.raw, one strip or several): returns (the Mystery Event script, its commands,
+    languages, versions, problems). Raises ValueError for anything that isn't a Ruby/Sapphire card."""
+    paths = card_strip_paths(path)
+    card, problems = b"", []
+    for p in paths:
+        data, damaged = read_strip(open(p, "rb").read())
+        if damaged:
+            problems.append(f"{os.path.basename(p)} is damaged: {len(damaged)} of its codewords fail their "
+                            "Reed-Solomon check")
+        card += data[CARD_TITLE:]
+    if problems:
+        return None, [], [], [], problems
+    size = int.from_bytes(card[:2], "little")
+    if card[2:6] != b"vpk0":
+        raise ValueError("this card holds no compressed e-Reader program, so no Mystery Event (some cards, "
+                         "such as the Berry Glitch Fixing Program, are programs for the e-Reader itself)")
+    prog = vpk0_decode(card[2:2 + size] if 6 <= size <= len(card) - 2 else card[2:])
+    start = prog.find(bytes([MEV_CHECKCOMPAT]) + struct.pack("<I", MEV_BASE))
+    if start < 0:
+        raise ValueError("this card holds no Mystery Event for Ruby/Sapphire (it may be a program for "
+                         "the e-Reader itself, or for another game)")
+    length, names = mev_script_extent(prog, start)
+    if length > MEV_MAX:
+        raise ValueError(f"the card's Mystery Event is {length} bytes, more than the game's {MEV_MAX}-byte buffer")
+    script = prog[start:start + length]
+    langs, vers, problems = describe_event_script(script)
+    if "enableresetrtc" in names:
+        problems.append("the card turns on the game's clock reset, and this tool leaves clocks alone")
+    return script, names, langs, vers, problems
+
+
+def card_hint(names):
+    """Where to go in the game after a card's event."""
+    hints = []
+    if "setenigmaberry" in names:
+        hints.append("talk to your Dad (Norman) in Petalburg City Gym after you've beaten him for the berry")
+    if "addtrainer" in names:
+        hints.append("in Mossdeep City, the old man whose house has a basement says the trainer is visiting: "
+                     "talk to him to battle")
+    if "initramscript" in names and not hints:
+        hints.append("talk to the person the card names (its message says who)")
+    return "; ".join(hints) or None
+
+
 def describe_event_script(script):
     """Read a Mystery Event script's compatibility fields: (languages, versions, problems)."""
     if len(script) < 17 or script[0] != MEV_CHECKCOMPAT:
@@ -949,7 +1166,7 @@ def describe_event_script(script):
     if not flag & 0x4:
         problems.append("its compatibility flags lack 0x4, so every game would refuse it")
     if not langs:
-        problems.append("it isn't marked for English or German games")
+        problems.append("it isn't marked for Japanese, English or German games")
     if not vers:
         problems.append("it isn't marked for Ruby or Sapphire")
     return langs, vers, problems
@@ -969,15 +1186,17 @@ def prepare_event(data, path=""):
         berry, problems = parse_ecb(data)
         if language not in MEV_LANGUAGE_MASKS:
             raise ValueError(f"the berry is for {language} games; Mystery Event scripts are only known for "
-                             "English and German Ruby/Sapphire")
+                             "Japanese, English and German Ruby/Sapphire")
         script = build_berry_script(data, language)
+        if language == "Japanese":
+            berry["name"] = "Japanese-named"                    # (the name is in Japanese characters)
         text = (f"a saved Enigma Berry (.ecb): the {berry['name']} BERRY ({', '.join(berry['flavours']) or 'no flavour'}); "
                 f"sent as a Mystery Event script for {language} games that stores exactly it ({len(script)} bytes)")
         return script, text, problems
     me3, problems = parse_me3(data)
     if language not in MEV_LANGUAGE_MASKS:
         raise ValueError(f"the file is for {language} games; Mystery Event scripts are only known for "
-                         "English and German Ruby/Sapphire")
+                         "Japanese, English and German Ruby/Sapphire")
     script = build_event_script(me3, language)
     place = RS_PLACES.get((me3["map_group"], me3["map_num"]), f"map {me3['map_group']}.{me3['map_num']}")
     text = f"a saved Mystery Event (.me3): a script for person {me3['person']} in {place}"
@@ -988,20 +1207,37 @@ def prepare_event(data, path=""):
     return script, text, problems
 
 
+def prepare_card(path):
+    """An e-Card (.raw): (script, description, problems, hint)."""
+    script, names, langs, vers, problems = read_card(path)
+    if script is None:
+        return None, "", problems, None
+    strips = len(card_strip_paths(path))
+    text = (f"an e-Card ({strips} strip{'s' if strips > 1 else ''}) for {'/'.join(vers) or 'no known version'}, "
+            f"{'/'.join(langs) or 'no known language'}: its own Mystery Event, {' '.join(names)} "
+            f"({len(script)} bytes), sent as the e-Reader sent it")
+    return script, text, problems, card_hint(names)
+
+
 def load_event(duo, path):
     """Hands the e-Reader program a Mystery Event script (0x2C PUT, then a CRC check)."""
-    raw = open(path, "rb").read()
-    data, text, problems = prepare_event(raw, path)
+    if path.lower().endswith(".raw"):
+        data, text, problems, hint = prepare_card(path)
+    else:
+        raw = open(path, "rb").read()
+        data, text, problems = prepare_event(raw, path)
+        hint = event_hint(raw)
     for p in problems:
         print(f"  *** {os.path.basename(path)}: {p} ***")
     if problems:
         raise ValueError("the file failed its checks, so it wasn't sent")
     print(f"  {os.path.basename(path)}: {text}")
-    hint = event_hint(raw)
     blob = len(data).to_bytes(4, "little") + data
     blob += bytes(-len(blob) % 4)
     put_blob(duo, blob, "Mystery Event")
     print(f"  Mystery Event loaded: {os.path.basename(path)} ({len(data)} bytes)")
+    if hint:
+        print(f"  Afterwards, in the game: {hint}.")
     return data, hint
 
 
@@ -1047,6 +1283,11 @@ def ereader_session(duo, args, poll_s=0.3, stop_when=None):
                         v = program_poll(duo, 2)
                         lang = GAME_LANGUAGES.get(v >> 16, f"language {v >> 16}")
                         text += f": link type {v & 0xFFFF:#06x}, {lang}"
+                        if event is not None:
+                            ev_langs = describe_event_script(event)[0]
+                            if ev_langs and lang not in ev_langs:
+                                text += (f"\n  *** The event is for {'/'.join(ev_langs)} games, so this {lang} game "
+                                         "will say it can't be used. ***")
                         report["game_link_type"], report["game_language"] = v & 0xFFFF, v >> 16
                     print(f"  [{time.time() - t0:6.1f} s] {text}")
                 last = state
@@ -1147,6 +1388,8 @@ MENUS = {
         "Ruby or Sapphire: MYSTERY EVENT on the title menu; press A when it asks.",
         "No MYSTERY EVENT on the title menu? Tell the man by the PC in Petalburg City's Pokemon Center",
         "  MYSTERY EVENT IS EXCITING (after beating Norman), save, and restart the game.",
+        "Japanese Ruby or Sapphire: ふしぎな できごと (fushigi na dekigoto) on the title menu, then A.",
+        "  (It's unlocked the same way, with the Japanese phrase; this tool hasn't confirmed its words.)",
     ],
     "probe": ["Use the game's wireless features (e.g. MYSTERY GIFT > WONDER CARDS > WIRELESS COMMUNICATION)."],
 }
