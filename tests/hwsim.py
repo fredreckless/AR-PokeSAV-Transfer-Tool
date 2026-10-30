@@ -770,7 +770,7 @@ class Hw:
         self.d2h.put(None)
 
     # ------------------------------------------------------------ link port, multi-player mode
-    def attach_mp_game(self, gen, game_master=True, blocks_per_line=25, xfer_blocks=125, slave_latency=240, race_window=0):
+    def attach_mp_game(self, gen, game_master=True, blocks_per_line=25, xfer_blocks=125, slave_latency=240, race_window=0, si_flicker=0):
         """A second GBA in the four-player link mode (SIOCNT multi-player, 115 kbit/s), running a
         game's link layer (tests/link_game_model.py) - the e-Reader route. Every transfer moves
         one 16-bit word from each console at once: each loads SIOMLT_SEND, the master starts it,
@@ -783,7 +783,9 @@ class Hw:
         (slave_latency, ~0.6 ms here; Ruby's own master allows 0.75 ms). A transfer the DUO starts
         sooner carries the game's stale word, and the game misses it (counted in mp_missed).
         race_window > 0 (the DUO as master): a transfer due within that many blocks finishes at the
-        moment the DUO reads SIOCNT - the worst moment, between its look at IF and at the busy bit."""
+        moment the DUO reads SIOCNT - the worst moment, between its look at IF and at the busy bit.
+        si_flicker = N > 0 (the game as master): every Nth read of SIOCNT shows SI low, as the
+        game's SO pulls it during its transfers - one look then says "master" (lab session 27)."""
         self.mp = gen
         self.mp_master, self.lg_bpl, self.mp_x = game_master, blocks_per_line, xfer_blocks
         self.blocks = 0
@@ -795,6 +797,7 @@ class Hw:
         self.mp_latency, self.mp_ready_at, self.mp_wire_word, self.mp_missed = slave_latency, 0, 0xFFFF, 0
         self.mp_start_blocks, self.mp_frame_blocks = [], blocks_per_line * 228
         self.mp_race_window, self.mp_races = race_window, 0
+        self.mp_si_flicker, self.mp_si_reads = si_flicker, 0
         self.lg_result = self.lg_error = None
         self.lg_done = False
         self.mu.hook_add(UC_HOOK_MEM_READ, self.mp_on_read, begin=0x04000006, end=0x04000007)
@@ -824,7 +827,12 @@ class Hw:
                 self.mp_duo_start = self.blocks            # finish it now, just as SIOCNT is read
                 self.mp_races += 1
                 self.mp_slave_step()
-            c = self.mp_cnt() & ~0xC | (4 if self.mp_master else 0) | 8   # the DUO's SI: 1 unless it's master
+            si = 4 if self.mp_master else 0                               # the DUO's SI: 1 unless it's master
+            if si and self.mp_si_flicker:
+                self.mp_si_reads += 1
+                if self.mp_si_reads % self.mp_si_flicker == 0:
+                    si = 0                                                 # the game's SO pulling it low
+            c = self.mp_cnt() & ~0xC | si | 8
             mu.mem_write(0x04000128, struct.pack("<H", c))
 
     def mp_on_write(self, mu, access, addr, size, value, _):

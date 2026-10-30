@@ -1367,10 +1367,10 @@ def _():
 import link_game_model as LG
 
 
-def ereader_run(game, event=None, seconds=60, stop_on_game=True, race_window=0):
+def ereader_run(game, event=None, seconds=60, stop_on_game=True, race_window=0, si_flicker=0):
     """The DUO's e-Reader program against a simulated Ruby on the GBA link cable."""
     hw, duo = run42()
-    hw.attach_mp_game(game.run(), game_master=game.master, race_window=race_window)   # the cable: who has the purple plug
+    hw.attach_mp_game(game.run(), game_master=game.master, race_window=race_window, si_flicker=si_flicker)   # the cable
     path = None
     if event is not None:
         path = event_file(event)
@@ -1548,13 +1548,24 @@ def _():
         assert line in hw.text, (line, hw.text)
 
 
+@test("e-Reader: Ruby as master while SI flickers (lab session 27) - the DUO still knows it's player 1, says so, and the event arrives")
+def _():
+    game = LG.RubyMysteryEvent(master=True)
+    hw, report = ereader_run(game, TEST_ME3, si_flicker=3)
+    assert hw.mp_si_reads > 100, hw.mp_si_reads
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.log, hw.text[-600:])
+    assert hw.lg_result == TEST_EVENT and report["bad_checksums"] == 0, report
+    assert "the DUO is player 1" in hw.text and "swap the cable" not in hw.text, hw.text
+
+
 @test("e-Reader: the DUO as master (pacing check against a game's link layer, with transfers finishing at the worst moment) - it starts the transfers and the handshake; a Japanese game gets a Japanese partner")
 def _():
     game = LG.RubyMysteryEvent(master=False, language=LG.LANG_JAPANESE, menu_rules=False)
     small = test_me3(script_len=250)
     # with adversarial timing: transfers finish just as the DUO looks at the busy bit (the start race)
+    # (the correct program doesn't look at SIOCNT while a transfer is in flight, so it meets few
+    # of these; the planted start race does, every cycle)
     hw, report = ereader_run(game, small, race_window=12)
-    assert hw.mp_races > 50, hw.mp_races
     assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.log, hw.text[-600:])
     assert hw.lg_result == W.prepare_event(small, "x (ENG).me3")[0]
     assert game.link_players[0]["language"] == LG.LANG_JAPANESE and "the DUO is player 0" in hw.text, hw.text

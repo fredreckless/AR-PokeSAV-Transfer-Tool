@@ -62,6 +62,7 @@ EREADER_MUTANTS = {  # firmware/programs/ereader.c: the e-Reader on the GBA link
     "e-Reader: as master, the session-24 gap (12 lines from the start)": ("#define GAP_AFTER_DONE 13 ", "#define GAP_AFTER_DONE 7 ", "e-Reader: the DUO as master"),
     "e-Reader: as master, command cycles back to back": ("                    next_cycle = now() + LINES_PER_FRAME;", "                    next_cycle = now();", "e-Reader: the DUO as master"),
     "e-Reader: as master, starts before handling the last transfer": ("        } else if (is_master && !in_flight && !(SIOCNT & CNT_START)", "        } else if (is_master && !(SIOCNT & CNT_START)", "e-Reader: the DUO as master"),
+    "e-Reader: takes its role from one look at SI (lab session 27)": ("    is_master = (SIOCNT >> CNT_ID_SHIFT & 3) == 0;            /* our player number, from the GBA */\n    role_known = 1;", "    is_master = !(SIOCNT & CNT_SI);", "while SI flickers"),
     "e-Reader: never notices the game starting over": ("    if (hs_run >= 3) {", "    if (hs_run >= 300000) {", "two events in one session"),
     "e-Reader: the event's last chunk is cut short": ("        u32 lo = at < tx_len ? tx_src[at] : 0, hi = at + 1 < tx_len ? tx_src[at + 1] : 0;", "        u32 lo = at + 14 < tx_len ? tx_src[at] : 0, hi = at + 1 < tx_len ? tx_src[at + 1] : 0;", "e-Reader: Ruby as master"),
 }

@@ -38,7 +38,9 @@ typedef struct {
 
 #define MULTI_MODE  0x2000
 #define BAUD_115200 0x0003
-#define CNT_SI      0x0004               /* 0: we are the master (player 0) */
+#define CNT_SI      0x0004               /* 0: we are the master (player 0) - but see role_known */
+#define CNT_ID_SHIFT 4                   /* bits 4-5: our player number, written after each transfer */
+#define SI_LOW_NEEDED 16                 /* SI must read 0 this many passes in a row before the first transfer */
 #define CNT_START   0x0080
 #define CNT_IRQ     0x4000               /* sets IF bit 7 when a transfer completes */
 #define IF_SERIAL   0x0080
@@ -78,6 +80,11 @@ static u32 event_words[(4 + EVENT_MAX + 3) / 4], put_at, event_ready;
 /* ------------------------------------------------------------------ progress, for the PC */
 enum { ST_WAITING, ST_HANDSHAKE, ST_CONNECTED, ST_GOT_PLAYER, ST_SENT_PLAYER, ST_SENT_EVENT, ST_CLOSED };
 static u32 state, is_master, transfers, bad_checksums, game_lp_type, game_lp_lang, stop_requested;
+/* Who is master. SI (SIOCNT bit 2) is 0 on the master's plug, but in multi-player mode the other
+ * GBA drives our SI during its transfers, so one look can say "master" when we aren't (lab
+ * session 27: "the DUO is player 0" while Ruby was master). So: after each transfer, the player
+ * number the GBA itself wrote into SIOCNT decides; before the first, SI must stay low. */
+static u32 role_known, si_low_run;
 static u32 sessions;                     /* link-ups so far (the game can start again after a close) */
 static u32 hs_run;                       /* consecutive handshake words from the game while linked */
 
@@ -195,6 +202,8 @@ static void on_transfer(void)            /* after every transfer, as the game's 
 {
     u16 w[2] = { SIOMULTI(0), SIOMULTI(1) };
     transfers++;
+    is_master = (SIOCNT >> CNT_ID_SHIFT & 3) == 0;            /* our player number, from the GBA */
+    role_known = 1;
     if (state == ST_HANDSHAKE || state == ST_WAITING) {
         static u32 prev, seen_two;
         u32 n = 0;
@@ -321,7 +330,10 @@ u32 start(api_t *api)
         if (state >= ST_CONNECTED && t - last_iter > max_gap)
             max_gap = t - last_iter;                 /* our longest look away from the link */
         last_iter = t;
-        is_master = !(SIOCNT & CNT_SI);
+        if (!role_known) {
+            si_low_run = SIOCNT & CNT_SI ? 0 : si_low_run < SI_LOW_NEEDED ? si_low_run + 1 : si_low_run;
+            is_master = si_low_run >= SI_LOW_NEEDED;
+        }
         if (REG_IF & IF_SERIAL) {
             REG_IF = IF_SERIAL;
             in_flight = 0;
