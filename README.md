@@ -172,7 +172,7 @@ python duo_events.py event                      (a dry run: link players only)
 
 The DUO copies the game's link type and language into its own link-player details, so the game's checks agree. If the game opens the link again (for another event), the DUO starts over with it (with `--keep-going`).
 
-**Status:** English Ruby received the Eon Ticket on real hardware, and Norman gave it (lab session 26). Enigma Berries work in the simulator and with a model of Ruby's engine; hardware is next. See [docs/EREADER.md](docs/EREADER.md).
+**Status:** English Ruby received the Eon Ticket on real hardware, and Norman gave it (lab session 26). The PUMKIN BERRY, an e-Reader Enigma Berry, followed (lab session 27). See [docs/EREADER.md](docs/EREADER.md).
 
 ## If something goes wrong
 

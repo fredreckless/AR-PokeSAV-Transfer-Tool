@@ -52,7 +52,7 @@ to save the event itself. Routes that write the save directly are the user's dec
 | Mystery Gift, Japanese Emerald | Old Sea Map and MysticTicket received; serial 0x7F7F chosen automatically | sessions 16–22 |
 | Mystery Gift, English LeafGreen | Aurora Ticket (full-size card) received first time; serial 0x7F7D | session 23 |
 | Wonder News | simulator only (needs a real news file) | — |
-| e-Reader → Ruby | Eon Ticket received (wrapped `.me3`, 342 bytes, 0 mismatches) and collected from Norman | sessions 24–26 |
+| e-Reader → Ruby | Eon Ticket (wrapped `.me3`) and the PUMKIN BERRY (wrapped `.ecb`) received, 0 mismatches, both collected from Norman | sessions 24–27 |
 
 Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
 
@@ -61,9 +61,11 @@ Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
 - **The user chooses what to work on next.** Don't start new features unasked; the ideas
   discussed on 30 October (Enigma Berries from `.ecb`, ribbons, e-Card trainers, a trade
   distributor) are in the roadmap's goal table.
-- **Next hardware test: an Enigma Berry** (Stage 4), e.g.
-  `python duo_events.py event --event "08-K001 RS - Pumkin Berry (USA).ecb"`, then Norman.
-  The user's berry files are in `EventsGallery\Released\Gen 3\ENG\e-Card Berries`.
+- **Enigma Berries work on hardware** (session 27: the PUMKIN BERRY from Norman). The user's
+  berry files are in `EventsGallery\Released\Gen 3\ENG\e-Card Berries`.
+- **A known false alarm:** the e-Reader trace can say "the DUO is player 0" and advise swapping
+  the cable when the game really is master (session 27). The fix, if the user wants it: decide
+  the role in `ereader.c` from SIOCNT's player ID (bits 4-5) after each transfer, not from SI.
 - Not yet checked on hardware: the Eon Ticket's Record Mixing gift; Mystery Gift through the new
   guided start-up (waiting: the cable stays fitted for the e-Reader route).
 - **The user's folder:** `tidy_folder.bat` (30 October) moves the older files into `old\` when run;
