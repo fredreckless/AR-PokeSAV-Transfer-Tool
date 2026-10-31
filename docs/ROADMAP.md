@@ -20,7 +20,8 @@ repository.
 | `.me3` Mystery Events (13, all the Eon Ticket) | e-Reader to Ruby/Sapphire | Working on hardware: English Ruby received the Eon Ticket (lab session 26) |
 | `.ecb` e-Card berries (18) | e-Reader Mystery Event (`setenigmaberry`) | English: working on hardware, the PUMKIN BERRY (lab session 27); Japanese: simulator done (Stage 7) |
 | e-Card `.raw` scans (R/S trainers and promos; Emerald and FRLG trainers, Japanese) | Decode the dot codes and do what the e-Reader did | Ruby/Sapphire: all 186 cards decode and pass the model, English and Japanese (Stages 6–7); hardware next. Emerald's Trainer Hill and the FireRed/LeafGreen cards use another protocol (Stage 8). The Berry Glitch Fixing Program is refused (it writes the save) |
-| `.pk3` Pokémon (about 1,000) | Varies by event; check each one | Not started |
+| `.pk3` Pokémon (3,344) | Varies by event: see docs/PK3_EVENTS.md | Catalogued (Stage 9, step 1): only the Mystery Mew was a trade; most others wrote the save directly. **The user's decision** on those comes next |
+| `.ect` e-Reader trainers (166) | e-Reader Mystery Event (`addtrainer`) | Simulator done: each matches its card's trainer byte for byte |
 
 **Out of scope:** files meant for other games or for the GameCube (the Channel, Colosseum and
 Pinball e-Cards; Pokémon from GameCube bonus discs).
@@ -176,10 +177,17 @@ hand. **Waiting:** the user's cable stays fitted for the e-Reader route for now.
 Emerald's Trainer Hill (`ereader_screen.c`) and the FireRed/LeafGreen e-Cards: a different link
 protocol, so a new GBA program.
 
-## Stage 9: Pokémon (`.pk3`; not started)
+## Stage 9: Pokémon (`.pk3`; step 1 done, 31 October 2026)
 
-First, how each event was given out; then the user's decision on routes that write the save;
-then a trade distributor through the game's own Trade Centre.
+1. **Done: how each event was given out** (docs/PK3_EVENTS.md). `duo_events.py pk3-info` reads
+   both PKHeX's decrypted form and the game's own. Of 3,344 files: 435 by trade (the Mystery
+   Mew), about 2,700 by routes that wrote the save (multiboot cartridges such as Aura Mew, event
+   machines such as PCNY's, GameCube discs), 167 never distributed, 17 unknown.
+2. **The user's decision** on the save-writing routes: the trade route, labelled as the nearest,
+   or the original multiboot route, which means our code writing saves.
+3. A trade distributor in the Cable Club (the Mystery Mew's authentic route, and the nearest for
+   the rest, if chosen): the e-Reader route's link layer, then the trade steps from `trade.c`.
+   Whatever the game sends in return is kept as a `.pk3` and can be traded back.
 
 ## Tidying done on 30 October
 

@@ -10,7 +10,7 @@ FW_MUTANTS = {
     "restart with interrupts on": ("    ldr  r0, lit_ime\n    movs r1, #0\n    strh r1, [r0]\n", "    movs r1, #0\n", "restart"),
 }
 FW42_MUTANTS = {
-    "run skips the program's CRC check": ("    ldr  r1, [r6, #8]\n    cmp  r0, r1\n    bne  run_bad\n", "    ldr  r1, [r6, #8]\n", "refused"),
+    "run skips the program's CRC check": ("    ldr  r1, [r6, #8]\n    cmp  r0, r1\n    bne  run_bad\n", "    ldr  r1, [r6, #8]\n", "v4.2 run: a staged program"),
     "run never replies before starting the program": ("    movs r0, #{CMD_RUN:#x}\n    ldr  r1, lit_ack\n    bl   {v4.AT['send_sbw']:#x}\n", "", "adapter test: answers"),
     "run accepts an entry point outside the code": ("    cmp  r1, r4\n    bhs  run_bad\n", "", "refused"),
 }
@@ -94,7 +94,7 @@ PC_MUTANTS = {
     "adapter program answers with the wrong ID": ("ADAPTER_IMAGE", "ADAPTER_IMAGE_WRONG_ID", "adapter test: answers"),
     "Wonder Card's RAM script read from the wrong place": ("    script = data[4 + size + 0x50 + 4:4 + size + 0x50 + 4 + 1000]", "    script = data[4 + size + 0x50:4 + size + 0x50 + 1000]", "Mystery Gift delivers"),
     "berry sent with initramscript's command number": ("MEV_SETENIGMABERRY = 7", "MEV_SETENIGMABERRY = 6", "Enigma Berry"),
-    "berry's checksum taken before the pointers are cleared": ("struct.pack(\"<iII\", sum(rec), start, start + len(rec))", "struct.pack(\"<iII\", sum(berry), start, start + len(rec))", "Enigma Berry"),
+    "berry's checksum taken before the pointers are cleared": ("struct.pack(\"<iII\", sum(rec), start, start + len(rec))\n    out += bytes([MEV_SETENIGMABERRY])", "struct.pack(\"<iII\", sum(berry), start, start + len(rec))\n    out += bytes([MEV_SETENIGMABERRY])", "Enigma Berry"),
     "berry file check counts the description pointers": ("    rec = bytearray(data[:ECB_CHECKSUM_AT])\n    rec[ECB_POINTERS] = bytes(8)\n", "    rec = bytearray(data[:ECB_CHECKSUM_AT])\n", "Enigma Berry files"),
     "card strips joined without skipping the later strips' titles": ("        card += data[CARD_TITLE:]\n", "        card += data[CARD_TITLE:] if not card else data\n", "e-Card scans"),
     "card strips' Reed-Solomon parity never checked": ("    damaged = [i for i, c in enumerate(cw) if rs_parity(c[:48]) != bytes(c[48:])]", "    damaged = []", "e-Card scans"),
@@ -227,8 +227,14 @@ def run_many(kinds=None, jobs=None):
     todo = [(k, n) for k in kinds for n in KINDS[k]]
     jobs = jobs or max(1, os.cpu_count() or 2)
     print(f"{len(todo)} planted bugs ({', '.join(kinds)}), {jobs} at a time", flush=True)
+    def one(kn):
+        try:
+            return run(*kn)
+        except Exception as e:                 # a planted bug that no longer fits the code: a failure,
+            print(f"BROKEN  {kn[0]}: {kn[1]}  ->  {type(e).__name__}: {e}", flush=True)   # not a crash
+            return False
     with cf.ThreadPoolExecutor(max_workers=jobs) as pool:
-        ok = all(list(pool.map(lambda kn: run(*kn), todo)))
+        ok = all(list(pool.map(one, todo)))
     print("every planted bug was caught" if ok else "SOME PLANTED BUGS WERE MISSED", flush=True)
     return ok
 

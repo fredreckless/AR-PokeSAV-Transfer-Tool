@@ -1001,6 +1001,9 @@ def _():
     b = bytearray(good); b[0] ^= 1; bad_images.append(b)                         # magic
     b = bytearray(good); struct.pack_into("<I", b, 4, 0x4000); bad_images.append(b)  # length too big
     b = bytearray(good); struct.pack_into("<I", b, 12, 0x1000); bad_images.append(b) # entry outside the code
+    b = bytearray(good); b[8] ^= 1; bad_images.append(b)                            # the stored CRC wrong: the
+    # code is intact, so a firmware that skipped the check would run it and this test fail cleanly,
+    # before the next case runs damaged code (which can crash the emulator outright)
     b = bytearray(good); b[40] ^= 0x10; bad_images.append(b)                        # code damaged (CRC)
     for img in bad_images:
         hw, duo = run42()

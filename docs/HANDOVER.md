@@ -72,8 +72,16 @@ Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
 - **Copy to the PC:** the PC was asleep at the end of the overnight session, so its
   `duo_events.py` and `HANDOVER.md` are older than `main`. Copy them across (and check SHA-1s)
   before the next hardware test.
+- **31 October:** a planted bug that matches its code more than once, or no longer at all, now
+  reports BROKEN instead of stopping the run. The bad-program test gained a case with intact code
+  and a wrong stored CRC, so "run skips the program's CRC check" is caught every time (damaged
+  code could crash the emulator first).
 - **Also overnight:** the `finishing` test's `--keep-going` check now runs 45 s (12 s let a
   planted bug through once under load).
+- **Stage 9, step 1 done (31 October):** `pk3-info`, `.ect` trainers, and docs/PK3_EVENTS.md.
+  Only the Mystery Mew was a trade; nearly every other released event wrote the save directly.
+  **The user decides** next: the trade route for all (labelled as the nearest), or the original
+  multiboot route (our code writing saves). Don't build either before that.
 - **For the user to decide:** the Berry Glitch Fixing Program cards are refused (an e-Reader
   program that writes the save itself), and so would be any card that turns on the clock reset
   (`enableresetrtc`; none of the gallery's does).

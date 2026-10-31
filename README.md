@@ -155,6 +155,8 @@ Ruby and Sapphire received their events through **Mystery Event**, from the Card
 python duo_events.py event --event "YOUR EVENT.me3"
 python duo_events.py event --event "YOUR BERRY.ecb"     (an e-Reader Enigma Berry)
 python duo_events.py event --event "YOUR CARD.raw"      (an e-Card scan, sent as the e-Reader sent it)
+python duo_events.py event --event "YOUR TRAINER.ect"   (a saved e-Reader trainer)
+python duo_events.py pk3-info FILE.pk3 ...              (describe Gen 3 Pokémon files; no DUO needed)
 python duo_events.py event                      (a dry run: link players only)
 ```
 
