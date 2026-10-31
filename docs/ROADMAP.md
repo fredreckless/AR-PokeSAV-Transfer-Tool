@@ -186,7 +186,8 @@ protocol, so a new GBA program.
 2. **Decided (31 October): the trade route for all.** Authentic for the Mystery Mew; for the
    rest, labelled as the nearest route that leaves the game in charge. Never-distributed
    Pokémon are offered the same way, marked as such. No multiboot save writer.
-3. A trade distributor in the Cable Club (the Mystery Mew's authentic route, and the nearest for
+3. **Next: the trade distributor** (docs/TRADE.md has the protocol, read from pokeruby).
+   A trade distributor in the Cable Club (the Mystery Mew's authentic route, and the nearest for
    the rest, if chosen): the e-Reader route's link layer, then the trade steps from `trade.c`.
    Whatever the game sends in return is kept as a `.pk3` and can be traded back.
 
