@@ -1618,6 +1618,88 @@ def _():
     assert ME.run(hw.lg_result, "English")[:2] == (ME.FAILURE, False)
 
 
+def test_pk3(species=409, pid=0x12345678, otid=0x0000_4E44, game=2, met=0xFF, fateful=True, lang=2,
+             nickname="TESTMON", ot="TESTER", encrypted=False, party=False):
+    """A made-up Gen 3 Pokemon. PKHeX's form (decrypted, blocks in G-A-E-M order) unless
+    `encrypted`, which gives the game's own form. Nothing here is a real event's data."""
+    g = struct.pack("<HHIBBH", species, 0, 1000, 0, 70, 0)
+    a = struct.pack("<4H4B", 1, 2, 0, 0, 35, 25, 0, 0)
+    e = bytes(12)
+    m = struct.pack("<BBHII", 0, met, 5 | game << 7 | 4 << 11, 0x3FFFFFFF & 0x1F7BDEF7, (1 << 31) if fateful else 0)
+    blocks = {"G": g, "A": a, "E": e, "M": m}
+    plain_gaem = g + a + e + m
+    checksum = sum(struct.unpack("<24H", plain_gaem)) & 0xFFFF
+    if encrypted:
+        shuffled = b"".join(blocks[c] for c in W.PK3_ORDERS[pid % 24])
+        data = struct.pack("<12I", *[w ^ pid ^ otid for w in struct.unpack("<12I", shuffled)])
+    else:
+        data = plain_gaem
+    head = struct.pack("<II", pid, otid) + gen3(nickname)[:10].ljust(10, b"\xff") + struct.pack("<H", lang)
+    head += gen3(ot)[:7].ljust(7, b"\xff") + b"\0" + struct.pack("<HH", checksum, 0)
+    return head + data + (bytes(20) if party else b"")
+
+
+@test("Pokemon files (.pk3): PKHeX's decrypted form and the game's encrypted form are both read and checked; species, Pokedex number, trainer, origin and the event mark; damage reported; pk3-info needs no DUO")
+def _():
+    for encrypted in (False, True):
+        for pid in (0x12345678, 0x9ABCDEF1, 23, 24 * 7 + 5):             # different block orders
+            data = test_pk3(pid=pid, encrypted=encrypted)
+            f, problems = W.parse_pk3(data)
+            assert not problems, problems
+            assert (f["dex"], f["name"], f["species"]) == (385, "JIRACHI", 409), f
+            assert f["ot"] == "TESTER" and f["nickname"] == "TESTMON" and f["tid"] == 0x4E44 and f["sid"] == 0
+            assert f["game"] == "Ruby" and f["met_location"] == 0xFF and f["fateful"] and f["met_level"] == 5
+            assert f["ball"] == "Poke" and f["language"] == "English" and f["moves"] == [1, 2]
+            assert ("encrypted" in f["form"]) == encrypted, f["form"]
+            g = W.pk3_game_form(data)                                    # always the game's form
+            assert W.parse_pk3(g)[0]["form"].startswith("the game's") and W.parse_pk3(g)[0]["blocks"] == f["blocks"]
+            assert g == test_pk3(pid=pid, encrypted=True)
+    # Pokedex numbers: Kanto/Johto as they are, Hoenn reordered, eggs
+    assert W.pk3_species(151) == (151, "MEW") and W.pk3_species(277) == (252, "TREECKO")
+    assert W.pk3_species(411) == (358, "CHIMECHO") and W.pk3_species(122) == (122, "MR. MIME")
+    assert W.pk3_species(410) == (386, "DEOXYS") and W.pk3_species(412)[1] == "EGG"
+    # a party Pokemon (100 bytes), a Japanese one, a shiny one
+    assert W.parse_pk3(test_pk3(party=True))[0]["party"]
+    jp = bytearray(test_pk3(lang=1)); jp[0x14:0x17] = bytes([0x01, 0x02, 0xFF])           # "あい"
+    assert W.parse_pk3(bytes(jp))[0]["ot"] == "あい" and W.parse_pk3(bytes(jp))[0]["language"] == "Japanese"
+    assert W.parse_pk3(test_pk3(pid=0x4E440000 | 0x0001, otid=0x00004E44))[0]["shiny"]
+    # damage: one byte of the data, in either form
+    for encrypted in (False, True):
+        bad = bytearray(test_pk3(encrypted=encrypted)); bad[0x30] ^= 4
+        assert "checksum" in " ".join(W.parse_pk3(bytes(bad))[1])
+    for data in (bytes(79), bytes(101)):
+        try:
+            W.parse_pk3(data); raise AssertionError("accepted")
+        except ValueError as e:
+            assert "not a Gen 3 Pokemon" in str(e)
+    # the command: no DUO, no USB
+    path = event_file(test_pk3(), "385 - JIRACHI - TEST.pk3")
+    old = W.UsbTransport
+    W.UsbTransport = None                                               # it must not even try
+    try:
+        _, text = quiet(W.main, ["pk3-info", path])
+    finally:
+        W.UsbTransport = old
+    assert "#385 JIRACHI" in text and "fateful encounter" in text and "PKHeX's (decrypted)" in text, text
+
+
+@test("e-Reader trainer files (.ect): wrapped so Ruby stores exactly the trainer, the tool points to Mossdeep; damaged and empty records refused; Japanese ones get the Japanese mask")
+def _():
+    script, text, problems = W.prepare_event(TEST_TRAINER, "08-A001 RS - Test (USA).ect")
+    assert not problems and "e-Reader trainer" in text, (text, problems)
+    status, saved, store = ME.run(script, "English", "Sapphire")
+    assert (status, saved) == (ME.SUCCESS, True) and store["trainer"] == TEST_TRAINER, store["trace"]
+    assert store["trace"] == [W.MEV_CHECKCOMPAT, W.MEV_CHECKSUM, W.MEV_ADDTRAINER, W.MEV_END]
+    assert "Mossdeep" in W.event_hint(TEST_TRAINER)
+    jp = W.prepare_event(TEST_TRAINER, "x (JPN).ect")[0]
+    assert jp[5] == 1 and ME.run(jp, "Japanese")[2]["trainer_valid"]
+    bad = bytearray(TEST_TRAINER); bad[50] ^= 1
+    assert "checksum" in " ".join(W.prepare_event(bytes(bad), "x.ect")[2])
+    assert "empty" in " ".join(W.prepare_event(bytes(188), "x.ect")[2])
+    damaged = bytearray(W.prepare_event(TEST_TRAINER, "x.ect")[0]); damaged[100] ^= 8      # on the way
+    assert ME.run(bytes(damaged))[:2] == (ME.LOAD_ERROR, False)
+
+
 @test("e-Reader: Ruby as master (purple plug) - handshake, link players, the event arrives intact, the link closes")
 def _():
     game = LG.RubyMysteryEvent(master=True)

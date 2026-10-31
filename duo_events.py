@@ -803,6 +803,8 @@ RS_PEOPLE = {(8, 1, 1): "your Dad (Norman) in Petalburg City Gym"}
 
 def event_hint(raw):
     """Where to go in the game after a saved event (.me3) has been stored: its RAM script's person."""
+    if len(raw) == EREADER_TRAINER_SIZE:
+        return card_hint(["addtrainer"])
     if len(raw) == ECB_SIZE:
         return ("talk to your Dad (Norman) in Petalburg City Gym after you've beaten him: he gives the "
                 f"{gen3_text(raw[:7])} BERRY (not if your bag or PC already holds an e-Reader berry)")
@@ -1155,6 +1157,154 @@ def card_hint(names):
     return "; ".join(hints) or None
 
 
+# ---------------------------------------------------------------- Pokemon (.pk3): Stage 9's first step
+# A .pk3 is one Gen 3 Pokemon as the games store it: 80 bytes in a PC box, 100 in the party (the
+# last 20, the party's status and stats, are worked out again by the game). The 48 bytes at 0x20
+# are four 12-byte blocks - Growth, Attacks, EVs/condition, Misc - in an order set by the
+# personality value mod 24, each word XORed with personality ^ trainer ID, and checked by a 16-bit
+# sum of the decrypted halfwords (pokeemerald pokemon.c). This reader only reads them: it's how the
+# gallery's events are catalogued (docs/PK3_EVENTS.md) before any route to send one is built.
+PK3_ORDERS = ("GAEM", "GAME", "GEAM", "GEMA", "GMAE", "GMEA", "AGEM", "AGME", "AEGM", "AEMG", "AMGE", "AMEG",
+              "EGAM", "EGMA", "EAGM", "EAMG", "EMGA", "EMAG", "MGAE", "MGEA", "MAGE", "MAEG", "MEGA", "MEAG")
+PK3_GAMES = {1: "Sapphire", 2: "Ruby", 3: "Emerald", 4: "FireRed", 5: "LeafGreen", 15: "Colosseum/XD"}
+PK3_BALLS = {1: "Master", 2: "Ultra", 3: "Great", 4: "Poke", 5: "Safari", 6: "Net", 7: "Dive", 8: "Nest",
+             9: "Repeat", 10: "Timer", 11: "Luxury", 12: "Premier"}
+PK3_MET_FATEFUL, PK3_MET_TRADE = 0xFF, 0xFE        # "met in a fateful encounter", an in-game trade
+PK3_HOENN_TO_NATIONAL = [252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 290, 291, 292, 276, 277, 285, 286, 327, 278, 279, 283, 284, 320, 321, 300, 301, 352, 343, 344, 299, 324, 302, 339, 340, 370, 341, 342, 349, 350, 318, 319, 328, 329, 330, 296, 297, 309, 310, 322, 323, 363, 364, 365, 331, 332, 361, 362, 337, 338, 298, 325, 326, 311, 312, 303, 307, 308, 333, 334, 360, 355, 356, 315, 287, 288, 289, 316, 317, 357, 293, 294, 295, 366, 367, 368, 359, 353, 354, 336, 335, 369, 304, 305, 306, 351, 313, 314, 345, 346, 347, 348, 280, 281, 282, 371, 372, 373, 374, 375, 376, 377, 378, 379, 382, 383, 384, 380, 381, 385, 386, 358]
+PK3_NAMES = "BULBASAUR|IVYSAUR|VENUSAUR|CHARMANDER|CHARMELEON|CHARIZARD|SQUIRTLE|WARTORTLE|BLASTOISE|CATERPIE|METAPOD|BUTTERFREE|WEEDLE|KAKUNA|BEEDRILL|PIDGEY|PIDGEOTTO|PIDGEOT|RATTATA|RATICATE|SPEAROW|FEAROW|EKANS|ARBOK|PIKACHU|RAICHU|SANDSHREW|SANDSLASH|NIDORAN♀|NIDORINA|NIDOQUEEN|NIDORAN♂|NIDORINO|NIDOKING|CLEFAIRY|CLEFABLE|VULPIX|NINETALES|JIGGLYPUFF|WIGGLYTUFF|ZUBAT|GOLBAT|ODDISH|GLOOM|VILEPLUME|PARAS|PARASECT|VENONAT|VENOMOTH|DIGLETT|DUGTRIO|MEOWTH|PERSIAN|PSYDUCK|GOLDUCK|MANKEY|PRIMEAPE|GROWLITHE|ARCANINE|POLIWAG|POLIWHIRL|POLIWRATH|ABRA|KADABRA|ALAKAZAM|MACHOP|MACHOKE|MACHAMP|BELLSPROUT|WEEPINBELL|VICTREEBEL|TENTACOOL|TENTACRUEL|GEODUDE|GRAVELER|GOLEM|PONYTA|RAPIDASH|SLOWPOKE|SLOWBRO|MAGNEMITE|MAGNETON|FARFETCH'D|DODUO|DODRIO|SEEL|DEWGONG|GRIMER|MUK|SHELLDER|CLOYSTER|GASTLY|HAUNTER|GENGAR|ONIX|DROWZEE|HYPNO|KRABBY|KINGLER|VOLTORB|ELECTRODE|EXEGGCUTE|EXEGGUTOR|CUBONE|MAROWAK|HITMONLEE|HITMONCHAN|LICKITUNG|KOFFING|WEEZING|RHYHORN|RHYDON|CHANSEY|TANGELA|KANGASKHAN|HORSEA|SEADRA|GOLDEEN|SEAKING|STARYU|STARMIE|MR. MIME|SCYTHER|JYNX|ELECTABUZZ|MAGMAR|PINSIR|TAUROS|MAGIKARP|GYARADOS|LAPRAS|DITTO|EEVEE|VAPOREON|JOLTEON|FLAREON|PORYGON|OMANYTE|OMASTAR|KABUTO|KABUTOPS|AERODACTYL|SNORLAX|ARTICUNO|ZAPDOS|MOLTRES|DRATINI|DRAGONAIR|DRAGONITE|MEWTWO|MEW|CHIKORITA|BAYLEEF|MEGANIUM|CYNDAQUIL|QUILAVA|TYPHLOSION|TOTODILE|CROCONAW|FERALIGATR|SENTRET|FURRET|HOOTHOOT|NOCTOWL|LEDYBA|LEDIAN|SPINARAK|ARIADOS|CROBAT|CHINCHOU|LANTURN|PICHU|CLEFFA|IGGLYBUFF|TOGEPI|TOGETIC|NATU|XATU|MAREEP|FLAAFFY|AMPHAROS|BELLOSSOM|MARILL|AZUMARILL|SUDOWOODO|POLITOED|HOPPIP|SKIPLOOM|JUMPLUFF|AIPOM|SUNKERN|SUNFLORA|YANMA|WOOPER|QUAGSIRE|ESPEON|UMBREON|MURKROW|SLOWKING|MISDREAVUS|UNOWN|WOBBUFFET|GIRAFARIG|PINECO|FORRETRESS|DUNSPARCE|GLIGAR|STEELIX|SNUBBULL|GRANBULL|QWILFISH|SCIZOR|SHUCKLE|HERACROSS|SNEASEL|TEDDIURSA|URSARING|SLUGMA|MAGCARGO|SWINUB|PILOSWINE|CORSOLA|REMORAID|OCTILLERY|DELIBIRD|MANTINE|SKARMORY|HOUNDOUR|HOUNDOOM|KINGDRA|PHANPY|DONPHAN|PORYGON2|STANTLER|SMEARGLE|TYROGUE|HITMONTOP|SMOOCHUM|ELEKID|MAGBY|MILTANK|BLISSEY|RAIKOU|ENTEI|SUICUNE|LARVITAR|PUPITAR|TYRANITAR|LUGIA|HO-OH|CELEBI|TREECKO|GROVYLE|SCEPTILE|TORCHIC|COMBUSKEN|BLAZIKEN|MUDKIP|MARSHTOMP|SWAMPERT|POOCHYENA|MIGHTYENA|ZIGZAGOON|LINOONE|WURMPLE|SILCOON|BEAUTIFLY|CASCOON|DUSTOX|LOTAD|LOMBRE|LUDICOLO|SEEDOT|NUZLEAF|SHIFTRY|TAILLOW|SWELLOW|WINGULL|PELIPPER|RALTS|KIRLIA|GARDEVOIR|SURSKIT|MASQUERAIN|SHROOMISH|BRELOOM|SLAKOTH|VIGOROTH|SLAKING|NINCADA|NINJASK|SHEDINJA|WHISMUR|LOUDRED|EXPLOUD|MAKUHITA|HARIYAMA|AZURILL|NOSEPASS|SKITTY|DELCATTY|SABLEYE|MAWILE|ARON|LAIRON|AGGRON|MEDITITE|MEDICHAM|ELECTRIKE|MANECTRIC|PLUSLE|MINUN|VOLBEAT|ILLUMISE|ROSELIA|GULPIN|SWALOT|CARVANHA|SHARPEDO|WAILMER|WAILORD|NUMEL|CAMERUPT|TORKOAL|SPOINK|GRUMPIG|SPINDA|TRAPINCH|VIBRAVA|FLYGON|CACNEA|CACTURNE|SWABLU|ALTARIA|ZANGOOSE|SEVIPER|LUNATONE|SOLROCK|BARBOACH|WHISCASH|CORPHISH|CRAWDAUNT|BALTOY|CLAYDOL|LILEEP|CRADILY|ANORITH|ARMALDO|FEEBAS|MILOTIC|CASTFORM|KECLEON|SHUPPET|BANETTE|DUSKULL|DUSCLOPS|TROPIUS|CHIMECHO|ABSOL|WYNAUT|SNORUNT|GLALIE|SPHEAL|SEALEO|WALREIN|CLAMPERL|HUNTAIL|GOREBYSS|RELICANTH|LUVDISC|BAGON|SHELGON|SALAMENCE|BELDUM|METANG|METAGROSS|REGIROCK|REGICE|REGISTEEL|LATIAS|LATIOS|KYOGRE|GROUDON|RAYQUAZA|JIRACHI|DEOXYS"
+GEN3_JP_KANA = '?あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんぁぃぅぇぉゃゅょがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽっアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンァィゥェォャュョガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポッ'
+
+
+def gen3_jp_text(raw):
+    """Japanese Gen 3 text up to its 0xFF end mark (kana, digits, the long-vowel mark)."""
+    out = []
+    for b in raw.split(b"\xFF")[0]:
+        out.append(GEN3_JP_KANA[b] if 0 < b < 0xA1 else str(b - 0xA1) if b < 0xAB else
+                   {0x00: " ", 0xAB: "!", 0xAC: "?", 0xAD: "。", 0xAE: "ー"}.get(b, "?"))
+    return "".join(out)
+
+
+def pk3_species(internal):
+    """(National Dex number, name) for a Gen 3 internal species number (Hoenn's are reordered)."""
+    if 1 <= internal <= 251:
+        n = internal
+    elif 277 <= internal <= 411:
+        n = PK3_HOENN_TO_NATIONAL[internal - 277]
+    elif internal == 412:
+        return 0, "EGG"
+    else:
+        return 0, f"species {internal}"
+    return n, PK3_NAMES.split("|")[n - 1]
+
+
+def parse_pk3(data):
+    """A Gen 3 Pokemon (.pk3, 80 or 100 bytes): returns (fields, problems). Raises ValueError if it
+    isn't one."""
+    if len(data) not in (80, 100):
+        raise ValueError(f"not a Gen 3 Pokemon: {len(data)} bytes, not 80 (box) or 100 (party)")
+    pid, otid = struct.unpack_from("<II", data, 0)
+    stored = struct.unpack_from("<H", data, 0x1C)[0]
+    problems = []
+    as_is = data[0x20:0x50]
+    key = pid ^ otid
+    decrypted = struct.pack("<12I", *[w ^ key for w in struct.unpack_from("<12I", data, 0x20)])
+    if sum(struct.unpack("<24H", as_is)) & 0xFFFF == stored:
+        form, plain, order = "PKHeX's (decrypted)", as_is, "GAEM"          # what PKHeX saves
+    else:
+        form, plain, order = "the game's (encrypted)", decrypted, PK3_ORDERS[pid % 24]
+        total = sum(struct.unpack("<24H", plain)) & 0xFFFF
+        if total != stored:
+            problems.append(f"its checksum is {stored:#06x}, but its data adds up to {total:#06x} "
+                            "(decrypted) or isn't stored decrypted either")
+    block = {c: plain[12 * i:12 * i + 12] for i, c in enumerate(order)}
+    species, item, exp = struct.unpack_from("<HHI", block["G"], 0)
+    moves = struct.unpack_from("<4H", block["A"], 0)
+    pokerus, met, origins, ivs, ribbons = struct.unpack_from("<BBHII", block["M"], 0)
+    lang = data[0x12]
+    text = gen3_jp_text if lang == 1 else gen3_text
+    dex, name = pk3_species(species)
+    if not species:
+        problems.append("it has no species")
+    return dict(pid=pid, tid=otid & 0xFFFF, sid=otid >> 16, nickname=text(data[0x08:0x12]),
+                ot=text(data[0x14:0x1B]), language=GAME_LANGUAGES.get(lang, f"language {lang}"),
+                species=species, dex=dex, name=name, item=item, exp=exp, moves=[m for m in moves if m],
+                met_location=met, met_level=origins & 0x7F, game=PK3_GAMES.get(origins >> 7 & 0xF, f"game {origins >> 7 & 0xF}"),
+                ball=PK3_BALLS.get(origins >> 11 & 0xF, f"ball {origins >> 11 & 0xF}"),
+                ot_gender="female" if origins >> 15 else "male", egg=bool(ivs >> 30 & 1),
+                ivs=[ivs >> (5 * i) & 31 for i in range(6)], ribbons=ribbons & 0x7FFFFFFF,
+                fateful=bool(ribbons >> 31), shiny=((otid >> 16) ^ (otid & 0xFFFF) ^ (pid >> 16) ^ (pid & 0xFFFF)) < 8,
+                party=len(data) == 100, form=form, blocks=b"".join(block[c] for c in "GAEM")), problems
+
+
+def pk3_game_form(data):
+    """A .pk3 in the game's own form (encrypted, blocks shuffled), as a trade would carry it."""
+    f, problems = parse_pk3(data)
+    if problems:
+        raise ValueError("; ".join(problems))
+    plain = b"".join(f["blocks"][12 * "GAEM".index(c):12 * "GAEM".index(c) + 12] for c in PK3_ORDERS[f["pid"] % 24])
+    key = struct.unpack_from("<I", data, 0)[0] ^ struct.unpack_from("<I", data, 4)[0]
+    enc = struct.pack("<12I", *[w ^ key for w in struct.unpack("<12I", plain)])
+    return data[:0x20] + enc + data[0x50:]
+
+
+def describe_pk3(f):
+    """One line or two about a Pokemon, for pk3-info."""
+    met = ("a fateful encounter" if f["met_location"] == PK3_MET_FATEFUL else
+           "an in-game trade" if f["met_location"] == PK3_MET_TRADE else f"location {f['met_location']}")
+    return (f"#{f['dex']:03d} {f['name']}{' (egg)' if f['egg'] else ''}{' (shiny)' if f['shiny'] else ''}, "
+            f"\"{f['nickname']}\", OT {f['ot']} ({f['ot_gender']}) {f['tid']:05d}/{f['sid']:05d}, {f['language']}; "
+            f"from {f['game']}, met at {met} (level {f['met_level']}), {f['ball']} Ball"
+            + ("; marked as an official event (fateful encounter)" if f["fateful"] else "")
+            + f"; stored in {f['form']} form")
+
+
+def pk3_info(paths):
+    for p in paths:
+        try:
+            f, problems = parse_pk3(open(p, "rb").read())
+        except (OSError, ValueError) as e:
+            print(f"{os.path.basename(p)}: {e}")
+            continue
+        uprint(f"{os.path.basename(p)}: {describe_pk3(f)}")
+        for prob in problems:
+            print(f"  *** {prob} ***")
+
+
+# ---------------------------------------------------------------- e-Reader trainers (.ect)
+# A ".ect" is an e-Reader trainer as Ruby/Sapphire save it: the 0xBC-byte BattleTowerEReaderTrainer
+# record, whose last word is the sum of the 46 before it (battle_tower.c). Like a .ecb, it's wrapped:
+# checkcompat, checksum, addtrainer (command 13), end. The trainer then visits the old man's house
+# in Mossdeep City.
+MEV_ADDTRAINER = 13
+
+
+def parse_ect(data):
+    if len(data) != EREADER_TRAINER_SIZE:
+        raise ValueError(f"not a saved e-Reader trainer: {len(data)} bytes, not {EREADER_TRAINER_SIZE}")
+    words = struct.unpack("<47I", data)
+    problems = []
+    if not any(words[:46]):
+        problems.append("the trainer record is empty")
+    elif sum(words[:46]) & 0xFFFFFFFF != words[46]:
+        problems.append(f"its checksum is {words[46]:#x}, but its words add up to {sum(words[:46]) & 0xFFFFFFFF:#x}")
+    return dict(name=gen3_text(data[4:12])), problems
+
+
+def build_trainer_script(rec, language="English", versions=("Ruby", "Sapphire")):
+    lang_mask = MEV_LANGUAGE_MASKS[language]
+    ver_mask = 0
+    for v in versions:
+        ver_mask |= MEV_VERSIONS[v]
+    head_len = 17 + 13 + 5 + 1 + 0                # checkcompat, checksum, addtrainer, end
+    start = MEV_BASE + head_len
+    out = bytearray([MEV_CHECKCOMPAT]) + struct.pack("<IHIHI", MEV_BASE, lang_mask, lang_mask, 0x4, ver_mask)
+    out += bytes([MEV_CHECKSUM]) + struct.pack("<iII", sum(rec), start, start + len(rec))
+    out += bytes([MEV_ADDTRAINER]) + struct.pack("<I", start)
+    out += bytes([MEV_END])
+    assert len(out) == head_len
+    return bytes(out + rec)
+
+
 def describe_event_script(script):
     """Read a Mystery Event script's compatibility fields: (languages, versions, problems)."""
     if len(script) < 17 or script[0] != MEV_CHECKCOMPAT:
@@ -1182,6 +1332,16 @@ def prepare_event(data, path=""):
         return data, (f"a Mystery Event script for {'/'.join(vers) or 'no known version'}, "
                       f"{'/'.join(langs) or 'no known language'}"), problems
     language = file_language(path) or "English"
+    if len(data) == EREADER_TRAINER_SIZE:
+        trainer, problems = parse_ect(data)
+        if language not in MEV_LANGUAGE_MASKS:
+            raise ValueError(f"the trainer is for {language} games; Mystery Event scripts are only known for "
+                             "Japanese, English and German Ruby/Sapphire")
+        script = build_trainer_script(data, language)
+        name = trainer["name"] if language != "Japanese" else "Japanese-named"
+        text = (f"a saved e-Reader trainer (.ect): {name}; sent as a Mystery Event script for {language} games "
+                f"that stores exactly it ({len(script)} bytes)")
+        return script, text, problems
     if len(data) == ECB_SIZE:
         berry, problems = parse_ecb(data)
         if language not in MEV_LANGUAGE_MASKS:
@@ -1546,6 +1706,8 @@ def parser():
     common(t, 180)
     p = sub.add_parser("probe", help="lab: the 2 MHz answer-encoding probe")
     common(p)
+    k = sub.add_parser("pk3-info", help="read-only: describe Gen 3 Pokemon files (.pk3); no DUO needed")
+    k.add_argument("files", nargs="+", metavar="FILE")
     f = sub.add_parser("find-serial", help="read-only: search the cartridge in the DUO for the distributor serial")
     f.add_argument("--deep", action="store_true", help="read the cartridge into memory and find the accepted-serials list")
     return ap
@@ -1564,6 +1726,9 @@ def main(argv=None):
     args = ap.parse_args(argv)
     if not args.command:
         ap.print_help()
+        return
+    if args.command == "pk3-info":
+        pk3_info(args.files)
         return
     for name in ("serial", "keep_going"):
         if not hasattr(args, name):

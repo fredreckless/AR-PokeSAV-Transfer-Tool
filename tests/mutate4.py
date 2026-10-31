@@ -101,6 +101,10 @@ PC_MUTANTS = {
     "vpk0 one-sample distances (method 1) off by four": ("else (m << 2) - 8", "else (m << 2) - 4", "e-Card"),
     "Japanese Mystery Events get the English mask": ('MEV_LANGUAGE_MASKS = {"Japanese": 1 << 0,', 'MEV_LANGUAGE_MASKS = {"Japanese": 1 << 1,', "Mystery Event files"),
     "a card's trainer record cut four bytes short": ("EREADER_TRAINER_SIZE = 0xBC", "EREADER_TRAINER_SIZE = 0xB8", "e-Card scans"),
+    "pk3 blocks unshuffled with personality mod 23": ('form, plain, order = "the game\'s (encrypted)", decrypted, PK3_ORDERS[pid % 24]', 'form, plain, order = "the game\'s (encrypted)", decrypted, PK3_ORDERS[pid % 23]', "Pokemon files"),
+    "Hoenn species not reordered to the National Dex": ("        n = PK3_HOENN_TO_NATIONAL[internal - 277]", "        n = internal - 25", "Pokemon files"),
+    "PKHeX's decrypted .pk3 form never recognised": ('    if sum(struct.unpack("<24H", as_is)) & 0xFFFF == stored:', "    if False:", "Pokemon files"),
+    ".ect trainer pointer four bytes late": ('    out += bytes([MEV_ADDTRAINER]) + struct.pack("<I", start)', '    out += bytes([MEV_ADDTRAINER]) + struct.pack("<I", start + 4)', "e-Reader trainer files"),
     "known game table ignored": ("    known = KNOWN_SAVE_GAMES.get(info[\"code\"][:3])\n    if forced:", "    known = None\n    if forced:", "known games"),
 }
 
