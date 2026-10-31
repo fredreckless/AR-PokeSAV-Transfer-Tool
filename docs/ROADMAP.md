@@ -183,8 +183,9 @@ protocol, so a new GBA program.
    both PKHeX's decrypted form and the game's own. Of 3,344 files: 435 by trade (the Mystery
    Mew), about 2,700 by routes that wrote the save (multiboot cartridges such as Aura Mew, event
    machines such as PCNY's, GameCube discs), 167 never distributed, 17 unknown.
-2. **The user's decision** on the save-writing routes: the trade route, labelled as the nearest,
-   or the original multiboot route, which means our code writing saves.
+2. **Decided (31 October): the trade route for all.** Authentic for the Mystery Mew; for the
+   rest, labelled as the nearest route that leaves the game in charge. Never-distributed
+   Pokémon are offered the same way, marked as such. No multiboot save writer.
 3. A trade distributor in the Cable Club (the Mystery Mew's authentic route, and the nearest for
    the rest, if chosen): the e-Reader route's link layer, then the trade steps from `trade.c`.
    Whatever the game sends in return is kept as a `.pk3` and can be traded back.

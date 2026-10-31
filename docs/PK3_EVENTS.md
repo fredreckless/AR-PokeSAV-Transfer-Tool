@@ -27,7 +27,14 @@ released reached the games by a route that **wrote the save directly** - a multi
 machine that "injected" it, or GameCube software over the GameCube-GBA cable. About 150 files
 were never distributed at all.
 
-## What that means for the goal (the user's decision)
+## Decided (31 October): the trade route for all
+
+The user chose **a trade for every event**: authentic for the Mystery Mew, and for the rest the
+nearest route that leaves the game in charge of its own save, labelled as such whenever one is
+sent. The never-distributed Pokémon are offered the same way, marked as never distributed. The
+multiboot route (our code writing the save) is not being built.
+
+## What that meant for the goal (the choice as it was put)
 
 - **The Mystery Mew:** a trade distributor is its authentic route. The DUO plays the other player
   in the Cable Club and the game saves the Mew itself.

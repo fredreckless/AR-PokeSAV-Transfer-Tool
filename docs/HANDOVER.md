@@ -80,8 +80,8 @@ Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
   planted bug through once under load).
 - **Stage 9, step 1 done (31 October):** `pk3-info`, `.ect` trainers, and docs/PK3_EVENTS.md.
   Only the Mystery Mew was a trade; nearly every other released event wrote the save directly.
-  **The user decides** next: the trade route for all (labelled as the nearest), or the original
-  multiboot route (our code writing saves). Don't build either before that.
+  **Decided (31 October): the trade route for all** (labelled as the nearest where it isn't the
+  original). No multiboot save writer. Next: the trade distributor (Stage 9, step 3).
 - **For the user to decide:** the Berry Glitch Fixing Program cards are refused (an e-Reader
   program that writes the save itself), and so would be any card that turns on the clock reset
   (`enableresetrtc`; none of the gallery's does).
