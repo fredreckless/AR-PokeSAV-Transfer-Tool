@@ -224,7 +224,7 @@ PROGRAMS = {"adapter_detect": ADAPTER_DETECT}
 # Programs written in C (firmware/programs/<name>.c), built with clang + lld for the
 # ARM7TDMI (ARMv4T, Thumb), linked to run at PROGRAM_AT, variables included in the image.
 C_PROGRAMS = {"adapter": ("adapter.c", []), "adapter_lab": ("adapter.c", ["-DLAB"]),
-              "adapter_probe": ("adapter.c", ["-DPROBE"]), "ereader": ("ereader.c", [])}
+              "adapter_probe": ("adapter.c", ["-DPROBE"]), "ereader": ("ereader.c", []), "trade": ("trade.c", [])}
 CLANG_VERSION = "18.1"                       # the version the embedded copies were built with
 _HERE = os.path.dirname(os.path.abspath(__file__))
 

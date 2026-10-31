@@ -1703,6 +1703,99 @@ def _():
     assert ME.run(bytes(damaged))[:2] == (ME.LOAD_ERROR, False)
 
 
+import trade_game_model as TG
+
+TRADE_EVENT = None
+
+
+def trade_run(master=True, accept=True, event=None, game_species=(25, 151, 280), pick=1, seconds=240):
+    """The DUO's trade program against a simulated Ruby in the Trade Center (docs/TRADE.md)."""
+    event = event or test_pk3(species=409, pid=0x0BADCAFE, otid=0x00004E44)
+    party = [W.pk3_party_form(test_pk3(species=sp, pid=0x1000 + sp, otid=0x2222)) for sp in game_species]
+    game = TG.RubyTrade(master=master, party=party, pick=pick, accept=accept)
+    hw, duo = run42()
+    hw.attach_mp_game(game.run(), game_master=game.master)
+    path = event_file(event, "385 - JIRACHI - TEST.pk3")
+    r = quiet(W.trade_session, duo, types.SimpleNamespace(pk3=path, seconds=seconds), poll_s=0.2,
+              stop_when=lambda: hw.lg_done)
+    hw.text = r[1]
+    assert duo.hello() == 0x104
+    hw.stop(); clean(hw)                              # nothing written to any cartridge
+    return hw, game, r[0], event, path
+
+
+def kept_files(path):
+    folder = os.path.join(os.path.dirname(path), "received")
+    return [open(os.path.join(folder, f), "rb").read() for f in sorted(os.listdir(folder))] if os.path.isdir(folder) else []
+
+
+@test("trade, the game as master (the cable as fitted): the DUO walks to its seat, the parties swap, the game receives the event Pokemon exactly and saves; the DUO keeps what it was given as a .pk3; no National Dex")
+def _():
+    hw, game, report, event, path = trade_run(master=True)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.log, hw.text[-800:])
+    res = game.result
+    assert res["received"] == W.pk3_party_form(event), "the game didn't receive the event Pokemon exactly"
+    assert res["saved"] and not res["national_dex_enabled"] and res["partner_seat"] == (7, 5), res
+    assert len(res["partner_party"]) == 1 and res["partner_pick"] == 0
+    assert report["traded"] and report["bad_checksums"] == 0 and report["barriers"] == 3, report
+    assert kept_files(path) == [res["gave"]], "the .pk3 kept isn't what the game gave"
+    assert W.parse_pk3(res["gave"])[0]["name"] == "MEW"
+    for line in ("the DUO is player 1", "walking to the table", "swapping parties", "traded and saved", "You gave: #151 MEW", "Kept on this PC"):
+        assert line in hw.text, (line, hw.text[-1500:])
+
+
+@test("trade, the DUO as master: it asks for the blocks itself (spaced so the game has filled each), and the game still receives the event Pokemon and saves")
+def _():
+    hw, game, report, event, path = trade_run(master=False)
+    assert hw.lg_error is None and hw.lg_done, (repr(hw.lg_error), game.log, hw.text[-800:])
+    res = game.result
+    assert res["received"] == W.pk3_party_form(event) and res["saved"] and res["partner_seat"] == (4, 5), res
+    assert report["traded"] and report["bad_checksums"] == 0, report
+    assert kept_files(path) == [res["gave"]], "the DUO's copy of the game's party was stale"
+    assert "the DUO is player 0" in hw.text
+
+
+@test("trade: the player says no - no trade, the DUO chooses CANCEL with the player and the link closes; nothing is kept")
+def _():
+    for master in (True, False):
+        hw, game, report, event, path = trade_run(master=master, accept=False)
+        assert hw.lg_error is None and hw.lg_done, (master, repr(hw.lg_error), game.log, hw.text[-800:])
+        assert "declined" in game.log and game.result["received"] is None and not game.result["saved"]
+        assert not report["traded"] and kept_files(path) == [] and "without a trade" in hw.text, hw.text[-400:]
+
+
+@test("party form: level, HP and stats worked out as the games do (base stats, growth rate, IVs, EVs, nature; Shedinja's 1 HP); a party file's own stats are kept; a damaged Pokemon isn't sent")
+def _():
+    def fields(**kw):
+        return struct.unpack("<IBBHHHHHHH", W.pk3_party_fields(W.parse_pk3(test_pk3(**kw))[0]))
+    # Pikachu (internal 25: 35/55/30/90/50/40, medium fast), level 50 (125,000 exp), IVs 31, EVs 0
+    def pikachu(pid):
+        d = bytearray(test_pk3(species=25, pid=pid))
+        f = W.parse_pk3(bytes(d))[0]
+        f["exp"], f["ivs"], f["evs"] = 125000, [31] * 6, [0] * 6
+        return struct.unpack("<IBBHHHHHHH", W.pk3_party_fields(f))
+    assert pikachu(25 * 4)[1:] == (50, 0xFF, 110, 110, 75, 50, 110, 70, 60), pikachu(100)   # Hardy: neutral
+    assert pikachu(25 * 4 + 1)[5:7] == (82, 45), pikachu(101)                              # Lonely: +Atk, -Def
+    assert W.pk3_exp_for_level(0, 1) == 1 and W.pk3_exp_for_level(3, 2) == 9 and W.pk3_exp_for_level(5, 100) == 1250000
+    sh = W.parse_pk3(test_pk3(species=303))[0]; sh["exp"] = 1000
+    assert struct.unpack("<IBBHHHHHHH", W.pk3_party_fields(sh))[3:5] == (1, 1)            # Shedinja
+    assert fields(species=409)[1] >= 1
+    # a 100-byte file with its own party fields keeps them
+    own = bytearray(test_pk3(party=True)); own[84:100] = bytes(range(1, 17))
+    assert W.pk3_party_form(bytes(own))[80:] == bytes(own[80:])
+    # the game's form: decrypts back to the same Pokemon, with the worked-out party fields after it
+    form = W.pk3_party_form(test_pk3())
+    assert W.parse_pk3(form[:80])[0]["species"] == 409
+    assert form[80:] == W.pk3_party_fields(W.parse_pk3(test_pk3())[0]) and form[84] >= 1 and form[88] > 0
+    # a damaged Pokemon: refused before anything is sent
+    bad = bytearray(test_pk3()); bad[0x30] ^= 2
+    try:
+        quiet(W.trade_session, None, types.SimpleNamespace(pk3=event_file(bytes(bad), "x.pk3"), seconds=1))
+        raise AssertionError("a damaged Pokemon was sent")
+    except ValueError:
+        pass
+
+
 @test("e-Reader: Ruby as master (purple plug) - handshake, link players, the event arrives intact, the link closes")
 def _():
     game = LG.RubyMysteryEvent(master=True)

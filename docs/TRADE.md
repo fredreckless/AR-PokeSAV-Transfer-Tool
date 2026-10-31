@@ -1,4 +1,8 @@
-# The Cable Club trade, as the DUO will play it (Stage 9, step 3)
+# The Cable Club trade, as the DUO plays it (Stage 9, step 3)
+
+**Status (31 October 2026): working in the simulator, both cable roles; hardware next.**
+`python duo_events.py trade --pk3 FILE` runs `firmware/programs/trade.c` against the game. The model
+of the game's side is `tests/trade_game_model.py`; four tests and nine planted bugs cover it.
 
 Decided on 31 October: every Gen 3 Pokémon goes by trade (docs/PK3_EVENTS.md). The DUO's GBA
 plays the second player in a Pokémon Center's Cable Club **Trade Center**, over the GBA link
@@ -91,11 +95,27 @@ can't receive yet (FireRed/LeafGreen need the National Dex for non-Kanto Pokémo
 nickname fix-up, and more. The tool should know them and say so before a trade, not leave it to
 fail.
 
-## Plan
+## What was built
 
-1. A model of the game's side, from the decomp: the room's lockstep (enough to walk and sit), the
-   trade screen's link, parties, menu, trade and save barriers (`tests/trade_game_model.py`).
-2. The DUO program: `ereader.c`'s link layer grown into a trade program, or a new `trade.c`.
-3. `duo_events.py trade --pk3 FILE`: builds the party, runs the program, follows each stage, saves
-   what comes back.
-4. Tests and planted bugs throughout; then hardware with English Ruby, on the cable as fitted.
+- **`trade.c`** (7.4 KB with its buffers): ereader.c's link engine, then the room's walk and key
+  22, block requests answered (and, as master, made 40 then 12 frames apart so the game has filled
+  its buffer), the menu messages, 0xABCD/0xDCBA, barriers answered, the link closes. After the
+  trade it swaps its own copy too, so the parties exchanged on the way out are right. It never
+  sends lp_field_2 = 0x8000.
+- **The tool:** checks the `.pk3`, builds the party form (game-encrypted box data plus the party
+  fields; see below), names the partner after the Pokémon's own trainer, follows each stage, and
+  keeps what the game gave as `received/<date> <species>.pk3` beside the event file.
+- **Party fields.** Ruby keeps the level, HP and stats exactly as sent, so the tool works them out
+  as `pokemon.c` does (base stats and growth rate from pokeemerald's `species_info.h`, the
+  experience tables, IVs, EVs, nature). Against the gallery's 48 released party files that carry
+  stats, all match; 5 unreleased debug ones differ by a point or two, as the games only refresh
+  stats at a level-up. A file that carries its own stats keeps them.
+- **The model** plays Ruby through all four links, in either role, and refuses what Ruby would:
+  wrong link types, a party with gaps, a Pokémon failing its checksum or with no level or HP, a
+  partner that never sits down or never answers a barrier.
+
+## Still to check on hardware
+
+- The walk's timing (40 frames after the room's first key, then a step every 20 frames).
+- That nothing else happens between the attendant and the room that needs an answer.
+- Emerald and FireRed/LeafGreen: their own trade code (not yet read).

@@ -105,6 +105,7 @@ PC_MUTANTS = {
     "Hoenn species not reordered to the National Dex": ("        n = PK3_HOENN_TO_NATIONAL[internal - 277]", "        n = internal - 25", "Pokemon files"),
     "PKHeX's decrypted .pk3 form never recognised": ('    if sum(struct.unpack("<24H", as_is)) & 0xFFFF == stored:', "    if False:", "Pokemon files"),
     ".ect trainer pointer four bytes late": ('    out += bytes([MEV_ADDTRAINER]) + struct.pack("<I", start)', '    out += bytes([MEV_ADDTRAINER]) + struct.pack("<I", start + 4)', "e-Reader trainer files"),
+    "party stats left empty in a traded Pokemon": ("    return box + pk3_party_fields(f)", "    return box + bytes(20)", "party form"),
     "known game table ignored": ("    known = KNOWN_SAVE_GAMES.get(info[\"code\"][:3])\n    if forced:", "    known = None\n    if forced:", "known games"),
 }
 
@@ -136,16 +137,16 @@ def run(kind, name):
                            capture_output=True, text=True, env=dict(os.environ, PYTHONPATH=paths.FIRMWARE))
         assert r.returncode == 0, r.stderr[-800:]
         env = dict(os.environ, V3_FW=os.path.join(work, "fw_mut.bin"))
-    elif kind in ("prog", "ereader"):
-        old, new, pick = (PROG_MUTANTS if kind == "prog" else EREADER_MUTANTS)[name]
+    elif kind in ("prog", "ereader", "trade"):
+        old, new, pick = KINDS[kind][name]
         sys.path.insert(0, paths.FIRMWARE)
         import programs
-        src_name = "adapter.c" if kind == "prog" else "ereader.c"
+        src_name = {"prog": "adapter.c", "ereader": "ereader.c", "trade": "trade.c"}[kind]
         src_path = os.path.join(paths.FIRMWARE, "programs", src_name)
         good_src = open(src_path).read()
         assert good_src.count(old) == 1, name
         # the everyday and the lab build share adapter.c
-        builds = ("adapter", "adapter_lab") if kind == "prog" else ("ereader",)
+        builds = {"prog": ("adapter", "adapter_lab"), "ereader": ("ereader",), "trade": ("trade",)}[kind]
         with BUILD_LOCK:
             good = {b: programs.build(b).hex() for b in builds}
         os.makedirs(os.path.join(work, "programs"))
@@ -209,7 +210,18 @@ def run(kind, name):
     return caught
 
 
-KINDS = {"fw": FW_MUTANTS, "fw42": FW42_MUTANTS, "prog": PROG_MUTANTS, "ereader": EREADER_MUTANTS, "pc": PC_MUTANTS}
+TRADE_MUTANTS = {    # firmware/programs/trade.c: the Cable Club trade partner
+    "trade: player 1 walks left at the table, away from its seat": ("walk1[4] = { 19, 19, 21, 19 }", "walk1[4] = { 19, 19, 20, 19 }", "trade, the game as master"),
+    "trade: our link player turns the game's National Dex on": ("lp[0] = game_player[16]; lp[1] = game_player[17];", "lp[0] = game_player[16]; lp[1] = game_player[17]; lp[3] = 0x80;", "trade, the game as master"),
+    "trade: every block request answered with the first two Pokemon": ("u32 k = requests_answered < 3 ? requests_answered : 2;", "u32 k = 0;", "trade, the game as master"),
+    "trade: the save's ready barriers never answered": ('queue(0x2FFE, 0, 0);                                     /* "ready": we are */', ";", "trade, the game as master"),
+    "trade: as slave, says no instead of yes": ("send_msg(0xBBBB, 0);", "send_msg(0xBBCC, 0);", "trade, the game as master"),
+    "trade: as master, asks for the next block at once": ("++req_timer > (req_sent ? 12 : 40)", "++req_timer > 0", "trade, the DUO as master"),
+    "trade: as master, never says the trade can go ahead": ("send_msg(0xCCDD, 0); state = ST_AGREED;", "send_msg(0xDDEE, 0); state = ST_AGREED;", "trade, the DUO as master"),
+}
+
+KINDS = {"fw": FW_MUTANTS, "fw42": FW42_MUTANTS, "prog": PROG_MUTANTS, "ereader": EREADER_MUTANTS, "trade": TRADE_MUTANTS,
+         "pc": PC_MUTANTS}
 
 
 def runnable_kinds():

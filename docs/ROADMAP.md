@@ -186,10 +186,9 @@ protocol, so a new GBA program.
 2. **Decided (31 October): the trade route for all.** Authentic for the Mystery Mew; for the
    rest, labelled as the nearest route that leaves the game in charge. Never-distributed
    Pokémon are offered the same way, marked as such. No multiboot save writer.
-3. **Next: the trade distributor** (docs/TRADE.md has the protocol, read from pokeruby).
-   A trade distributor in the Cable Club (the Mystery Mew's authentic route, and the nearest for
-   the rest, if chosen): the e-Reader route's link layer, then the trade steps from `trade.c`.
-   Whatever the game sends in return is kept as a `.pk3` and can be traded back.
+3. **The trade distributor: working in the simulator (31 October 2026)**, both cable roles
+   (docs/TRADE.md). `duo_events.py trade --pk3 FILE`; Ruby/Sapphire first. **Next: a hardware
+   run** with English Ruby, offering a spare Pokémon; then Emerald and FireRed/LeafGreen.
 
 ## Tidying done on 30 October
 

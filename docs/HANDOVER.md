@@ -81,7 +81,12 @@ Lab notes: `lab/sessions/sessionNN/README.md`; index in `lab/README.md`.
 - **Stage 9, step 1 done (31 October):** `pk3-info`, `.ect` trainers, and docs/PK3_EVENTS.md.
   Only the Mystery Mew was a trade; nearly every other released event wrote the save directly.
   **Decided (31 October): the trade route for all** (labelled as the nearest where it isn't the
-  original). No multiboot save writer. Next: the trade distributor (Stage 9, step 3).
+  original). No multiboot save writer.
+- **The trade distributor works in the simulator (31 October):** `trade --pk3 FILE`, program
+  `trade.c`, model `tests/trade_game_model.py`, docs/TRADE.md. **Next: a hardware run** with English
+  Ruby on the GBA cable as fitted: back up the save, go to a Pokémon Center's Cable Club (2nd floor),
+  TRADE CENTER, sit at the table, offer a spare Pokémon. Whatever Ruby gives is kept in
+  `received\` beside the event file.
 - **For the user to decide:** the Berry Glitch Fixing Program cards are refused (an e-Reader
   program that writes the save itself), and so would be any card that turns on the clock reset
   (`enableresetrtc`; none of the gallery's does).

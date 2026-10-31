@@ -157,6 +157,7 @@ python duo_events.py event --event "YOUR BERRY.ecb"     (an e-Reader Enigma Berr
 python duo_events.py event --event "YOUR CARD.raw"      (an e-Card scan, sent as the e-Reader sent it)
 python duo_events.py event --event "YOUR TRAINER.ect"   (a saved e-Reader trainer)
 python duo_events.py pk3-info FILE.pk3 ...              (describe Gen 3 Pokémon files; no DUO needed)
+python duo_events.py trade --pk3 FILE.pk3              (trade the game a Pokémon in the Cable Club)
 python duo_events.py event                      (a dry run: link players only)
 ```
 
